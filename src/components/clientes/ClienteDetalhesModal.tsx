@@ -6,7 +6,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Phone, Heart, Users, ThumbsUp, Star, Calendar } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Phone, Heart, Users, ThumbsUp, Star, Calendar, User } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -32,7 +33,13 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="items-center text-center">
+          <Avatar className="h-24 w-24 mb-4">
+            <AvatarImage src={cliente.avatar_url || undefined} />
+            <AvatarFallback>
+              <User className="h-12 w-12 text-gray-400" />
+            </AvatarFallback>
+          </Avatar>
           <DialogTitle className="text-2xl">{cliente.nome}</DialogTitle>
           <DialogDescription>
             Cliente desde {format(new Date(cliente.cliente_desde), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}

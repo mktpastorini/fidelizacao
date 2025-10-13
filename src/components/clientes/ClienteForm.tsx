@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Trash2 } from "lucide-react";
 import { Cliente, Filho } from "@/types/supabase";
 
@@ -21,6 +22,7 @@ const formSchema = z.object({
   whatsapp: z.string().optional(),
   gostos: z.string().optional(),
   indicacoes: z.coerce.number().int().nonnegative().optional(),
+  avatar_url: z.string().nullable().optional(),
   filhos: z.array(
     z.object({
       nome: z.string().min(1, { message: "Nome do filho é obrigatório." }),
@@ -44,6 +46,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues }: ClienteFo
       whatsapp: defaultValues?.whatsapp || "",
       gostos: defaultValues?.gostos ? JSON.stringify(defaultValues.gostos, null, 2) : "",
       indicacoes: defaultValues?.indicacoes || 0,
+      avatar_url: defaultValues?.avatar_url || null,
       filhos: defaultValues?.filhos || [],
     },
   });
@@ -56,6 +59,23 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues }: ClienteFo
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="avatar_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Foto do Cliente</FormLabel>
+              <FormControl>
+                <ImageUpload
+                  bucket="client_avatars"
+                  url={field.value}
+                  onUpload={(url) => field.onChange(url)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="nome"

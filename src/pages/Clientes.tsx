@@ -97,11 +97,12 @@ export default function ClientesPage() {
         throw new Error("Formato de 'Gostos' inválido. Use JSON.");
       }
 
-      const { data: clienteData, error: clienteError } = await supabase.from("clientes").insert([{ ...newCliente, user_id: userId }]).select().single();
+      const { filhos, ...clienteDataToInsert } = newCliente;
+      const { data: clienteData, error: clienteError } = await supabase.from("clientes").insert([{ ...clienteDataToInsert, gostos, user_id: userId }]).select().single();
       if (clienteError) throw new Error(clienteError.message);
 
-      if (newCliente.filhos && newCliente.filhos.length > 0) {
-        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: clienteData.id, user_id: userId }));
+      if (filhos && filhos.length > 0) {
+        const filhosData = filhos.map((filho: any) => ({ ...filho, cliente_id: clienteData.id, user_id: userId }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
         if (filhosError) throw new Error(filhosError.message);
       }

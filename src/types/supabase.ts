@@ -12,6 +12,7 @@ export type Cliente = {
   gostos: Record<string, any> | null;
   indicacoes: number;
   whatsapp: string | null;
+  avatar_url: string | null;
   filhos: Filho[];
   created_at: string;
 };
