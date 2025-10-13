@@ -23,3 +23,11 @@ export type Mesa = {
   cliente_id: string | null;
   created_at: string;
 };
+
+export type MessageTemplate = {
+  id: string;
+  nome: string;
+  conteudo: string;
+  tipo: 'chegada' | 'pagamento' | 'geral';
+  created_at: string;
+};
