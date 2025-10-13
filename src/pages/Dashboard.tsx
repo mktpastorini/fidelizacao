@@ -203,7 +203,7 @@ export default function Dashboard() {
         <Skeleton className="h-10 w-1/4" />
         <Skeleton className="h-6 w-1/2" />
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-          {[...Array(5)].map(i => <Skeleton key={i} className="h-24" />)}
+          {[...Array(5)].map((_, i) => <Skeleton key={`stat-skeleton-${i}`} className="h-24" />)}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 space-y-6">
