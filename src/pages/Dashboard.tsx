@@ -54,7 +54,6 @@ export default function Dashboard() {
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
   const [lastArrivedClient, setLastArrivedClient] = useState<Cliente | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(true);
-  const [triggerScan, setTriggerScan] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboardData"],
@@ -124,12 +123,6 @@ export default function Dashboard() {
     },
     onError: (error: Error) => showError(error.message),
   });
-
-  const handleScanClick = () => {
-    setTriggerScan(true);
-    setIsRecognitionDialogOpen(true);
-    setTimeout(() => setTriggerScan(false), 500);
-  };
 
   const handleClientRecognized = (cliente: Cliente) => {
     const toastId = showLoading("Confirmando reconhecimento e enviando mensagem...");
@@ -216,7 +209,7 @@ export default function Dashboard() {
                 </div>
               )}
             </div>
-            <Button size="lg" className="w-full" onClick={handleScanClick} disabled={!isCameraActive}>
+            <Button size="lg" className="w-full" onClick={() => setIsRecognitionDialogOpen(true)} disabled={!isCameraActive}>
               <Camera className="w-5 h-5 mr-2" />
               Analisar Rosto
             </Button>
@@ -234,7 +227,6 @@ export default function Dashboard() {
         clientes={data?.clientes || []}
         onClientRecognized={handleClientRecognized}
         onNewClient={handleNewClient}
-        triggerScan={triggerScan}
       />
 
       <NewClientDialog

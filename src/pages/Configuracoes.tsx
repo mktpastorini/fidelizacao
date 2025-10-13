@@ -67,14 +67,14 @@ export default function ConfiguracoesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
       
-      // Garante que valores vazios sejam salvos como null
-      const settingsToUpdate = {
-        ...updatedSettings,
+      const settingsToUpsert = {
+        id: user.id,
+        webhook_url: updatedSettings.webhook_url || null,
         chegada_template_id: updatedSettings.chegada_template_id || null,
         pagamento_template_id: updatedSettings.pagamento_template_id || null,
       };
 
-      const { error } = await supabase.from("user_settings").update(settingsToUpdate).eq("id", user.id);
+      const { error } = await supabase.from("user_settings").upsert(settingsToUpsert);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
