@@ -136,8 +136,9 @@ export default function Dashboard() {
         showSuccess(`Mensagem de boas-vindas enviada para ${cliente.nome}!`);
         setIsArrivalModalOpen(true);
       },
-      onError: () => {
+      onError: (error: Error) => {
         dismissToast(toastId);
+        showError(`Falha no webhook: ${error.message}. Verifique suas configurações. Prosseguindo com a alocação...`);
         setIsArrivalModalOpen(true);
       }
     });
