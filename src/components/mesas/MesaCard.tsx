@@ -15,28 +15,31 @@ export function MesaCard({ mesa, onClick, children }: MesaCardProps) {
   return (
     <Card
       className={cn(
-        "transition-all",
-        isOcupada ? "bg-blue-50 border-blue-200" : "bg-white"
+        "shadow-lg transition-all hover:shadow-xl cursor-pointer",
+        isOcupada ? "border-t-4 border-blue-500" : "border-t-4 border-gray-200"
       )}
+      onClick={onClick}
     >
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span className="cursor-pointer" onClick={onClick}>Mesa {mesa.numero}</span>
+      <CardHeader className="flex flex-row items-start justify-between pb-2">
+        <div>
+          <CardTitle className="text-2xl font-bold">Mesa {mesa.numero}</CardTitle>
+          <CardDescription className="flex items-center gap-1 text-xs text-gray-500 pt-1">
+            <Users className="w-3 h-3" />
+            <span>Capacidade: {mesa.capacidade}</span>
+          </CardDescription>
+        </div>
+        <div onClick={(e) => e.stopPropagation()}>
           {children}
-        </CardTitle>
-        <CardDescription className="flex items-center gap-2 text-xs">
-          <Users className="w-3 h-3" />
-          <span>Capacidade: {mesa.capacidade}</span>
-        </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="cursor-pointer" onClick={onClick}>
+      <CardContent>
         {isOcupada ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-2">
             <User className="w-4 h-4 text-blue-600" />
             <span className="font-semibold text-blue-800">{mesa.cliente?.nome}</span>
           </div>
         ) : (
-          <p className="text-sm text-gray-500">Livre</p>
+          <p className="text-sm text-green-600 font-semibold pt-2">Livre</p>
         )}
       </CardContent>
     </Card>
