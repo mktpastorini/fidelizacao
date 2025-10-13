@@ -11,23 +11,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { ClienteForm } from "@/components/clientes/ClienteForm";
-import { PlusCircle, MoreHorizontal, Trash2, Edit, Search } from "lucide-react";
+import { ClienteCard } from "@/components/clientes/ClienteCard";
+import { ClienteDetalhesModal } from "@/components/clientes/ClienteDetalhesModal";
+import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
-import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
@@ -51,8 +49,11 @@ async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
 
 export default function ClientesPage() {
   const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isDetalhesOpen, setIsDetalhesOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
 
@@ -60,10 +61,7 @@ export default function ClientesPage() {
     const timerId = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
     }, 300);
-
-    return () => {
-      clearTimeout(timerId);
-    };
+    return () => clearTimeout(timerId);
   }, [searchTerm]);
 
   const { data: clientes, isLoading, isError } = useQuery({
@@ -71,11 +69,19 @@ export default function ClientesPage() {
     queryFn: () => fetchClientes(debouncedSearchTerm),
   });
 
-  const handleDialogChange = (isOpen: boolean) => {
-    if (!isOpen) {
-      setEditingCliente(null);
-    }
-    setIsDialogOpen(isOpen);
+  const handleFormOpen = (cliente: Cliente | null = null) => {
+    setEditingCliente(cliente);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setEditingCliente(null);
+    setIsFormOpen(false);
+  };
+
+  const handleDetalhesOpen = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setIsDetalhesOpen(true);
   };
 
   const addClienteMutation = useMutation({
@@ -86,36 +92,16 @@ export default function ClientesPage() {
 
       let gostos = null;
       try {
-        if (newCliente.gostos) {
-          gostos = JSON.parse(newCliente.gostos);
-        }
+        if (newCliente.gostos) gostos = JSON.parse(newCliente.gostos);
       } catch (e) {
         throw new Error("Formato de 'Gostos' inválido. Use JSON.");
       }
 
-      const { data: clienteData, error: clienteError } = await supabase
-        .from("clientes")
-        .insert([
-          {
-            nome: newCliente.nome,
-            casado_com: newCliente.casado_com,
-            whatsapp: newCliente.whatsapp,
-            gostos: gostos,
-            indicacoes: newCliente.indicacoes,
-            user_id: userId,
-          },
-        ])
-        .select()
-        .single();
-
+      const { data: clienteData, error: clienteError } = await supabase.from("clientes").insert([{ ...newCliente, user_id: userId }]).select().single();
       if (clienteError) throw new Error(clienteError.message);
 
       if (newCliente.filhos && newCliente.filhos.length > 0) {
-        const filhosData = newCliente.filhos.map((filho: any) => ({
-          ...filho,
-          cliente_id: clienteData.id,
-          user_id: userId,
-        }));
+        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: clienteData.id, user_id: userId }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
         if (filhosError) throw new Error(filhosError.message);
       }
@@ -123,11 +109,9 @@ export default function ClientesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Cliente adicionado com sucesso!");
-      handleDialogChange(false);
+      handleFormClose();
     },
-    onError: (error: Error) => {
-      showError(error.message);
-    },
+    onError: (error: Error) => showError(error.message),
   });
 
   const editClienteMutation = useMutation({
@@ -139,29 +123,18 @@ export default function ClientesPage() {
 
       let gostos = null;
       try {
-        if (clienteInfo.gostos) {
-          gostos = JSON.parse(clienteInfo.gostos);
-        }
+        if (clienteInfo.gostos) gostos = JSON.parse(clienteInfo.gostos);
       } catch (e) {
         throw new Error("Formato de 'Gostos' inválido. Use JSON.");
       }
 
-      const { error: clienteError } = await supabase
-        .from("clientes")
-        .update({ ...clienteInfo, gostos })
-        .eq("id", id);
+      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo, gostos }).eq("id", id);
       if (clienteError) throw new Error(clienteError.message);
 
-      const { error: deleteFilhosError } = await supabase.from("filhos").delete().eq("cliente_id", id);
-      if (deleteFilhosError) throw new Error(deleteFilhosError.message);
+      await supabase.from("filhos").delete().eq("cliente_id", id);
 
       if (filhos && filhos.length > 0) {
-        const filhosData = filhos.map((filho: any) => ({
-          nome: filho.nome,
-          idade: filho.idade,
-          cliente_id: id,
-          user_id: userId,
-        }));
+        const filhosData = filhos.map((filho: any) => ({ nome: filho.nome, idade: filho.idade, cliente_id: id, user_id: userId }));
         const { error: insertFilhosError } = await supabase.from("filhos").insert(filhosData);
         if (insertFilhosError) throw new Error(insertFilhosError.message);
       }
@@ -169,11 +142,9 @@ export default function ClientesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Cliente atualizado com sucesso!");
-      handleDialogChange(false);
+      handleFormClose();
     },
-    onError: (error: Error) => {
-      showError(error.message);
-    },
+    onError: (error: Error) => showError(error.message),
   });
 
   const deleteClienteMutation = useMutation({
@@ -184,10 +155,9 @@ export default function ClientesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Cliente excluído com sucesso!");
+      setClienteToDelete(null);
     },
-    onError: (error: Error) => {
-      showError(error.message);
-    },
+    onError: (error: Error) => showError(error.message),
   });
 
   const handleSubmit = (values: any) => {
@@ -202,113 +172,61 @@ export default function ClientesPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Clientes</h1>
-        <p className="text-gray-600 mt-2">
-          Gerencie as informações dos seus clientes aqui.
-        </p>
+        <p className="text-gray-600 mt-2">Gerencie as informações dos seus clientes aqui.</p>
       </div>
 
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Buscar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Adicionar Cliente
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
-            </DialogHeader>
-            <ClienteForm
-              onSubmit={handleSubmit}
-              isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending}
-              defaultValues={editingCliente || undefined}
-            />
-          </DialogContent>
-        </Dialog>
+        <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cliente</Button>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        {isLoading ? (
-          <p>Carregando clientes...</p>
-        ) : isError ? (
-          <p className="text-red-500">Erro ao carregar clientes.</p>
-        ) : clientes && clientes.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Cliente Desde</TableHead>
-                <TableHead>Indicações</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clientes.map((cliente) => (
-                <TableRow key={cliente.id}>
-                  <TableCell>{cliente.nome}</TableCell>
-                  <TableCell>{cliente.whatsapp || "-"}</TableCell>
-                  <TableCell>
-                    {format(new Date(cliente.cliente_desde), "dd/MM/yyyy")}
-                  </TableCell>
-                  <TableCell>{cliente.indicacoes}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditingCliente(cliente);
-                            setIsDialogOpen(true);
-                          }}
-                        >
-                          <Edit className="w-4 h-4 mr-2" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-red-500"
-                          onClick={() => deleteClienteMutation.mutate(cliente.id)}
-                          disabled={deleteClienteMutation.isPending}
-                        >
-                          <Trash2 className="w-4 h-4 mr-2" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500">
-              {debouncedSearchTerm
-                ? `Nenhum cliente encontrado para "${debouncedSearchTerm}".`
-                : "Nenhum cliente cadastrado ainda."}
-            </p>
-            {!debouncedSearchTerm && (
-              <p className="text-gray-500">
-                Clique em "Adicionar Cliente" para começar.
-              </p>
-            )}
-          </div>
-        )}
-      </div>
+      {isLoading ? <p>Carregando clientes...</p> : isError ? <p className="text-red-500">Erro ao carregar clientes.</p> : clientes && clientes.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {clientes.map((cliente) => (
+            <ClienteCard
+              key={cliente.id}
+              cliente={cliente}
+              onView={() => handleDetalhesOpen(cliente)}
+              onEdit={() => handleFormOpen(cliente)}
+              onDelete={() => setClienteToDelete(cliente)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <p className="text-gray-500">{debouncedSearchTerm ? `Nenhum cliente encontrado para "${debouncedSearchTerm}".` : "Nenhum cliente cadastrado ainda."}</p>
+          {!debouncedSearchTerm && <p className="text-gray-500">Clique em "Adicionar Cliente" para começar.</p>}
+        </div>
+      )}
+
+      <Dialog open={isFormOpen} onOpenChange={handleFormClose}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle></DialogHeader>
+          <ClienteForm onSubmit={handleSubmit} isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} defaultValues={editingCliente || undefined} />
+        </DialogContent>
+      </Dialog>
+
+      <ClienteDetalhesModal isOpen={isDetalhesOpen} onOpenChange={setIsDetalhesOpen} cliente={selectedCliente} />
+
+      {clienteToDelete && (
+        <AlertDialog open={!!clienteToDelete} onOpenChange={() => setClienteToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir {clienteToDelete.nome}? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setClienteToDelete(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteClienteMutation.mutate(clienteToDelete.id)}>Confirmar</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }
