@@ -39,3 +39,26 @@ export type Profile = {
   last_name: string | null;
   updated_at: string;
 };
+
+export type UserSettings = {
+  id: string;
+  webhook_url: string | null;
+};
+
+export type Pedido = {
+  id: string;
+  mesa_id: string | null;
+  cliente_id: string | null;
+  status: string;
+  created_at: string;
+  closed_at: string | null;
+  itens_pedido: ItemPedido[];
+};
+
+export type ItemPedido = {
+  id: string;
+  pedido_id: string;
+  nome_produto: string;
+  quantidade: number;
+  preco: number | null;
+};
