@@ -7,6 +7,7 @@ import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
+import Produtos from "./pages/Produtos";
 import Mensagens from "./pages/Mensagens";
 import Mesas from "./pages/Mesas";
 import Configuracoes from "./pages/Configuracoes";
@@ -27,6 +28,7 @@ const App = () => (
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
+              <Route path="/produtos" element={<Produtos />} />
               <Route path="/mensagens" element={<Mensagens />} />
               <Route path="/mesas" element={<Mesas />} />
               <Route path="/configuracoes" element={<Configuracoes />} />

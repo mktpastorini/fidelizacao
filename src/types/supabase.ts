@@ -64,3 +64,11 @@ export type ItemPedido = {
   quantidade: number;
   preco: number | null;
 };
+
+export type Produto = {
+  id: string;
+  nome: string;
+  preco: number;
+  descricao: string | null;
+  created_at: string;
+};
