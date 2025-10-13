@@ -20,12 +20,15 @@ function pemToBinary(pem: string) {
 }
 
 async function getGoogleAuthToken() {
+  console.log("Tentando obter o token de autenticação do Google...");
   const client_email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
   const private_key = Deno.env.get('GOOGLE_PRIVATE_KEY');
 
   if (!client_email || !private_key) {
+    console.error("ERRO: Secrets 'GOOGLE_CLIENT_EMAIL' ou 'GOOGLE_PRIVATE_KEY' não encontrados.");
     throw new Error("Os secrets GOOGLE_CLIENT_EMAIL e GOOGLE_PRIVATE_KEY devem estar configurados.");
   }
+  console.log("Secrets encontrados. Prosseguindo com a criação do token.");
 
   const scope = "https://www.googleapis.com/auth/cloud-vision";
   const aud = "https://oauth2.googleapis.com/token";
@@ -37,6 +40,7 @@ async function getGoogleAuthToken() {
     true,
     ["sign"]
   );
+  console.log("Chave privada importada com sucesso.");
 
   const jwt = await create(
     { alg: "RS256", typ: "JWT" },
@@ -49,6 +53,7 @@ async function getGoogleAuthToken() {
     },
     cryptoKey
   );
+  console.log("JWT criado com sucesso.");
 
   const response = await fetch(aud, {
     method: "POST",
@@ -61,15 +66,24 @@ async function getGoogleAuthToken() {
 
   if (!response.ok) {
     const errorBody = await response.json();
+    console.error("Erro na resposta do Google OAuth:", errorBody);
     throw new Error(`Erro ao obter token de acesso do Google: ${errorBody.error_description}`);
   }
 
   const { access_token } = await response.json();
+  console.log("Token de acesso do Google obtido com sucesso.");
   return access_token;
 }
 
 
 serve(async (req) => {
+  console.log("--- INICIANDO TESTE DE CONEXÃO GOOGLE VISION ---");
+  const clientEmailExists = !!Deno.env.get('GOOGLE_CLIENT_EMAIL');
+  const privateKeyExists = !!Deno.env.get('GOOGLE_PRIVATE_KEY');
+  console.log("Verificando a existência de secrets...");
+  console.log("Secret 'GOOGLE_CLIENT_EMAIL' encontrado:", clientEmailExists);
+  console.log("Secret 'GOOGLE_PRIVATE_KEY' encontrado:", privateKeyExists);
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -77,6 +91,7 @@ serve(async (req) => {
   try {
     const accessToken = await getGoogleAuthToken();
     const testImageUrl = "https://storage.googleapis.com/cloud-samples-data/vision/face/face_no_surprise.jpg";
+    console.log("Enviando requisição para a API do Google Vision...");
 
     const response = await fetch(`https://vision.googleapis.com/v1/images:annotate`, {
       method: 'POST',
@@ -91,6 +106,7 @@ serve(async (req) => {
         }],
       }),
     });
+    console.log(`Resposta da API do Google: Status ${response.status}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -109,18 +125,21 @@ serve(async (req) => {
     const faceAnnotation = data.responses[0]?.faceAnnotations?.[0];
 
     if (!faceAnnotation) {
+      console.log("Conexão bem-sucedida, mas nenhum rosto detectado na imagem de teste.");
       return new Response(JSON.stringify({ success: true, message: "Conexão bem-sucedida, mas nenhum rosto detectado na imagem de teste." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
+    console.log("SUCESSO: Conexão com a Google Vision API funcionando perfeitamente!");
     return new Response(JSON.stringify({ success: true, message: "Conexão com a Google Vision API funcionando perfeitamente!" }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
+    console.error("ERRO CATCH FINAL:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
