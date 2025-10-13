@@ -17,6 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { showError, showSuccess } from "@/utils/toast";
 import { PlusCircle, Trash2, CreditCard } from "lucide-react";
+import { useMemo } from "react";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -57,6 +58,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     queryFn: () => fetchPedidoAberto(mesa!.id),
     enabled: !!mesa && isOpen,
   });
+
+  const totalPedido = useMemo(() => {
+    if (!pedido?.itens_pedido) return 0;
+    return pedido.itens_pedido.reduce((acc, item) => {
+      return acc + (item.preco || 0) * item.quantidade;
+    }, 0);
+  }, [pedido]);
 
   const addItemMutation = useMutation({
     mutationFn: async (novoItem: z.infer<typeof itemSchema>) => {
@@ -222,6 +230,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                 </Button>
               </form>
             </Form>
+          </div>
+        </div>
+        <div className="mt-6 pt-4 border-t">
+          <div className="flex justify-between items-center text-lg font-bold">
+            <span>Total do Pedido:</span>
+            <span>R$ {totalPedido.toFixed(2).replace('.', ',')}</span>
           </div>
         </div>
         <DialogFooter className="mt-4">
