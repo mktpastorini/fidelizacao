@@ -144,55 +144,48 @@ export default function Dashboard() {
 
       <RevenueChart />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Painel de Reconhecimento</CardTitle>
-            <CardDescription>Simule a chegada e o reconhecimento facial de um cliente.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Dialog open={isRecognitionDialogOpen} onOpenChange={setIsRecognitionDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="w-full">Simular Reconhecimento Facial</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Selecionar Cliente</DialogTitle>
-                </DialogHeader>
-                <Command>
-                  <CommandInput placeholder="Buscar cliente..." />
-                  <CommandList>
-                    <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {data?.clientes.map((cliente) => (
-                        <CommandItem key={cliente.id} onSelect={() => handleClientRecognized(cliente)}>
-                          {cliente.nome}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Último Cliente na Chegada</CardTitle>
-            <CardDescription>Informações do último cliente que foi reconhecido.</CardDescription>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle>Controle de Chegada</CardTitle>
+          <CardDescription>Simule o reconhecimento de clientes e veja o último a chegar.</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col md:flex-row items-center gap-6 p-6">
+          <Dialog open={isRecognitionDialogOpen} onOpenChange={setIsRecognitionDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="w-full md:w-auto">Simular Reconhecimento</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Selecionar Cliente</DialogTitle>
+              </DialogHeader>
+              <Command>
+                <CommandInput placeholder="Buscar cliente..." />
+                <CommandList>
+                  <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                  <CommandGroup>
+                    {data?.clientes.map((cliente) => (
+                      <CommandItem key={cliente.id} onSelect={() => handleClientRecognized(cliente)}>
+                        {cliente.nome}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </DialogContent>
+          </Dialog>
+          <div className="flex-1 p-4 border rounded-lg bg-gray-50/50 dark:bg-gray-900/50 w-full">
+            <h4 className="font-medium text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Último Cliente na Chegada</h4>
             {lastArrivedClient ? (
               <div>
-                <p className="font-semibold">{lastArrivedClient.nome}</p>
-                <p className="text-sm text-gray-500">{lastArrivedClient.whatsapp}</p>
+                <p className="font-semibold text-lg">{lastArrivedClient.nome}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{lastArrivedClient.whatsapp}</p>
               </div>
             ) : (
-              <p className="text-sm text-gray-500">Aguardando a chegada do primeiro cliente...</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Aguardando a chegada do primeiro cliente...</p>
             )}
-          </CardContent>
-        </Card>
-      </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <ClientArrivalModal
         isOpen={isArrivalModalOpen}
