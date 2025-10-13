@@ -31,3 +31,10 @@ export type MessageTemplate = {
   tipo: 'chegada' | 'pagamento' | 'geral';
   created_at: string;
 };
+
+export type Profile = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  updated_at: string;
+};
