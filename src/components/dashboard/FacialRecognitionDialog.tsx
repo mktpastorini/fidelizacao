@@ -23,23 +23,45 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, clientes, onClie
   const [snapshot, setSnapshot] = useState<string | null>(null);
 
   const handleScan = useCallback(() => {
-    const imageSrc = webcamRef.current?.getScreenshot();
+    // This is a placeholder for the actual screenshot logic
+    // In a real app, you might use webcamRef.current.getScreenshot()
+    // For now, we'll simulate a snapshot to trigger the UI flow
+    const imageSrc = "placeholder_snapshot"; // Simulate getting a snapshot
     if (imageSrc) {
       setSnapshot(imageSrc);
       setIsScanning(true);
       setTimeout(() => {
-        const clientWithFace = clientes.find(c => c.avatar_url);
-        setMatch(clientWithFace || null);
+        // Improved simulation: randomly pick a client with a photo
+        const clientsWithFaces = clientes.filter(c => c.avatar_url);
+        const randomMatch = clientsWithFaces.length > 0 
+          ? clientsWithFaces[Math.floor(Math.random() * clientsWithFaces.length)] 
+          : null;
+        setMatch(randomMatch);
         setIsScanning(false);
       }, 2000);
     }
-  }, [webcamRef, clientes]);
+  }, [clientes]);
 
   useEffect(() => {
     if (triggerScan && isOpen) {
-      handleScan();
+      // A small delay to ensure the webcam is ready before scanning
+      setTimeout(() => {
+        const imageSrc = webcamRef.current?.getScreenshot();
+        if (imageSrc) {
+          setSnapshot(imageSrc);
+          setIsScanning(true);
+          setTimeout(() => {
+            const clientsWithFaces = clientes.filter(c => c.avatar_url);
+            const randomMatch = clientsWithFaces.length > 0 
+              ? clientsWithFaces[Math.floor(Math.random() * clientsWithFaces.length)] 
+              : null;
+            setMatch(randomMatch);
+            setIsScanning(false);
+          }, 2000);
+        }
+      }, 100);
     }
-  }, [triggerScan, isOpen, handleScan]);
+  }, [triggerScan, isOpen, clientes]);
 
   const handleConfirm = () => {
     if (match) {
@@ -68,6 +90,13 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, clientes, onClie
           <DialogDescription>Aguarde enquanto identificamos o cliente.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
+          {/* This is a hidden webcam to capture the image */}
+          <Webcam
+            audio={false}
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            style={{ display: 'none' }}
+          />
           {snapshot && (
             <div className="text-center">
               <div className="flex items-center justify-center gap-4">
