@@ -58,14 +58,17 @@ export function TemplateSettingsForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Template de Chegada</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+              <Select
+                onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
+                defaultValue={field.value || ""}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um template para a chegada do cliente" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {chegadaTemplates.map(template => (
                     <SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>
                   ))}
@@ -84,14 +87,17 @@ export function TemplateSettingsForm({
           render={({ field }) => (
             <FormItem>
               <FormLabel>Template Pós-Pagamento</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+              <Select
+                onValueChange={(value) => field.onChange(value === 'none' ? null : value)}
+                defaultValue={field.value || ""}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um template para o pós-pagamento" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
+                  <SelectItem value="none">Nenhum</SelectItem>
                   {pagamentoTemplates.map(template => (
                     <SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>
                   ))}
