@@ -4,12 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Mesa } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ClientArrivalModal } from "@/components/dashboard/ClientArrivalModal";
+import { FacialRecognitionDialog } from "@/components/dashboard/FacialRecognitionDialog";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
-import { Users, Table, CheckCircle, DollarSign, ReceiptText } from "lucide-react";
+import { Users, Table, CheckCircle, DollarSign, ReceiptText, Camera } from "lucide-react";
 import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 
 type DashboardData = {
@@ -96,10 +95,9 @@ export default function Dashboard() {
   });
 
   const handleClientRecognized = (cliente: Cliente) => {
-    const toastId = showLoading("Reconhecendo cliente e enviando mensagem...");
+    const toastId = showLoading("Confirmando reconhecimento e enviando mensagem...");
     setRecognizedClient(cliente);
     setLastArrivedClient(cliente);
-    setIsRecognitionDialogOpen(false);
     
     sendWelcomeMessageMutation.mutate(cliente, {
       onSuccess: () => {
@@ -109,6 +107,7 @@ export default function Dashboard() {
       },
       onError: () => {
         dismissToast(toastId);
+        // Mesmo com erro no webhook, abrimos o modal de alocação
         setIsArrivalModalOpen(true);
       }
     });
@@ -147,45 +146,33 @@ export default function Dashboard() {
       <Card>
         <CardHeader>
           <CardTitle>Controle de Chegada</CardTitle>
-          <CardDescription>Simule o reconhecimento de clientes e veja o último a chegar.</CardDescription>
+          <CardDescription>Use a câmera para reconhecer clientes e iniciar o atendimento.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col md:flex-row items-center gap-6 p-6">
-          <Dialog open={isRecognitionDialogOpen} onOpenChange={setIsRecognitionDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="w-full md:w-auto">Simular Reconhecimento</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Selecionar Cliente</DialogTitle>
-              </DialogHeader>
-              <Command>
-                <CommandInput placeholder="Buscar cliente..." />
-                <CommandList>
-                  <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                  <CommandGroup>
-                    {data?.clientes.map((cliente) => (
-                      <CommandItem key={cliente.id} onSelect={() => handleClientRecognized(cliente)}>
-                        {cliente.nome}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </DialogContent>
-          </Dialog>
+          <Button size="lg" className="w-full md:w-auto" onClick={() => setIsRecognitionDialogOpen(true)}>
+            <Camera className="w-5 h-5 mr-2" />
+            Reconhecimento Facial
+          </Button>
           <div className="flex-1 p-4 border rounded-lg bg-gray-50/50 dark:bg-gray-900/50 w-full">
-            <h4 className="font-medium text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Último Cliente na Chegada</h4>
+            <h4 className="font-medium text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Último Cliente Reconhecido</h4>
             {lastArrivedClient ? (
               <div>
                 <p className="font-semibold text-lg">{lastArrivedClient.nome}</p>
                 <p className="text-sm text-gray-600 dark:text-gray-300">{lastArrivedClient.whatsapp}</p>
               </div>
             ) : (
-              <p className="text-sm text-gray-500 dark:text-gray-400">Aguardando a chegada do primeiro cliente...</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Aguardando reconhecimento...</p>
             )}
           </div>
         </CardContent>
       </Card>
+
+      <FacialRecognitionDialog
+        isOpen={isRecognitionDialogOpen}
+        onOpenChange={setIsRecognitionDialogOpen}
+        clientes={data?.clientes || []}
+        onClientRecognized={handleClientRecognized}
+      />
 
       <ClientArrivalModal
         isOpen={isArrivalModalOpen}
