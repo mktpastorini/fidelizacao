@@ -21,24 +21,26 @@ async function fetchUserData(): Promise<UserData> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { profile: null, settings: null, templates: [] };
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profiles, error: profileError } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id, first_name, last_name, updated_at")
     .eq("id", user.id)
-    .single();
-  if (profileError && profileError.code !== 'PGRST116') throw new Error(profileError.message);
+    .limit(1);
+  if (profileError) throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+  const profile = profiles?.[0] || null;
 
-  const { data: settings, error: settingsError } = await supabase
+  const { data: settingsList, error: settingsError } = await supabase
     .from("user_settings")
     .select("*")
     .eq("id", user.id)
-    .single();
-  if (settingsError && settingsError.code !== 'PGRST116') throw new Error(settingsError.message);
+    .limit(1);
+  if (settingsError) throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
+  const settings = settingsList?.[0] || null;
 
   const { data: templates, error: templatesError } = await supabase
     .from("message_templates")
     .select("*");
-  if (templatesError) throw new Error(templatesError.message);
+  if (templatesError) throw new Error(`Erro ao buscar templates: ${templatesError.message}`);
 
   return { profile, settings, templates: templates || [] };
 }
