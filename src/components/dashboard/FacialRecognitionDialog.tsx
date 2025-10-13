@@ -40,19 +40,13 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, clientes, onClie
         setIsScanning(true);
 
         const recognitionTimeout = setTimeout(() => {
-          // SIMULAÇÃO INTELIGENTE:
-          // 1. Encontra o cliente mais recente com foto (a lista já vem ordenada por data de criação).
-          const mostRecentClientWithFace = clientes.find(c => c.avatar_url);
+          // SIMULAÇÃO CONFIÁVEL:
+          // O sistema só reconhecerá um cliente com o nome exato "Dyad Test".
+          const testClient = clientes.find(
+            c => c.nome.toLowerCase() === 'dyad test' && c.avatar_url
+          );
           
-          // 2. Simula uma chance de sucesso. Vamos dar 70% de chance de reconhecer o cliente mais recente.
-          const shouldSucceed = Math.random() < 0.7;
-
-          let foundMatch = null;
-          if (mostRecentClientWithFace && shouldSucceed) {
-            foundMatch = mostRecentClientWithFace;
-          }
-          
-          setMatch(foundMatch);
+          setMatch(testClient || null);
           setIsScanning(false);
         }, 2000);
 
