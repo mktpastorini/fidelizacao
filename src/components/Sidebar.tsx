@@ -1,6 +1,8 @@
-import { NavLink } from "react-router-dom";
-import { Home, Users, MessageSquare, Settings, Table } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Home, Users, MessageSquare, Settings, Table, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
@@ -11,6 +13,13 @@ const navItems = [
 ];
 
 export function Sidebar() {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
   return (
     <aside className="w-64 bg-white dark:bg-gray-950 border-r border-gray-200 dark:border-gray-800 flex flex-col">
       <div className="p-4 border-b border-gray-200 dark:border-gray-800">
@@ -33,6 +42,12 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+        <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+          <LogOut className="w-5 h-5 mr-3" />
+          <span>Sair</span>
+        </Button>
+      </div>
     </aside>
   );
 }

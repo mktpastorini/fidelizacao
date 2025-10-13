@@ -4,11 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { AuthLayout } from "./components/AuthLayout";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import Mensagens from "./pages/Mensagens";
 import Mesas from "./pages/Mesas";
 import Configuracoes from "./pages/Configuracoes";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,12 +22,15 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/clientes" element={<Clientes />} />
-            <Route path="/mensagens" element={<Mensagens />} />
-            <Route path="/mesas" element={<Mesas />} />
-            <Route path="/configuracoes" element={<Configuracoes />} />
+          <Route path="/login" element={<Login />} />
+          <Route element={<AuthLayout />}>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/mensagens" element={<Mensagens />} />
+              <Route path="/mesas" element={<Mesas />} />
+              <Route path="/configuracoes" element={<Configuracoes />} />
+            </Route>
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
