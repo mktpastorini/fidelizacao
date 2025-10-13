@@ -7,12 +7,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Helper para converter a chave PEM para o formato que a API de Criptografia espera
 function pemToBinary(pem: string) {
   const base64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
-    .replace(/-----END PRIVATE KEY-----/g, "")
-    .replace(/\s/g, "");
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\n/g, ""); // Corrigido para remover apenas newlines
   const binary = atob(base64);
   const arr = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -21,7 +20,6 @@ function pemToBinary(pem: string) {
   return arr.buffer;
 }
 
-// Esta função gera um token de acesso OAuth2 usando as credenciais da Conta de Serviço
 async function getGoogleAuthToken() {
   const credsString = Deno.env.get('GOOGLE_CREDENTIALS_JSON');
   if (!credsString) {
