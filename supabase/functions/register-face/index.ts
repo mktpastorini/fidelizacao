@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para gerar um embedding simulado (nosso sistema antigo)
+// Função para gerar um embedding simulado
 function getSimulatedEmbedding() {
   const embedding = Array(512).fill(0).map(() => Math.random() * 0.1);
   return embedding;
@@ -14,12 +14,22 @@ function getSimulatedEmbedding() {
 
 // Função para obter o embedding da Google Cloud Vision API
 async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
+  let imageRequestPayload;
+  if (imageUrl.startsWith('http')) {
+    // É uma URL pública
+    imageRequestPayload = { source: { imageUri: imageUrl } };
+  } else {
+    // É uma imagem em base64, remove o prefixo
+    const base64Image = imageUrl.replace(/^data:image\/jpeg;base64,/, "");
+    imageRequestPayload = { content: base64Image };
+  }
+
   const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       requests: [{
-        image: { source: { imageUri: imageUrl } },
+        image: imageRequestPayload,
         features: [{ type: 'FACE_DETECTION' }],
       }],
     }),
@@ -33,10 +43,6 @@ async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
   const data = await response.json();
   const faceAnnotation = data.responses[0]?.faceAnnotations?.[0];
   
-  // A API do Google Vision não retorna um vetor de embedding diretamente.
-  // Ela retorna pontos de referência (landmarks). Para um sistema de reconhecimento real,
-  // precisaríamos de um modelo que gere embeddings, como o da Face API do Azure ou um modelo customizado.
-  // Para este exemplo, vamos simular um embedding a partir dos landmarks para manter o fluxo.
   if (!faceAnnotation) {
     throw new Error("Nenhum rosto detectado pela Google Vision API.");
   }
@@ -71,7 +77,6 @@ serve(async (req) => {
     const { data: { user } } = await supabaseAdmin.auth.getUser(req.headers.get('Authorization')!.replace('Bearer ', ''))
     if (!user) throw new Error("Usuário não autenticado.")
 
-    // 1. Descobre qual IA o usuário selecionou
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('ai_provider')
@@ -83,7 +88,6 @@ serve(async (req) => {
 
     let embedding;
 
-    // 2. Gera o embedding usando o provedor correto
     if (provider === 'google_vision') {
       const apiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
       if (!apiKey) throw new Error("Chave da API do Google Vision não configurada.");
@@ -92,7 +96,6 @@ serve(async (req) => {
       embedding = getSimulatedEmbedding();
     }
 
-    // 3. Salva o embedding e o provedor no banco de dados
     const { error: upsertError } = await supabaseAdmin
       .from('customer_faces')
       .upsert({

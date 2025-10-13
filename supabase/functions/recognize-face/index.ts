@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para gerar um embedding simulado (nosso sistema antigo)
+// Função para gerar um embedding simulado
 function getSimulatedEmbedding() {
   const embedding = Array(512).fill(0).map(() => Math.random() * 0.1);
   return embedding;
@@ -14,12 +14,22 @@ function getSimulatedEmbedding() {
 
 // Função para obter o embedding da Google Cloud Vision API
 async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
+  let imageRequestPayload;
+  if (imageUrl.startsWith('http')) {
+    // É uma URL pública
+    imageRequestPayload = { source: { imageUri: imageUrl } };
+  } else {
+    // É uma imagem em base64, remove o prefixo
+    const base64Image = imageUrl.replace(/^data:image\/jpeg;base64,/, "");
+    imageRequestPayload = { content: base64Image };
+  }
+
   const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       requests: [{
-        image: { source: { imageUri: imageUrl } },
+        image: imageRequestPayload,
         features: [{ type: 'FACE_DETECTION' }],
       }],
     }),
@@ -40,7 +50,7 @@ async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
   const landmarks = faceAnnotation.landmarks.map((l: any) => [l.position.x, l.position.y, l.position.z]).flat();
   const embedding = Array(512).fill(0);
   for(let i = 0; i < landmarks.length && i < 512; i++) {
-    embedding[i] = landmarks[i] / 1000.0;
+    embedding[i] = landmarks[i] / 1000.0; // Normaliza
   }
 
   return embedding;
