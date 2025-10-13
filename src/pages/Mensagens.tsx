@@ -28,6 +28,7 @@ import { MessageTemplateForm } from "@/components/mensagens/MessageTemplateForm"
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 async function fetchMessageTemplates(): Promise<MessageTemplate[]> {
   const { data, error } = await supabase
@@ -116,16 +117,16 @@ export default function MensagensPage() {
     }
   };
 
-  const getBadgeVariant = (type: string) => {
+  const getBadgeClassName = (type: string) => {
     switch (type) {
       case 'chegada':
-        return 'default';
+        return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
       case 'pagamento':
-        return 'secondary';
+        return 'bg-green-100 text-green-800 hover:bg-green-200';
       case 'geral':
-        return 'outline';
+        return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
       default:
-        return 'outline';
+        return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
   };
 
@@ -177,7 +178,7 @@ export default function MensagensPage() {
                 <TableRow key={template.id}>
                   <TableCell className="font-medium">{template.nome}</TableCell>
                   <TableCell>
-                    <Badge variant={getBadgeVariant(template.tipo)}>
+                    <Badge variant="outline" className={cn("border-transparent", getBadgeClassName(template.tipo))}>
                       {template.tipo.charAt(0).toUpperCase() + template.tipo.slice(1)}
                     </Badge>
                   </TableCell>
