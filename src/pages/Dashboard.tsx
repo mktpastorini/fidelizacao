@@ -11,6 +11,7 @@ import { FacialRecognitionDialog } from "@/components/dashboard/FacialRecognitio
 import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopClientsCard } from "@/components/dashboard/TopClientsCard";
+import { RecentArrivalsCard } from "@/components/dashboard/RecentArrivalsCard";
 import { Users, Table, CheckCircle, DollarSign, ReceiptText, Camera } from "lucide-react";
 import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 
@@ -93,6 +94,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["recentArrivals"] });
       showSuccess("Cliente alocado com sucesso!");
       onArrivalModalChange(false);
     },
@@ -240,6 +242,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <TopClientsCard />
+          <RecentArrivalsCard />
         </div>
 
         <div className="lg:col-span-2">
