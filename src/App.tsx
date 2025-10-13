@@ -10,6 +10,7 @@ import Clientes from "./pages/Clientes";
 import Produtos from "./pages/Produtos";
 import Mensagens from "./pages/Mensagens";
 import Mesas from "./pages/Mesas";
+import Historico from "./pages/Historico";
 import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -29,8 +30,9 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/clientes" element={<Clientes />} />
               <Route path="/produtos" element={<Produtos />} />
-              <Route path="/mensagens" element={<Mensagens />} />
               <Route path="/mesas" element={<Mesas />} />
+              <Route path="/historico" element={<Historico />} />
+              <Route path="/mensagens" element={<Mensagens />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
             </Route>
           </Route>

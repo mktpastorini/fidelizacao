@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Users, MessageSquare, Settings, Table, LogOut, ClipboardList } from "lucide-react";
+import { Home, Users, MessageSquare, Settings, Table, LogOut, ClipboardList, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,8 +8,9 @@ const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
   { to: "/clientes", icon: Users, label: "Clientes" },
   { to: "/produtos", icon: ClipboardList, label: "Produtos" },
-  { to: "/mensagens", icon: MessageSquare, label: "Mensagens" },
   { to: "/mesas", icon: Table, label: "Mesas" },
+  { to: "/historico", icon: History, label: "Histórico" },
+  { to: "/mensagens", icon: MessageSquare, label: "Mensagens" },
   { to: "/configuracoes", icon: Settings, label: "Configurações" },
 ];
 
