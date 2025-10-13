@@ -11,7 +11,7 @@ function pemToBinary(pem: string) {
   const base64 = pem
     .replace("-----BEGIN PRIVATE KEY-----", "")
     .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\n/g, "");
+    .replace(/\\n/g, ""); // CORREÇÃO: Remove os caracteres literais \n
   const binary = atob(base64);
   const arr = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
