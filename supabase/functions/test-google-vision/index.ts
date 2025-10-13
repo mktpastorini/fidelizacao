@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getGoogleAuthToken } from '../_shared/google-auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,16 +13,15 @@ serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
-    if (!apiKey) {
-      throw new Error("A variável de ambiente GOOGLE_VISION_API_KEY não está configurada no Supabase.");
-    }
-
+    const accessToken = await getGoogleAuthToken();
     const testImageUrl = "https://storage.googleapis.com/cloud-samples-data/vision/face/face_no_surprise.jpg";
 
-    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
         requests: [{
           image: { source: { imageUri: testImageUrl } },
@@ -37,9 +38,7 @@ serve(async (req) => {
         if (errorBody.error && errorBody.error.message) {
           errorMessage = `Erro da API do Google: ${errorBody.error.message}`;
         }
-      } catch (e) {
-        // O corpo não era JSON, usamos o texto bruto.
-      }
+      } catch (e) { /* O corpo não era JSON, usamos o texto bruto. */ }
       console.error("Google Vision API Error:", errorText);
       throw new Error(errorMessage);
     }

@@ -1,32 +1,28 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { getGoogleAuthToken } from '../_shared/google-auth.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função para gerar um embedding simulado
-function getSimulatedEmbedding() {
-  const embedding = Array(512).fill(0).map(() => Math.random() * 0.1);
-  return embedding;
-}
-
-// Função para obter o embedding da Google Cloud Vision API
-async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
+async function getGoogleVisionEmbedding(imageUrl: string) {
+  const accessToken = await getGoogleAuthToken();
   let imageRequestPayload;
   if (imageUrl.startsWith('http')) {
-    // É uma URL pública
     imageRequestPayload = { source: { imageUri: imageUrl } };
   } else {
-    // É uma imagem em base64, remove o prefixo de forma robusta
     const base64Image = imageUrl.substring(imageUrl.indexOf(',') + 1);
     imageRequestPayload = { content: base64Image };
   }
 
-  const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+  const response = await fetch(`https://vision.googleapis.com/v1/images:annotate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
     body: JSON.stringify({
       requests: [{
         image: imageRequestPayload,
@@ -50,10 +46,14 @@ async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
   const landmarks = faceAnnotation.landmarks.map((l: any) => [l.position.x, l.position.y, l.position.z]).flat();
   const embedding = Array(512).fill(0);
   for(let i = 0; i < landmarks.length && i < 512; i++) {
-    embedding[i] = landmarks[i] / 1000.0; // Normaliza
+    embedding[i] = landmarks[i] / 1000.0;
   }
 
   return embedding;
+}
+
+function getSimulatedEmbedding() {
+  return Array(512).fill(0).map(() => Math.random() * 0.1);
 }
 
 serve(async (req) => {
@@ -87,9 +87,7 @@ serve(async (req) => {
     let embedding;
 
     if (provider === 'google_vision') {
-      const apiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
-      if (!apiKey) throw new Error("Chave da API do Google Vision não configurada.");
-      embedding = await getGoogleVisionEmbedding(image_url, apiKey);
+      embedding = await getGoogleVisionEmbedding(image_url);
     } else {
       embedding = getSimulatedEmbedding();
     }
