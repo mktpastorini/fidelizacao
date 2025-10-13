@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClienteForm } from "@/components/clientes/ClienteForm";
-import { PlusCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { format } from "date-fns";
 
@@ -45,11 +45,19 @@ async function fetchClientes(): Promise<Cliente[]> {
 export default function ClientesPage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
 
   const { data: clientes, isLoading, isError } = useQuery({
     queryKey: ["clientes"],
     queryFn: fetchClientes,
   });
+
+  const handleDialogChange = (isOpen: boolean) => {
+    if (!isOpen) {
+      setEditingCliente(null);
+    }
+    setIsDialogOpen(isOpen);
+  };
 
   const addClienteMutation = useMutation({
     mutationFn: async (newCliente: any) => {
@@ -95,7 +103,53 @@ export default function ClientesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Cliente adicionado com sucesso!");
-      setIsDialogOpen(false);
+      handleDialogChange(false);
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+
+  const editClienteMutation = useMutation({
+    mutationFn: async (updatedCliente: any) => {
+      const { id, filhos, ...clienteInfo } = updatedCliente;
+      const { data: user } = await supabase.auth.getUser();
+      const userId = user?.user?.id;
+      if (!userId) throw new Error("Usuário não autenticado");
+
+      let gostos = null;
+      try {
+        if (clienteInfo.gostos) {
+          gostos = JSON.parse(clienteInfo.gostos);
+        }
+      } catch (e) {
+        throw new Error("Formato de 'Gostos' inválido. Use JSON.");
+      }
+
+      const { error: clienteError } = await supabase
+        .from("clientes")
+        .update({ ...clienteInfo, gostos })
+        .eq("id", id);
+      if (clienteError) throw new Error(clienteError.message);
+
+      const { error: deleteFilhosError } = await supabase.from("filhos").delete().eq("cliente_id", id);
+      if (deleteFilhosError) throw new Error(deleteFilhosError.message);
+
+      if (filhos && filhos.length > 0) {
+        const filhosData = filhos.map((filho: any) => ({
+          nome: filho.nome,
+          idade: filho.idade,
+          cliente_id: id,
+          user_id: userId,
+        }));
+        const { error: insertFilhosError } = await supabase.from("filhos").insert(filhosData);
+        if (insertFilhosError) throw new Error(insertFilhosError.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      showSuccess("Cliente atualizado com sucesso!");
+      handleDialogChange(false);
     },
     onError: (error: Error) => {
       showError(error.message);
@@ -116,6 +170,14 @@ export default function ClientesPage() {
     },
   });
 
+  const handleSubmit = (values: any) => {
+    if (editingCliente) {
+      editClienteMutation.mutate({ ...values, id: editingCliente.id });
+    } else {
+      addClienteMutation.mutate(values);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -125,7 +187,7 @@ export default function ClientesPage() {
             Gerencie as informações dos seus clientes aqui.
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="w-4 h-4 mr-2" />
@@ -134,11 +196,12 @@ export default function ClientesPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Adicionar Novo Cliente</DialogTitle>
+              <DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
             </DialogHeader>
             <ClienteForm
-              onSubmit={(values) => addClienteMutation.mutate(values)}
-              isSubmitting={addClienteMutation.isPending}
+              onSubmit={handleSubmit}
+              isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending}
+              defaultValues={editingCliente || undefined}
             />
           </DialogContent>
         </Dialog>
@@ -175,6 +238,15 @@ export default function ClientesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingCliente(cliente);
+                            setIsDialogOpen(true);
+                          }}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Editar
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-red-500"
                           onClick={() => deleteClienteMutation.mutate(cliente.id)}
