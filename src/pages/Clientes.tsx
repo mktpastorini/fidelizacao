@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente } from "@/types/supabase";
@@ -25,15 +25,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ClienteForm } from "@/components/clientes/ClienteForm";
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from "lucide-react";
+import { PlusCircle, MoreHorizontal, Trash2, Edit, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
 
-async function fetchClientes(): Promise<Cliente[]> {
-  const { data: clientes, error: clientesError } = await supabase
+async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
+  let query = supabase
     .from("clientes")
     .select("*, filhos(*)")
     .order("created_at", { ascending: false });
+
+  if (searchTerm) {
+    query = query.ilike("nome", `%${searchTerm}%`);
+  }
+
+  const { data: clientes, error: clientesError } = await query;
 
   if (clientesError) {
     throw new Error(clientesError.message);
@@ -46,10 +53,22 @@ export default function ClientesPage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => {
+      clearTimeout(timerId);
+    };
+  }, [searchTerm]);
 
   const { data: clientes, isLoading, isError } = useQuery({
-    queryKey: ["clientes"],
-    queryFn: fetchClientes,
+    queryKey: ["clientes", debouncedSearchTerm],
+    queryFn: () => fetchClientes(debouncedSearchTerm),
   });
 
   const handleDialogChange = (isOpen: boolean) => {
@@ -180,12 +199,22 @@ export default function ClientesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Clientes</h1>
-          <p className="text-gray-600 mt-2">
-            Gerencie as informações dos seus clientes aqui.
-          </p>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Clientes</h1>
+        <p className="text-gray-600 mt-2">
+          Gerencie as informações dos seus clientes aqui.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between mb-4">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
         </div>
         <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
@@ -264,10 +293,16 @@ export default function ClientesPage() {
           </Table>
         ) : (
           <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum cliente cadastrado ainda.</p>
             <p className="text-gray-500">
-              Clique em "Adicionar Cliente" para começar.
+              {debouncedSearchTerm
+                ? `Nenhum cliente encontrado para "${debouncedSearchTerm}".`
+                : "Nenhum cliente cadastrado ainda."}
             </p>
+            {!debouncedSearchTerm && (
+              <p className="text-gray-500">
+                Clique em "Adicionar Cliente" para começar.
+              </p>
+            )}
           </div>
         )}
       </div>
