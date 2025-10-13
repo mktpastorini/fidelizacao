@@ -7,6 +7,9 @@ import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSetting
 import { showError, showSuccess } from "@/utils/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 type UserData = {
   profile: Profile | null;
@@ -67,12 +70,7 @@ export default function ConfiguracoesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
       
-      const settingsToUpsert = {
-        id: user.id,
-        webhook_url: updatedSettings.webhook_url !== undefined ? updatedSettings.webhook_url : data?.settings?.webhook_url,
-        chegada_template_id: updatedSettings.chegada_template_id !== undefined ? updatedSettings.chegada_template_id : data?.settings?.chegada_template_id,
-        pagamento_template_id: updatedSettings.pagamento_template_id !== undefined ? updatedSettings.pagamento_template_id : data?.settings?.pagamento_template_id,
-      };
+      const settingsToUpsert = { id: user.id, ...updatedSettings };
 
       const { error } = await supabase.from("user_settings").upsert(settingsToUpsert);
       if (error) throw new Error(error.message);
@@ -155,6 +153,37 @@ export default function ConfiguracoesPage() {
                 defaultValues={data?.settings || undefined}
                 templates={data?.templates || []}
               />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Inteligência Artificial</CardTitle>
+            <CardDescription>Selecione o provedor para o reconhecimento facial.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ai-provider">Provedor de Reconhecimento Facial</Label>
+                  <Select
+                    defaultValue={data?.settings?.ai_provider || 'simulacao'}
+                    onValueChange={(value) => updateSettingsMutation.mutate({ ai_provider: value })}
+                  >
+                    <SelectTrigger id="ai-provider">
+                      <SelectValue placeholder="Selecione um provedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simulacao">Simulação (Padrão)</SelectItem>
+                      <SelectItem value="google_vision">Google Cloud Vision</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Lembre-se de configurar a chave de API correspondente para provedores externos.
+                  </p>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
