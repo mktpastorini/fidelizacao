@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ImageUpload } from "@/components/ui/ImageUpload";
+import { ImageCapture } from "@/components/clientes/ImageCapture";
 import { Trash2 } from "lucide-react";
 import { Cliente, Filho } from "@/types/supabase";
 
@@ -66,8 +66,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues }: ClienteFo
             <FormItem>
               <FormLabel>Foto do Cliente</FormLabel>
               <FormControl>
-                <ImageUpload
-                  bucket="client_avatars"
+                <ImageCapture
                   url={field.value}
                   onUpload={(url) => field.onChange(url)}
                 />

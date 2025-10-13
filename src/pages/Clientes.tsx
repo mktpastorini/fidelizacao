@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -19,7 +18,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { ClienteForm } from "@/components/clientes/ClienteForm";
 import { ClienteCard } from "@/components/clientes/ClienteCard";
@@ -106,6 +104,16 @@ export default function ClientesPage() {
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
         if (filhosError) throw new Error(filhosError.message);
       }
+      
+      // Registrar o rosto após criar o cliente
+      if (clienteData.avatar_url) {
+        const { error: faceError } = await supabase.functions.invoke('register-face', {
+          body: { cliente_id: clienteData.id, image_url: clienteData.avatar_url },
+        });
+        if (faceError) {
+          showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
@@ -138,6 +146,16 @@ export default function ClientesPage() {
         const filhosData = filhos.map((filho: any) => ({ nome: filho.nome, idade: filho.idade, cliente_id: id, user_id: userId }));
         const { error: insertFilhosError } = await supabase.from("filhos").insert(filhosData);
         if (insertFilhosError) throw new Error(insertFilhosError.message);
+      }
+
+      // Registrar o rosto após editar o cliente
+      if (clienteInfo.avatar_url) {
+        const { error: faceError } = await supabase.functions.invoke('register-face', {
+          body: { cliente_id: id, image_url: clienteInfo.avatar_url },
+        });
+        if (faceError) {
+          showError(`Cliente atualizado, mas falha ao registrar o rosto: ${faceError.message}`);
+        }
       }
     },
     onSuccess: () => {
