@@ -69,9 +69,9 @@ export default function ConfiguracoesPage() {
       
       const settingsToUpsert = {
         id: user.id,
-        webhook_url: updatedSettings.webhook_url || null,
-        chegada_template_id: updatedSettings.chegada_template_id || null,
-        pagamento_template_id: updatedSettings.pagamento_template_id || null,
+        webhook_url: updatedSettings.webhook_url !== undefined ? updatedSettings.webhook_url : data?.settings?.webhook_url,
+        chegada_template_id: updatedSettings.chegada_template_id !== undefined ? updatedSettings.chegada_template_id : data?.settings?.chegada_template_id,
+        pagamento_template_id: updatedSettings.pagamento_template_id !== undefined ? updatedSettings.pagamento_template_id : data?.settings?.pagamento_template_id,
       };
 
       const { error } = await supabase.from("user_settings").upsert(settingsToUpsert);
@@ -82,6 +82,20 @@ export default function ConfiguracoesPage() {
       showSuccess("Configurações salvas com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
+  });
+
+  const testWebhookMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('test-webhook');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      showSuccess("Webhook testado com sucesso! Verifique seu serviço para a mensagem de teste.");
+    },
+    onError: (error: Error) => {
+      showError(`Teste falhou: ${error.message}`);
+    },
   });
 
   return (
@@ -121,6 +135,8 @@ export default function ConfiguracoesPage() {
                 onSubmit={(values) => updateSettingsMutation.mutate(values)}
                 isSubmitting={updateSettingsMutation.isPending}
                 defaultValues={data?.settings || undefined}
+                onTest={() => testWebhookMutation.mutate()}
+                isTesting={testWebhookMutation.isPending}
               />
             )}
           </CardContent>

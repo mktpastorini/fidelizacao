@@ -67,7 +67,9 @@ serve(async (req) => {
     // 4. Personaliza a mensagem, substituindo {cliente} pelo nome real
     const personalizedMessage = template.conteudo.replace(/{cliente}/g, client.nome);
 
-    // 5. Envia a requisição para o webhook
+    // 5. Envia a requisição para o webhook.
+    // Nota: Esta é uma requisição POST simples sem cabeçalhos de autenticação (JWT).
+    // Seu endpoint de webhook não precisa de autenticação para receber esta chamada.
     const webhookResponse = await fetch(settings.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
