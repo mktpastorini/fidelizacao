@@ -10,12 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard } from "lucide-react";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -65,7 +66,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
       let pedidoId = pedido?.id;
 
-      // Se não houver pedido aberto, cria um novo
       if (!pedidoId) {
         const { data: novoPedido, error: pedidoError } = await supabase
           .from("pedidos")
@@ -81,7 +81,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         pedidoId = novoPedido.id;
       }
 
-      // Adiciona o item ao pedido
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         user_id: user.user.id,
@@ -109,6 +108,40 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onError: (error: Error) => showError(error.message),
   });
 
+  const closeOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!pedido || !mesa) throw new Error("Pedido ou mesa não encontrado.");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado.");
+
+      await supabase
+        .from("pedidos")
+        .update({ status: "pago", closed_at: new Date().toISOString() })
+        .eq("id", pedido.id);
+
+      await supabase
+        .from("mesas")
+        .update({ cliente_id: null })
+        .eq("id", mesa.id);
+
+      if (mesa.cliente_id) {
+        const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', {
+          body: { clientId: mesa.cliente_id, userId: user.id },
+        });
+        if (functionError) {
+          showError(`Conta fechada, mas falha ao enviar webhook: ${functionError.message}`);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      showSuccess("Conta fechada com sucesso!");
+      onOpenChange(false);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
     addItemMutation.mutate(values);
   };
@@ -121,7 +154,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           <DialogDescription>Cliente: {mesa?.cliente?.nome || "N/A"}</DialogDescription>
         </DialogHeader>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto">
-          {/* Coluna de Itens */}
           <div className="space-y-4">
             <h3 className="font-semibold">Itens do Pedido</h3>
             {isLoading ? (
@@ -145,7 +177,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             )}
           </div>
 
-          {/* Coluna para Adicionar Item */}
           <div className="p-4 border rounded-lg">
             <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
             <Form {...form}>
@@ -193,6 +224,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             </Form>
           </div>
         </div>
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            onClick={() => closeOrderMutation.mutate()}
+            disabled={!pedido || pedido.itens_pedido.length === 0 || closeOrderMutation.isPending}
+          >
+            <CreditCard className="w-4 h-4 mr-2" />
+            {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar e Pagar"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
