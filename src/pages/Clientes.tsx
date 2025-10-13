@@ -8,13 +8,14 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogDesc,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -105,7 +106,6 @@ export default function ClientesPage() {
         if (filhosError) throw new Error(filhosError.message);
       }
       
-      // Registrar o rosto após criar o cliente
       if (clienteData.avatar_url) {
         const { error: faceError } = await supabase.functions.invoke('register-face', {
           body: { cliente_id: clienteData.id, image_url: clienteData.avatar_url },
@@ -148,7 +148,6 @@ export default function ClientesPage() {
         if (insertFilhosError) throw new Error(insertFilhosError.message);
       }
 
-      // Registrar o rosto após editar o cliente
       if (clienteInfo.avatar_url) {
         const { error: faceError } = await supabase.functions.invoke('register-face', {
           body: { cliente_id: id, image_url: clienteInfo.avatar_url },
@@ -223,7 +222,12 @@ export default function ClientesPage() {
 
       <Dialog open={isFormOpen} onOpenChange={handleFormClose}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
+            <DialogDescription>
+              Preencha as informações abaixo. A foto é usada para o reconhecimento facial.
+            </DialogDescription>
+          </DialogHeader>
           <ClienteForm onSubmit={handleSubmit} isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} defaultValues={editingCliente || undefined} />
         </DialogContent>
       </Dialog>
@@ -235,9 +239,9 @@ export default function ClientesPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDesc>
                 Tem certeza que deseja excluir {clienteToDelete.nome}? Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
+              </AlertDialogDesc>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel onClick={() => setClienteToDelete(null)}>Cancelar</AlertDialogCancel>

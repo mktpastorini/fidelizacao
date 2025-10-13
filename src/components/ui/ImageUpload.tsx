@@ -1,74 +1,95 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { User } from 'lucide-react';
-import { showError } from '@/utils/toast';
+"use client"
+
+import { supabase } from "@/integrations/supabase/client"
+import { useState, useEffect } from "react"
+import { Button } from "./button"
+import { Input } from "./input"
+import { Avatar, AvatarImage, AvatarFallback } from "./avatar"
+import { User, UploadCloud, Loader2 } from "lucide-react"
+import { showError } from "@/utils/toast"
 
 type ImageUploadProps = {
-  bucket: string;
-  url: string | null;
-  onUpload: (url: string) => void;
-};
+  bucket: string
+  url: string | null | undefined
+  onUpload: (url: string) => void
+}
 
 export function ImageUpload({ bucket, url, onUpload }: ImageUploadProps) {
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(url);
-  const [isUploading, setIsUploading] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null | undefined>(url)
+  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
-    setAvatarUrl(url);
-  }, [url]);
+    setAvatarUrl(url)
+  }, [url])
 
   async function uploadAvatar(event: React.ChangeEvent<HTMLInputElement>) {
     try {
-      setIsUploading(true);
+      setUploading(true)
+
       if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('Você precisa selecionar uma imagem para fazer o upload.');
+        throw new Error("Você deve selecionar uma imagem para enviar.")
       }
 
-      const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      const file = event.target.files[0]
+      const fileExt = file.name.split(".").pop()
+      const filePath = `${Math.random()}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file);
-      if (uploadError) throw uploadError;
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file)
 
-      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-      if (!data.publicUrl) throw new Error("Não foi possível obter a URL pública da imagem.");
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(filePath)
+      if (!data.publicUrl) {
+        throw new Error("Não foi possível obter a URL pública da imagem.")
+      }
       
-      setAvatarUrl(data.publicUrl);
-      onUpload(data.publicUrl);
+      onUpload(data.publicUrl)
+      setAvatarUrl(data.publicUrl)
     } catch (error: any) {
-      showError(error.message);
+      showError(error.message)
     } finally {
-      setIsUploading(false);
+      setUploading(false)
     }
   }
 
   return (
-    <div className="flex items-center gap-4">
-      <Avatar className="h-20 w-20">
-        <AvatarImage src={avatarUrl || undefined} alt="Avatar do Cliente" />
+    <div className="flex flex-col items-center gap-4 p-4 border rounded-lg">
+      <Avatar className="h-32 w-32">
+        <AvatarImage src={avatarUrl || undefined} />
         <AvatarFallback>
-          <User className="h-10 w-10 text-gray-400" />
+          <User className="h-16 w-16 text-gray-400" />
         </AvatarFallback>
       </Avatar>
       <div>
         <Button asChild variant="outline">
-          <label htmlFor="single">
-            {isUploading ? 'Enviando...' : 'Enviar Foto'}
+          <label htmlFor="single" className="cursor-pointer">
+            {uploading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <UploadCloud className="w-4 h-4 mr-2" />
+                Enviar Arquivo
+              </>
+            )}
           </label>
         </Button>
-        <input
-          style={{ visibility: 'hidden', position: 'absolute' }}
+        <Input
+          style={{
+            visibility: "hidden",
+            position: "absolute",
+          }}
           type="file"
           id="single"
           accept="image/*"
           onChange={uploadAvatar}
-          disabled={isUploading}
+          disabled={uploading}
         />
       </div>
     </div>
-  );
+  )
 }
