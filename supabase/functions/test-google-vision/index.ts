@@ -6,41 +6,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function pemToBinary(pem: string) {
-  const base64 = pem
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\\n/g, ""); // CORREÇÃO: Remove os caracteres literais \n
-  const binary = atob(base64);
-  const arr = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    arr[i] = binary.charCodeAt(i);
-  }
-  return arr.buffer;
-}
-
 async function getGoogleAuthToken() {
   console.log("Tentando obter o token de autenticação do Google...");
   const client_email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
-  const private_key = Deno.env.get('GOOGLE_PRIVATE_KEY');
+  const private_key_string = Deno.env.get('GOOGLE_PRIVATE_KEY');
 
-  if (!client_email || !private_key) {
+  if (!client_email || !private_key_string) {
     console.error("ERRO: Secrets 'GOOGLE_CLIENT_EMAIL' ou 'GOOGLE_PRIVATE_KEY' não encontrados.");
     throw new Error("Os secrets GOOGLE_CLIENT_EMAIL e GOOGLE_PRIVATE_KEY devem estar configurados.");
   }
   console.log("Secrets encontrados. Prosseguindo com a criação do token.");
 
+  // Reformata a chave do secret para um formato PEM válido
+  function formatPem(pem: string) {
+    const base64 = pem
+      .replace("-----BEGIN PRIVATE KEY-----", "")
+      .replace("-----END PRIVATE KEY-----", "")
+      .replace(/\\n/g, "")
+      .replace(/\s/g, "");
+    
+    const pemHeader = "-----BEGIN PRIVATE KEY-----";
+    const pemFooter = "-----END PRIVATE KEY-----";
+    
+    const chunks = base64.match(/.{1,64}/g) || [];
+    const formattedBase64 = chunks.join('\n');
+
+    return `${pemHeader}\n${formattedBase64}\n${pemFooter}`;
+  }
+
+  const formattedPrivateKey = formatPem(private_key_string);
+  console.log("Chave privada formatada com sucesso.");
+
   const scope = "https://www.googleapis.com/auth/cloud-vision";
   const aud = "https://oauth2.googleapis.com/token";
-
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8",
-    pemToBinary(private_key),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    true,
-    ["sign"]
-  );
-  console.log("Chave privada importada com sucesso.");
 
   const jwt = await create(
     { alg: "RS256", typ: "JWT" },
@@ -51,7 +49,7 @@ async function getGoogleAuthToken() {
       exp: getNumericDate(3600),
       iat: getNumericDate(0),
     },
-    cryptoKey
+    formattedPrivateKey
   );
   console.log("JWT criado com sucesso.");
 
@@ -77,13 +75,6 @@ async function getGoogleAuthToken() {
 
 
 serve(async (req) => {
-  console.log("--- INICIANDO TESTE DE CONEXÃO GOOGLE VISION ---");
-  const clientEmailExists = !!Deno.env.get('GOOGLE_CLIENT_EMAIL');
-  const privateKeyExists = !!Deno.env.get('GOOGLE_PRIVATE_KEY');
-  console.log("Verificando a existência de secrets...");
-  console.log("Secret 'GOOGLE_CLIENT_EMAIL' encontrado:", clientEmailExists);
-  console.log("Secret 'GOOGLE_PRIVATE_KEY' encontrado:", privateKeyExists);
-
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
