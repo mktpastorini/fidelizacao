@@ -12,8 +12,10 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopClientsCard } from "@/components/dashboard/TopClientsCard";
 import { RecentArrivalsCard } from "@/components/dashboard/RecentArrivalsCard";
+import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Users, Table, CheckCircle, DollarSign, ReceiptText, Camera } from "lucide-react";
 import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type DashboardData = {
   clientes: Cliente[];
@@ -193,6 +195,31 @@ export default function Dashboard() {
   const formatCurrency = (value: number | undefined) => {
     if (typeof value !== 'number') return "R$ 0,00";
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-1/4" />
+        <Skeleton className="h-6 w-1/2" />
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          {[...Array(5)].map(i => <Skeleton key={i} className="h-24" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 space-y-6">
+            <Skeleton className="h-96" />
+            <Skeleton className="h-64" />
+          </div>
+          <div className="lg:col-span-2">
+            <Skeleton className="h-[500px]" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (data?.clientes.length === 0) {
+    return <WelcomeCard />;
   }
 
   return (
