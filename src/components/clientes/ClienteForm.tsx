@@ -20,6 +20,7 @@ const formSchema = z.object({
   casado_com: z.string().optional(),
   whatsapp: z.string().optional(),
   gostos: z.string().optional(),
+  indicacoes: z.coerce.number().int().nonnegative().optional(),
   filhos: z.array(
     z.object({
       nome: z.string().min(1, { message: "Nome do filho é obrigatório." }),
@@ -42,6 +43,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues }: ClienteFo
       casado_com: defaultValues?.casado_com || "",
       whatsapp: defaultValues?.whatsapp || "",
       gostos: defaultValues?.gostos ? JSON.stringify(defaultValues.gostos, null, 2) : "",
+      indicacoes: defaultValues?.indicacoes || 0,
       filhos: defaultValues?.filhos || [],
     },
   });
@@ -67,19 +69,34 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues }: ClienteFo
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="casado_com"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Casado(a) com</FormLabel>
-              <FormControl>
-                <Input placeholder="Nome do cônjuge" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="casado_com"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Casado(a) com</FormLabel>
+                <FormControl>
+                  <Input placeholder="Nome do cônjuge" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="indicacoes"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Indicações</FormLabel>
+                <FormControl>
+                  <Input type="number" placeholder="0" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <FormField
           control={form.control}
           name="whatsapp"

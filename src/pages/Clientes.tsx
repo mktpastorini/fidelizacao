@@ -101,6 +101,7 @@ export default function ClientesPage() {
             casado_com: newCliente.casado_com,
             whatsapp: newCliente.whatsapp,
             gostos: gostos,
+            indicacoes: newCliente.indicacoes,
             user_id: userId,
           },
         ])
@@ -248,6 +249,7 @@ export default function ClientesPage() {
                 <TableHead>Nome</TableHead>
                 <TableHead>WhatsApp</TableHead>
                 <TableHead>Cliente Desde</TableHead>
+                <TableHead>Indicações</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -259,6 +261,7 @@ export default function ClientesPage() {
                   <TableCell>
                     {format(new Date(cliente.cliente_desde), "dd/MM/yyyy")}
                   </TableCell>
+                  <TableCell>{cliente.indicacoes}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
