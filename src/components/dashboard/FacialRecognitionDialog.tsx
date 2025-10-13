@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { Cliente } from '@/types/supabase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -40,17 +40,25 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, clientes, onClie
         setIsScanning(true);
 
         const recognitionTimeout = setTimeout(() => {
-          const clientsWithFaces = clientes.filter(c => c.avatar_url);
-          const randomMatch = clientsWithFaces.length > 0
-            ? clientsWithFaces[Math.floor(Math.random() * clientsWithFaces.length)]
-            : null;
-          setMatch(randomMatch);
+          // SIMULAÇÃO INTELIGENTE:
+          // 1. Encontra o cliente mais recente com foto (a lista já vem ordenada por data de criação).
+          const mostRecentClientWithFace = clientes.find(c => c.avatar_url);
+          
+          // 2. Simula uma chance de sucesso. Vamos dar 70% de chance de reconhecer o cliente mais recente.
+          const shouldSucceed = Math.random() < 0.7;
+
+          let foundMatch = null;
+          if (mostRecentClientWithFace && shouldSucceed) {
+            foundMatch = mostRecentClientWithFace;
+          }
+          
+          setMatch(foundMatch);
           setIsScanning(false);
         }, 2000);
 
         return () => clearTimeout(recognitionTimeout);
       }
-    }, 500); // Delay to allow webcam to initialize
+    }, 500);
 
     return () => clearTimeout(scanTimeout);
   }, [isOpen, clientes]);
