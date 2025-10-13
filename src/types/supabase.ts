@@ -43,6 +43,8 @@ export type Profile = {
 export type UserSettings = {
   id: string;
   webhook_url: string | null;
+  chegada_template_id: string | null;
+  pagamento_template_id: string | null;
 };
 
 export type Pedido = {
