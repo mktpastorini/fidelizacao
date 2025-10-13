@@ -10,6 +10,7 @@ import { ClientArrivalModal } from "@/components/dashboard/ClientArrivalModal";
 import { FacialRecognitionDialog } from "@/components/dashboard/FacialRecognitionDialog";
 import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
+import { TopClientsCard } from "@/components/dashboard/TopClientsCard";
 import { Users, Table, CheckCircle, DollarSign, ReceiptText, Camera } from "lucide-react";
 import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 
@@ -136,6 +137,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["topClients"] });
       showSuccess("Cliente adicionado e rosto registrado com sucesso!");
       setIsNewClientModalOpen(false);
     },
@@ -209,33 +211,36 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Recepção Ativa</CardTitle>
-            <CardDescription>A câmera está pronta para reconhecer seus clientes.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
-            <div className="w-full aspect-square rounded-lg overflow-hidden bg-black relative flex items-center justify-center">
-              {isCameraActive ? (
-                <Webcam
-                  audio={false}
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="text-center text-white p-4">
-                  <p className="font-semibold text-lg">Aguardando Alocação</p>
-                  <p className="text-sm">{recognizedClient?.nome}</p>
-                </div>
-              )}
-            </div>
-            <Button size="lg" className="w-full" onClick={() => setIsRecognitionDialogOpen(true)} disabled={!isCameraActive}>
-              <Camera className="w-5 h-5 mr-2" />
-              Analisar Rosto
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-1 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Recepção Ativa</CardTitle>
+              <CardDescription>A câmera está pronta para reconhecer seus clientes.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-4">
+              <div className="w-full aspect-square rounded-lg overflow-hidden bg-black relative flex items-center justify-center">
+                {isCameraActive ? (
+                  <Webcam
+                    audio={false}
+                    ref={webcamRef}
+                    screenshotFormat="image/jpeg"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center text-white p-4">
+                    <p className="font-semibold text-lg">Aguardando Alocação</p>
+                    <p className="text-sm">{recognizedClient?.nome}</p>
+                  </div>
+                )}
+              </div>
+              <Button size="lg" className="w-full" onClick={() => setIsRecognitionDialogOpen(true)} disabled={!isCameraActive}>
+                <Camera className="w-5 h-5 mr-2" />
+                Analisar Rosto
+              </Button>
+            </CardContent>
+          </Card>
+          <TopClientsCard />
+        </div>
 
         <div className="lg:col-span-2">
           <RevenueChart />
