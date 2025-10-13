@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Mesa } from "@/types/supabase";
+import { Mesa, Cliente } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,15 +23,18 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { MesaForm } from "@/components/mesas/MesaForm";
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from "lucide-react";
+import { AssignClienteDialog } from "@/components/mesas/AssignClienteDialog";
+import { PlusCircle, MoreHorizontal, Trash2, Edit, UserPlus, UserMinus } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
+import { Badge } from "@/components/ui/badge";
 
 async function fetchMesas(): Promise<Mesa[]> {
   const { data, error } = await supabase
     .from("mesas")
-    .select("*")
+    .select("*, cliente:clientes(id, nome)")
     .order("numero", { ascending: true });
 
   if (error) {
@@ -41,21 +44,40 @@ async function fetchMesas(): Promise<Mesa[]> {
   return data || [];
 }
 
+async function fetchClientes(): Promise<Pick<Cliente, 'id' | 'nome'>[]> {
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id, nome")
+    .order("nome", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+  return data || [];
+}
+
 export default function MesasPage() {
   const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
+  const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
 
   const { data: mesas, isLoading, isError } = useQuery({
     queryKey: ["mesas"],
     queryFn: fetchMesas,
   });
 
-  const handleDialogChange = (isOpen: boolean) => {
+  const { data: clientes, isLoading: isLoadingClientes } = useQuery({
+    queryKey: ["clientes_list"],
+    queryFn: fetchClientes,
+  });
+
+  const handleFormDialogChange = (isOpen: boolean) => {
     if (!isOpen) {
       setEditingMesa(null);
     }
-    setIsDialogOpen(isOpen);
+    setIsFormDialogOpen(isOpen);
   };
 
   const addMesaMutation = useMutation({
@@ -70,7 +92,7 @@ export default function MesasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Mesa adicionada com sucesso!");
-      handleDialogChange(false);
+      handleFormDialogChange(false);
     },
     onError: (error: Error) => {
       showError(error.message);
@@ -86,7 +108,7 @@ export default function MesasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Mesa atualizada com sucesso!");
-      handleDialogChange(false);
+      handleFormDialogChange(false);
     },
     onError: (error: Error) => {
       showError(error.message);
@@ -107,11 +129,47 @@ export default function MesasPage() {
     },
   });
 
-  const handleSubmit = (values: { numero: number; capacidade: number }) => {
+  const assignClienteMutation = useMutation({
+    mutationFn: async ({ mesaId, clienteId }: { mesaId: string; clienteId: string }) => {
+      const { error } = await supabase.from("mesas").update({ cliente_id: clienteId }).eq("id", mesaId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      showSuccess("Mesa ocupada com sucesso!");
+      setIsAssignDialogOpen(false);
+      setSelectedMesa(null);
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+
+  const unassignClienteMutation = useMutation({
+    mutationFn: async (mesaId: string) => {
+      const { error } = await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      showSuccess("Mesa liberada com sucesso!");
+    },
+    onError: (error: Error) => {
+      showError(error.message);
+    },
+  });
+
+  const handleFormSubmit = (values: { numero: number; capacidade: number }) => {
     if (editingMesa) {
       editMesaMutation.mutate({ ...values, id: editingMesa.id });
     } else {
       addMesaMutation.mutate(values);
+    }
+  };
+
+  const handleAssignSubmit = (clienteId: string) => {
+    if (selectedMesa) {
+      assignClienteMutation.mutate({ mesaId: selectedMesa.id, clienteId });
     }
   };
 
@@ -124,7 +182,7 @@ export default function MesasPage() {
             Gerencie as mesas do seu estabelecimento.
           </p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
+        <Dialog open={isFormDialogOpen} onOpenChange={handleFormDialogChange}>
           <DialogTrigger asChild>
             <Button>
               <PlusCircle className="w-4 h-4 mr-2" />
@@ -136,7 +194,7 @@ export default function MesasPage() {
               <DialogTitle>{editingMesa ? "Editar Mesa" : "Adicionar Nova Mesa"}</DialogTitle>
             </DialogHeader>
             <MesaForm
-              onSubmit={handleSubmit}
+              onSubmit={handleFormSubmit}
               isSubmitting={addMesaMutation.isPending || editMesaMutation.isPending}
               defaultValues={editingMesa || undefined}
             />
@@ -156,6 +214,7 @@ export default function MesasPage() {
                 <TableHead>Número</TableHead>
                 <TableHead>Capacidade</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Cliente</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -164,7 +223,14 @@ export default function MesasPage() {
                 <TableRow key={mesa.id}>
                   <TableCell>{mesa.numero}</TableCell>
                   <TableCell>{mesa.capacidade} pessoas</TableCell>
-                  <TableCell>{mesa.cliente_id ? "Ocupada" : "Livre"}</TableCell>
+                  <TableCell>
+                    {mesa.cliente ? (
+                      <Badge>Ocupada</Badge>
+                    ) : (
+                      <Badge variant="secondary">Livre</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>{mesa.cliente?.nome || "-"}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -173,10 +239,22 @@ export default function MesasPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
+                        {mesa.cliente ? (
+                          <DropdownMenuItem onClick={() => unassignClienteMutation.mutate(mesa.id)}>
+                            <UserMinus className="w-4 h-4 mr-2" />
+                            Liberar Mesa
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => { setSelectedMesa(mesa); setIsAssignDialogOpen(true); }}>
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Ocupar Mesa
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
                             setEditingMesa(mesa);
-                            setIsDialogOpen(true);
+                            setIsFormDialogOpen(true);
                           }}
                         >
                           <Edit className="w-4 h-4 mr-2" />
@@ -206,6 +284,13 @@ export default function MesasPage() {
           </div>
         )}
       </div>
+      <AssignClienteDialog
+        isOpen={isAssignDialogOpen}
+        onOpenChange={setIsAssignDialogOpen}
+        clientes={clientes || []}
+        onSubmit={handleAssignSubmit}
+        isSubmitting={assignClienteMutation.isPending || isLoadingClientes}
+      />
     </div>
   );
 }

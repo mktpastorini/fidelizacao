@@ -22,6 +22,7 @@ export type Mesa = {
   capacidade: number;
   cliente_id: string | null;
   created_at: string;
+  cliente: { id: string; nome: string } | null;
 };
 
 export type MessageTemplate = {
