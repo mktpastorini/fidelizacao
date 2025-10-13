@@ -98,10 +98,10 @@ export default function Dashboard() {
     onError: (error: Error) => showError(error.message),
   });
 
-  const addClienteMutation = useMutation({
+  const addClienteAndRegisterFaceMutation = useMutation({
     mutationFn: async (newCliente: any) => {
-      const { data: user } = await supabase.auth.getUser();
-      const userId = user?.user?.id;
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
       if (!userId) throw new Error("Usuário não autenticado");
 
       let gostos = null;
@@ -113,21 +113,35 @@ export default function Dashboard() {
 
       const { filhos, ...clienteDataToInsert } = newCliente;
       const { data: clienteData, error: clienteError } = await supabase.from("clientes").insert([{ ...clienteDataToInsert, gostos, user_id: userId }]).select().single();
-      if (clienteError) throw new Error(clienteError.message);
+      if (clienteError) throw new Error(`Erro ao criar cliente: ${clienteError.message}`);
+
+      const newClientId = clienteData.id;
 
       if (filhos && filhos.length > 0) {
-        const filhosData = filhos.map((filho: any) => ({ ...filho, cliente_id: clienteData.id, user_id: userId }));
+        const filhosData = filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: userId }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
-        if (filhosError) throw new Error(filhosError.message);
+        if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
+
+      if (clienteData.avatar_url) {
+        const { error: faceError } = await supabase.functions.invoke('register-face', {
+          body: { cliente_id: newClientId, image_url: clienteData.avatar_url },
+        });
+        if (faceError) {
+          showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
+        }
+      }
+      return clienteData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      showSuccess("Cliente adicionado com sucesso!");
+      showSuccess("Cliente adicionado e rosto registrado com sucesso!");
       setIsNewClientModalOpen(false);
     },
-    onError: (error: Error) => showError(error.message),
+    onError: (error: Error) => {
+      showError(error.message);
+    },
   });
 
   const handleClientRecognized = (cliente: Cliente) => {
@@ -161,7 +175,7 @@ export default function Dashboard() {
   };
 
   const handleNewClientSubmit = (values: any) => {
-    addClienteMutation.mutate(values);
+    addClienteAndRegisterFaceMutation.mutate(values);
   };
 
   const onArrivalModalChange = (isOpen: boolean) => {
@@ -231,7 +245,6 @@ export default function Dashboard() {
       <FacialRecognitionDialog
         isOpen={isRecognitionDialogOpen}
         onOpenChange={setIsRecognitionDialogOpen}
-        clientes={data?.clientes || []}
         onClientRecognized={handleClientRecognized}
         onNewClient={handleNewClient}
       />
@@ -240,7 +253,7 @@ export default function Dashboard() {
         isOpen={isNewClientModalOpen}
         onOpenChange={setIsNewClientModalOpen}
         onSubmit={handleNewClientSubmit}
-        isSubmitting={addClienteMutation.isPending}
+        isSubmitting={addClienteAndRegisterFaceMutation.isPending}
       />
 
       <ClientArrivalModal

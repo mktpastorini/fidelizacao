@@ -6,19 +6,20 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { User, Check, X, UserPlus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
+import { showError } from '@/utils/toast';
 
 type FacialRecognitionDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  clientes: (Cliente & { face_image_url?: string })[];
   onClientRecognized: (cliente: Cliente) => void;
   onNewClient: () => void;
 };
 
-export function FacialRecognitionDialog({ isOpen, onOpenChange, clientes, onClientRecognized, onNewClient }: FacialRecognitionDialogProps) {
+export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecognized, onNewClient }: FacialRecognitionDialogProps) {
   const webcamRef = useRef<Webcam>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [match, setMatch] = useState<(Cliente & { face_image_url?: string }) | null>(null);
+  const [match, setMatch] = useState<Cliente | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
 
   const resetState = () => {
@@ -33,29 +34,40 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, clientes, onClie
       return;
     }
 
+    const performRecognition = async (imageUrl: string) => {
+      setIsScanning(true);
+      setMatch(null);
+
+      try {
+        const { data, error } = await supabase.functions.invoke('recognize-face', {
+          body: { image_url: imageUrl },
+        });
+
+        if (error) throw error;
+
+        if (data.match) {
+          setMatch(data.match);
+        } else {
+          setMatch(null);
+        }
+      } catch (err: any) {
+        showError(`Erro no reconhecimento: ${err.message}`);
+        setMatch(null);
+      } finally {
+        setIsScanning(false);
+      }
+    };
+
     const scanTimeout = setTimeout(() => {
       const imageSrc = webcamRef.current?.getScreenshot();
       if (imageSrc) {
         setSnapshot(imageSrc);
-        setIsScanning(true);
-
-        const recognitionTimeout = setTimeout(() => {
-          // SIMULAÇÃO CONFIÁVEL:
-          // O sistema só reconhecerá um cliente com o nome exato "Dyad Test".
-          const testClient = clientes.find(
-            c => c.nome.toLowerCase() === 'dyad test' && c.avatar_url
-          );
-          
-          setMatch(testClient || null);
-          setIsScanning(false);
-        }, 2000);
-
-        return () => clearTimeout(recognitionTimeout);
+        performRecognition(imageSrc);
       }
-    }, 500);
+    }, 1000); // Delay to allow camera initialization
 
     return () => clearTimeout(scanTimeout);
-  }, [isOpen, clientes]);
+  }, [isOpen]);
 
   const handleConfirm = () => {
     if (match) {
