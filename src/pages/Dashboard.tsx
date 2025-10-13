@@ -72,10 +72,16 @@ export default function Dashboard() {
     mutationFn: async (cliente: Cliente) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
-      const { error } = await supabase.functions.invoke('send-welcome-message', { body: { clientId: cliente.id, userId: user.id } });
-      if (error) throw new Error(`Erro ao enviar webhook: ${error.message}`);
+      
+      const { error } = await supabase.functions.invoke('send-welcome-message', { 
+        body: { clientId: cliente.id, userId: user.id } 
+      });
+
+      if (error) {
+        const detailedError = (error as any).context?.error || error.message;
+        throw new Error(detailedError);
+      }
     },
-    onError: (error: Error) => showError(error.message),
   });
 
   const allocateTableMutation = useMutation({
