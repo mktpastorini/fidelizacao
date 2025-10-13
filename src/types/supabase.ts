@@ -15,3 +15,11 @@ export type Cliente = {
   filhos: Filho[];
   created_at: string;
 };
+
+export type Mesa = {
+  id: string;
+  numero: number;
+  capacidade: number;
+  cliente_id: string | null;
+  created_at: string;
+};
