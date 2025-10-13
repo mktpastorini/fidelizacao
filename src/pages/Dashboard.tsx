@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ClientArrivalModal } from "@/components/dashboard/ClientArrivalModal";
+import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { Users, Table, CheckCircle, DollarSign, ReceiptText } from "lucide-react";
 import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 
@@ -140,6 +141,8 @@ export default function Dashboard() {
         <StatCard title="Mesas Ocupadas" value={`${mesasOcupadas} de ${data?.mesas.length ?? 0}`} icon={Table} />
         <StatCard title="Taxa de Ocupação" value={`${data?.mesas.length ? Math.round((mesasOcupadas / data.mesas.length) * 100) : 0}%`} icon={CheckCircle} />
       </div>
+
+      <RevenueChart />
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
