@@ -11,7 +11,7 @@ function pemToBinary(pem: string) {
   const base64 = pem
     .replace("-----BEGIN PRIVATE KEY-----", "")
     .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\n/g, ""); // Corrigido para remover apenas newlines
+    .replace(/\n/g, "");
   const binary = atob(base64);
   const arr = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
@@ -21,18 +21,19 @@ function pemToBinary(pem: string) {
 }
 
 async function getGoogleAuthToken() {
-  const credsString = Deno.env.get('GOOGLE_CREDENTIALS_JSON');
-  if (!credsString) {
-    throw new Error("A variável de ambiente GOOGLE_CREDENTIALS_JSON não está configurada.");
+  const client_email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
+  const private_key = Deno.env.get('GOOGLE_PRIVATE_KEY');
+
+  if (!client_email || !private_key) {
+    throw new Error("Os secrets GOOGLE_CLIENT_EMAIL e GOOGLE_PRIVATE_KEY devem estar configurados.");
   }
 
-  const creds = JSON.parse(credsString);
   const scope = "https://www.googleapis.com/auth/cloud-vision";
   const aud = "https://oauth2.googleapis.com/token";
 
-  const privateKey = await crypto.subtle.importKey(
+  const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
-    pemToBinary(creds.private_key),
+    pemToBinary(private_key),
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     true,
     ["sign"]
@@ -41,13 +42,13 @@ async function getGoogleAuthToken() {
   const jwt = await create(
     { alg: "RS256", typ: "JWT" },
     {
-      iss: creds.client_email,
+      iss: client_email,
       scope: scope,
       aud: aud,
       exp: getNumericDate(3600),
       iat: getNumericDate(0),
     },
-    privateKey
+    cryptoKey
   );
 
   const response = await fetch(aud, {
