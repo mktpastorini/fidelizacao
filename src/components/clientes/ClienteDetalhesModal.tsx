@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Pedido, ItemPedido } from "@/types/supabase";
 import {
@@ -12,7 +13,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Heart, Users, ThumbsUp, Star, User } from "lucide-react";
+import { Phone, Heart, Users, ThumbsUp, Star, User, BarChart2, ShoppingCart, Repeat } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -46,6 +47,16 @@ const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: R
   </div>
 );
 
+const StatDisplay = ({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) => (
+  <div className="p-4 bg-gray-50 rounded-lg text-center">
+    <div className="flex justify-center items-center mb-1">
+      <Icon className="w-4 h-4 mr-2 text-gray-500" />
+      <p className="text-sm text-gray-500">{title}</p>
+    </div>
+    <p className="text-2xl font-bold">{value}</p>
+  </div>
+);
+
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteDetalhesModalProps) {
@@ -60,6 +71,16 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
   const calculateTotal = (itens: ItemPedido[]) => {
     return itens.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
   };
+
+  const stats = useMemo(() => {
+    if (!historico || historico.length === 0) {
+      return { totalVisits: 0, totalSpent: 0, averageTicket: 0 };
+    }
+    const totalVisits = historico.length;
+    const totalSpent = historico.reduce((acc, pedido) => acc + calculateTotal(pedido.itens_pedido), 0);
+    const averageTicket = totalSpent / totalVisits;
+    return { totalVisits, totalSpent, averageTicket };
+  }, [historico]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -109,27 +130,34 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
           <TabsContent value="historico" className="py-4">
             {isHistoryLoading ? (
               <div className="space-y-2">
-                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-20 w-full" />
                 <Skeleton className="h-8 w-full" />
                 <Skeleton className="h-8 w-full" />
               </div>
             ) : historico && historico.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead className="text-right">Valor Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {historico.map(pedido => (
-                    <TableRow key={pedido.id}>
-                      <TableCell>{pedido.closed_at ? format(new Date(pedido.closed_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(calculateTotal(pedido.itens_pedido))}</TableCell>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <StatDisplay title="Total de Visitas" value={stats.totalVisits} icon={Repeat} />
+                  <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} icon={ShoppingCart} />
+                  <StatDisplay title="Ticket Médio" value={formatCurrency(stats.averageTicket)} icon={BarChart2} />
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead className="text-right">Valor Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {historico.map(pedido => (
+                      <TableRow key={pedido.id}>
+                        <TableCell>{pedido.closed_at ? format(new Date(pedido.closed_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(calculateTotal(pedido.itens_pedido))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             ) : (
               <p className="text-center text-gray-500 py-8">Nenhum histórico de compras encontrado.</p>
             )}
