@@ -19,8 +19,8 @@ async function getGoogleVisionEmbedding(imageUrl: string, apiKey: string) {
     // É uma URL pública
     imageRequestPayload = { source: { imageUri: imageUrl } };
   } else {
-    // É uma imagem em base64, remove o prefixo
-    const base64Image = imageUrl.replace(/^data:image\/jpeg;base64,/, "");
+    // É uma imagem em base64, remove o prefixo de forma robusta
+    const base64Image = imageUrl.substring(imageUrl.indexOf(',') + 1);
     imageRequestPayload = { content: base64Image };
   }
 
