@@ -12,11 +12,11 @@ const variables = [
   { name: "{observacoes}", description: "Vem das 'Preferências'." },
 ];
 
-export function VariableReference() {
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-  };
+type VariableReferenceProps = {
+  onVariableClick: (variable: string) => void;
+};
 
+export function VariableReference({ onVariableClick }: VariableReferenceProps) {
   return (
     <Card>
       <CardHeader>
@@ -27,7 +27,7 @@ export function VariableReference() {
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground mb-4">
-          Clique em uma variável para copiar. Elas serão substituídas pelos dados do cliente.
+          Clique em uma variável para inserir no texto. Elas serão substituídas pelos dados do cliente.
         </p>
         <div className="flex flex-wrap gap-2">
           {variables.map((variable) => (
@@ -36,7 +36,7 @@ export function VariableReference() {
               variant="secondary"
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground"
               title={variable.description}
-              onClick={() => handleCopy(variable.name)}
+              onClick={() => onVariableClick(variable.name)}
             >
               {variable.name}
             </Badge>

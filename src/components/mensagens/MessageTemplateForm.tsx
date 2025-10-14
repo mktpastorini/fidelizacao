@@ -50,22 +50,29 @@ export function MessageTemplateForm({ onSubmit, isSubmitting, defaultValues }: M
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
+  const insertTextAtCursor = (textToInsert: string) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const newText = text.substring(0, start) + emojiData.emoji + text.substring(end);
+    const currentText = textarea.value;
+    const newText = currentText.substring(0, start) + textToInsert + currentText.substring(end);
     
     form.setValue("conteudo", newText, { shouldValidate: true });
 
-    // Move cursor to after the inserted emoji
     setTimeout(() => {
-      textarea.selectionStart = textarea.selectionEnd = start + emojiData.emoji.length;
+      textarea.selectionStart = textarea.selectionEnd = start + textToInsert.length;
       textarea.focus();
     }, 0);
+  };
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    insertTextAtCursor(emojiData.emoji);
+  };
+
+  const handleVariableClick = (variable: string) => {
+    insertTextAtCursor(variable);
   };
 
   return (
@@ -143,7 +150,7 @@ export function MessageTemplateForm({ onSubmit, isSubmitting, defaultValues }: M
         </form>
       </Form>
       <div className="pt-2">
-        <VariableReference />
+        <VariableReference onVariableClick={handleVariableClick} />
       </div>
     </div>
   );
