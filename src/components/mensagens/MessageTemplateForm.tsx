@@ -19,7 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { MessageTemplate } from "@/types/supabase";
+import { VariableReference } from "./VariableReference";
+import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
+import { Smile } from "lucide-react";
+import { useRef } from "react";
 
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome do template é obrigatório." }),
@@ -43,65 +48,103 @@ export function MessageTemplateForm({ onSubmit, isSubmitting, defaultValues }: M
     },
   });
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleEmojiClick = (emojiData: EmojiClickData) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const newText = text.substring(0, start) + emojiData.emoji + text.substring(end);
+    
+    form.setValue("conteudo", newText, { shouldValidate: true });
+
+    // Move cursor to after the inserted emoji
+    setTimeout(() => {
+      textarea.selectionStart = textarea.selectionEnd = start + emojiData.emoji.length;
+      textarea.focus();
+    }, 0);
+  };
+
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        <FormField
-          control={form.control}
-          name="nome"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Nome do Template</FormLabel>
-              <FormControl>
-                <Input placeholder="Ex: Mensagem de Boas-Vindas" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="tipo"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Tipo</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="nome"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nome do Template</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o tipo de template" />
-                  </SelectTrigger>
+                  <Input placeholder="Ex: Mensagem de Boas-Vindas" {...field} />
                 </FormControl>
-                <SelectContent>
-                  <SelectItem value="geral">Geral</SelectItem>
-                  <SelectItem value="chegada">Chegada de Cliente</SelectItem>
-                  <SelectItem value="pagamento">Pós-Pagamento</SelectItem>
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="conteudo"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Conteúdo da Mensagem</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Escreva sua mensagem aqui. Você pode usar {cliente} para o nome do cliente."
-                  rows={5}
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Salvando..." : "Salvar Template"}
-        </Button>
-      </form>
-    </Form>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="tipo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipo</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tipo de template" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="geral">Geral</SelectItem>
+                    <SelectItem value="chegada">Chegada de Cliente</SelectItem>
+                    <SelectItem value="pagamento">Pós-Pagamento</SelectItem>
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="conteudo"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Conteúdo da Mensagem</FormLabel>
+                <FormControl>
+                  <div className="relative">
+                    <Textarea
+                      placeholder="Escreva sua mensagem aqui..."
+                      rows={8}
+                      {...field}
+                      ref={textareaRef}
+                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="absolute bottom-2 right-2 h-7 w-7">
+                          <Smile className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 border-0">
+                        <EmojiPicker onEmojiClick={handleEmojiClick} />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Salvando..." : "Salvar Template"}
+          </Button>
+        </form>
+      </Form>
+      <div className="pt-2">
+        <VariableReference />
+      </div>
+    </div>
   );
 }

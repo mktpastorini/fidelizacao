@@ -6,6 +6,32 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function personalizeMessage(content: string, client: any): string {
+  let personalized = content;
+  const clientData = {
+    nome: client.nome || '',
+    conjuge: client.casado_com || '',
+    indicacoes: client.indicacoes?.toString() || '0',
+  };
+
+  // Substitui variáveis diretas do cliente
+  for (const [key, value] of Object.entries(clientData)) {
+    personalized = personalized.replace(new RegExp(`{${key}}`, 'g'), value);
+  }
+
+  // Substitui variáveis do JSON 'gostos'
+  if (client.gostos && typeof client.gostos === 'object') {
+    for (const [key, value] of Object.entries(client.gostos)) {
+      personalized = personalized.replace(new RegExp(`{${key}}`, 'g'), String(value));
+    }
+  }
+
+  // Remove quaisquer variáveis restantes que não foram encontradas
+  personalized = personalized.replace(/{[a-zA-Z_]+}/g, '');
+
+  return personalized;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -22,7 +48,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 1. Busca as configurações do usuário (URL do webhook e ID do template de pagamento)
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('webhook_url, pagamento_template_id')
@@ -37,7 +62,6 @@ serve(async (req) => {
       })
     }
 
-    // 2. Busca o conteúdo do template de mensagem
     const { data: template, error: templateError } = await supabaseAdmin
       .from('message_templates')
       .select('conteudo')
@@ -46,10 +70,9 @@ serve(async (req) => {
 
     if (templateError) throw templateError
 
-    // 3. Busca os detalhes do cliente (nome e WhatsApp)
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clientes')
-      .select('nome, whatsapp')
+      .select('nome, casado_com, indicacoes, gostos, whatsapp')
       .eq('id', clientId)
       .single()
 
@@ -61,12 +84,8 @@ serve(async (req) => {
       })
     }
 
-    // 4. Personaliza a mensagem
-    const personalizedMessage = template.conteudo.replace(/{cliente}/g, client.nome);
+    const personalizedMessage = personalizeMessage(template.conteudo, client);
 
-    // 5. Envia a requisição para o webhook.
-    // Nota: Esta é uma requisição POST simples sem cabeçalhos de autenticação (JWT).
-    // Seu endpoint de webhook não precisa de autenticação para receber esta chamada.
     const webhookResponse = await fetch(settings.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

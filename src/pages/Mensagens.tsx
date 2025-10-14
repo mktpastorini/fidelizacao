@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MessageTemplateForm } from "@/components/mensagens/MessageTemplateForm";
+import { DefaultTemplates } from "@/components/mensagens/DefaultTemplates";
 import { PlusCircle, MoreHorizontal, Trash2, Edit } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Badge } from "@/components/ui/badge";
@@ -62,11 +63,10 @@ export default function MensagensPage() {
 
   const addTemplateMutation = useMutation({
     mutationFn: async (newTemplate: Omit<MessageTemplate, 'id' | 'created_at' | 'user_id'>) => {
-      const { data: user } = await supabase.auth.getUser();
-      const userId = user?.user?.id;
-      if (!userId) throw new Error("Usuário não autenticado");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const { error } = await supabase.from("message_templates").insert([{ ...newTemplate, user_id: userId }]);
+      const { error } = await supabase.from("message_templates").insert([{ ...newTemplate, user_id: user.id }]);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -146,7 +146,7 @@ export default function MensagensPage() {
               Adicionar Template
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-4xl">
             <DialogHeader>
               <DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle>
             </DialogHeader>
@@ -158,6 +158,13 @@ export default function MensagensPage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {!isLoading && templates && (
+        <DefaultTemplates 
+          onAdd={(template) => addTemplateMutation.mutate(template)}
+          existingTemplateNames={templates.map(t => t.nome)}
+        />
+      )}
 
       <div className="bg-white p-6 rounded-lg shadow-md">
         {isLoading ? (
@@ -217,9 +224,6 @@ export default function MensagensPage() {
         ) : (
           <div className="text-center py-12">
             <p className="text-gray-500">Nenhum template de mensagem cadastrado.</p>
-            <p className="text-gray-500">
-              Clique em "Adicionar Template" para criar o primeiro.
-            </p>
           </div>
         )}
       </div>
