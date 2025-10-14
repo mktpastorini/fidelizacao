@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Mesa } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ClientArrivalModal } from "@/components/dashboard/ClientArrivalModal";
 import { FacialRecognitionDialog } from "@/components/dashboard/FacialRecognitionDialog";
@@ -13,7 +14,8 @@ import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopClientsCard } from "@/components/dashboard/TopClientsCard";
 import { RecentArrivalsCard } from "@/components/dashboard/RecentArrivalsCard";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
-import { Users, Table, CheckCircle, DollarSign, ReceiptText, Camera } from "lucide-react";
+import { ClienteForm } from "@/components/clientes/ClienteForm";
+import { Users, Table, CheckCircle, DollarSign, ReceiptText, Camera, UserPlus } from "lucide-react";
 import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -54,6 +56,7 @@ export default function Dashboard() {
   const [isRecognitionDialogOpen, setIsRecognitionDialogOpen] = useState(false);
   const [isArrivalModalOpen, setIsArrivalModalOpen] = useState(false);
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false);
+  const [isClienteFormOpen, setIsClienteFormOpen] = useState(false);
   
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
   const [lastArrivedClient, setLastArrivedClient] = useState<Cliente | null>(null);
@@ -99,6 +102,48 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ["recentArrivals"] });
       showSuccess("Cliente alocado com sucesso!");
       onArrivalModalChange(false);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const addClienteMutation = useMutation({
+    mutationFn: async (newCliente: any) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      const gostosObject = newCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
+
+      const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
+        p_user_id: user.id,
+        p_nome: newCliente.nome,
+        p_casado_com: newCliente.casado_com,
+        p_whatsapp: newCliente.whatsapp,
+        p_gostos: gostosObject,
+        p_avatar_url: newCliente.avatar_url,
+        p_indicado_por_id: newCliente.indicado_por_id === 'none' ? null : newCliente.indicado_por_id,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+
+      if (newCliente.filhos && newCliente.filhos.length > 0) {
+        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+        const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
+        if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
+      }
+      
+      if (newCliente.avatar_url) {
+        const { error: faceError } = await supabase.functions.invoke('register-face', {
+          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
+        });
+        if (faceError) {
+          showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      showSuccess("Cliente adicionado com sucesso!");
+      setIsClienteFormOpen(false);
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -224,11 +269,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-gray-600 mt-2">
-          Visão geral do seu estabelecimento e clientes.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-gray-600 mt-2">
+            Visão geral do seu estabelecimento e clientes.
+          </p>
+        </div>
+        <Button onClick={() => setIsClienteFormOpen(true)}>
+          <UserPlus className="w-4 h-4 mr-2" />
+          Cadastrar Cliente
+        </Button>
       </div>
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -299,6 +350,22 @@ export default function Dashboard() {
         onAllocateTable={handleAllocateTable}
         isAllocating={allocateTableMutation.isPending}
       />
+
+      <Dialog open={isClienteFormOpen} onOpenChange={setIsClienteFormOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adicionar Novo Cliente</DialogTitle>
+            <DialogDescription>
+              Preencha as informações abaixo para cadastrar um novo cliente.
+            </DialogDescription>
+          </DialogHeader>
+          <ClienteForm 
+            onSubmit={(values) => addClienteMutation.mutate(values)} 
+            isSubmitting={addClienteMutation.isPending}
+            clientes={data?.clientes || []}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

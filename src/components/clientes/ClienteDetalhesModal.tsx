@@ -124,6 +124,7 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
                 </DetailSection>
                 <DetailSection title="Fidelidade" icon={ThumbsUp}>
                   <p>Indicou {cliente.indicacoes} cliente(s).</p>
+                  {cliente.indicado_por && <p>Indicado por: <span className="font-semibold">{cliente.indicado_por.nome}</span></p>}
                 </DetailSection>
               </TabsContent>
 

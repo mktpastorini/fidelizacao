@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
     .from("clientes")
-    .select("*, filhos(*)")
+    .select("*, filhos(*), indicado_por:clientes!indicado_por_id(nome)")
     .order("created_at", { ascending: false });
 
   if (searchTerm) {

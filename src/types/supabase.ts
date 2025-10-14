@@ -16,6 +16,7 @@ export type Cliente = {
   filhos: Filho[];
   created_at: string;
   indicado_por_id: string | null;
+  indicado_por?: { nome: string } | null;
 };
 
 export type Mesa = {
