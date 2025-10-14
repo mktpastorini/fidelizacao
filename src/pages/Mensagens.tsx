@@ -11,7 +11,7 @@ import { DefaultTemplates } from "@/components/mensagens/DefaultTemplates";
 import { LogDetailsModal } from "@/components/mensagens/LogDetailsModal";
 import { SendBulkMessageDialog } from "@/components/mensagens/SendBulkMessageDialog";
 import { PlusCircle, MoreHorizontal, Trash2, Edit, Eye, Send } from "lucide-react";
-import { showError, showSuccess } from "@/utils/toast";
+import { showError, showSuccess, showLoading, dismissToast } from "@/utils/toast";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -124,8 +124,26 @@ export default function MensagensPage() {
       showSuccess(data.message || "Mensagens enviadas para a fila.");
       setIsSendDialogOpen(false);
     },
-    onError: (error: Error) => showError(error.message),
+    onError: (error: Error) => {
+      showError(`Falha no envio: ${error.message}`);
+    },
   });
+
+  const handleBulkSubmit = (values: { template_id: string; client_ids: string[] }) => {
+    const toastId = showLoading("Enviando mensagens para a fila...");
+    sendBulkMessageMutation.mutate(values, {
+      onSuccess: (data) => {
+        dismissToast(toastId);
+        queryClient.invalidateQueries({ queryKey: ["message_logs"] });
+        showSuccess(data.message || "Mensagens enviadas para a fila.");
+        setIsSendDialogOpen(false);
+      },
+      onError: (error: Error) => {
+        dismissToast(toastId);
+        showError(`Falha no envio: ${error.message}`);
+      },
+    });
+  };
 
   const handleTemplateSubmit = (values: any) => {
     if (editingTemplate) {
@@ -249,7 +267,7 @@ export default function MensagensPage() {
         onOpenChange={setIsSendDialogOpen}
         templates={templates || []}
         clientes={clientes || []}
-        onSubmit={(values) => sendBulkMessageMutation.mutate(values)}
+        onSubmit={handleBulkSubmit}
         isSubmitting={sendBulkMessageMutation.isPending}
       />
     </div>
