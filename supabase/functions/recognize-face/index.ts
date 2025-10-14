@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// --- Lógica do Google Vision ---
 async function getGoogleAuthToken() {
   const client_email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
   const private_key_string = Deno.env.get('GOOGLE_PRIVATE_KEY');
@@ -70,10 +69,14 @@ async function getGoogleAuthToken() {
 async function getGoogleVisionEmbedding(imageUrl: string) {
   const accessToken = await getGoogleAuthToken();
   let imageRequestPayload;
+
   if (imageUrl.startsWith('http')) {
     imageRequestPayload = { source: { imageUri: imageUrl } };
   } else {
     const base64Image = imageUrl.substring(imageUrl.indexOf(',') + 1);
+    if (!base64Image) {
+      throw new Error("A imagem (base64) está vazia após o processamento inicial.");
+    }
     imageRequestPayload = { content: base64Image };
   }
 
@@ -111,7 +114,6 @@ async function getGoogleVisionEmbedding(imageUrl: string) {
 
   return embedding;
 }
-// --- Fim da Lógica do Google Vision ---
 
 function getSimulatedEmbedding() {
   return Array(512).fill(0).map(() => Math.random() * 0.1);
@@ -129,13 +131,14 @@ serve(async (req) => {
     if (!image_url) {
       throw new Error("Payload inválido: image_url é obrigatório.");
     }
-    console.log("RECOGNIZE-FACE: 1/10 - Payload recebido.");
+    console.log("RECOGNIZE-FACE: 1/11 - Payload recebido.");
+    console.log(`RECOGNIZE-FACE: 2/11 - URL da imagem (iniciais): ${image_url.substring(0, 70)}...`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-    console.log("RECOGNIZE-FACE: 2/10 - Cliente Supabase Admin criado.");
+    console.log("RECOGNIZE-FACE: 3/11 - Cliente Supabase Admin criado.");
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -145,7 +148,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError) throw userError;
     if (!user) throw new Error("Usuário não autenticado.");
-    console.log(`RECOGNIZE-FACE: 3/10 - Usuário autenticado: ${user.id}`);
+    console.log(`RECOGNIZE-FACE: 4/11 - Usuário autenticado: ${user.id}`);
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -155,20 +158,20 @@ serve(async (req) => {
     
     if (settingsError) throw settingsError;
     const provider = settings?.ai_provider || 'simulacao';
-    console.log(`RECOGNIZE-FACE: 4/10 - Provedor de IA: ${provider}`);
+    console.log(`RECOGNIZE-FACE: 5/11 - Provedor de IA: ${provider}`);
 
     let embedding;
     if (provider === 'google_vision') {
-      console.log("RECOGNIZE-FACE: 5/10 - Gerando embedding com Google Vision...");
+      console.log("RECOGNIZE-FACE: 6/11 - Gerando embedding com Google Vision...");
       embedding = await getGoogleVisionEmbedding(image_url);
-      console.log("RECOGNIZE-FACE: 6/10 - Embedding do Google Vision gerado.");
+      console.log("RECOGNIZE-FACE: 7/11 - Embedding do Google Vision gerado.");
     } else {
-      console.log("RECOGNIZE-FACE: 5/10 - Gerando embedding com Simulação...");
+      console.log("RECOGNIZE-FACE: 6/11 - Gerando embedding com Simulação...");
       embedding = getSimulatedEmbedding();
-      console.log("RECOGNIZE-FACE: 6/10 - Embedding de simulação gerado.");
+      console.log("RECOGNIZE-FACE: 7/11 - Embedding de simulação gerado.");
     }
 
-    console.log("RECOGNIZE-FACE: 7/10 - Buscando correspondência no DB...");
+    console.log("RECOGNIZE-FACE: 8/11 - Buscando correspondência no DB...");
     const { data: match, error: rpcError } = await supabaseAdmin.rpc('match_customer_face', {
       query_embedding: embedding,
       match_threshold: 0.9,
@@ -177,17 +180,17 @@ serve(async (req) => {
     });
 
     if (rpcError) throw rpcError;
-    console.log("RECOGNIZE-FACE: 8/10 - Busca no DB concluída.");
+    console.log("RECOGNIZE-FACE: 9/11 - Busca no DB concluída.");
 
     if (!match || match.length === 0) {
-      console.log("RECOGNIZE-FACE: 9/10 - Nenhuma correspondência encontrada.");
+      console.log("RECOGNIZE-FACE: 10/11 - Nenhuma correspondência encontrada.");
       return new Response(JSON.stringify({ match: null, message: 'Nenhum cliente correspondente encontrado.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
 
-    console.log(`RECOGNIZE-FACE: 9/10 - Correspondência encontrada: cliente_id ${match[0].cliente_id}`);
+    console.log(`RECOGNIZE-FACE: 10/11 - Correspondência encontrada: cliente_id ${match[0].cliente_id}`);
     const { data: cliente, error: clientError } = await supabaseAdmin
       .from('clientes')
       .select('*, filhos(*)')
@@ -195,7 +198,7 @@ serve(async (req) => {
       .single();
 
     if (clientError) throw clientError;
-    console.log("RECOGNIZE-FACE: 10/10 - Detalhes do cliente buscados. SUCESSO.");
+    console.log("RECOGNIZE-FACE: 11/11 - Detalhes do cliente buscados. SUCESSO.");
 
     return new Response(JSON.stringify({ match: cliente }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

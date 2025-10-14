@@ -7,7 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// --- Lógica do Google Vision ---
 async function getGoogleAuthToken() {
   const client_email = Deno.env.get('GOOGLE_CLIENT_EMAIL');
   const private_key_string = Deno.env.get('GOOGLE_PRIVATE_KEY');
@@ -70,10 +69,14 @@ async function getGoogleAuthToken() {
 async function getGoogleVisionEmbedding(imageUrl: string) {
   const accessToken = await getGoogleAuthToken();
   let imageRequestPayload;
+
   if (imageUrl.startsWith('http')) {
     imageRequestPayload = { source: { imageUri: imageUrl } };
   } else {
     const base64Image = imageUrl.substring(imageUrl.indexOf(',') + 1);
+    if (!base64Image) {
+      throw new Error("A imagem (base64) está vazia após o processamento inicial.");
+    }
     imageRequestPayload = { content: base64Image };
   }
 
@@ -111,7 +114,6 @@ async function getGoogleVisionEmbedding(imageUrl: string) {
 
   return embedding;
 }
-// --- Fim da Lógica do Google Vision ---
 
 function getSimulatedEmbedding() {
   return Array(512).fill(0).map(() => Math.random() * 0.1);
@@ -128,13 +130,15 @@ serve(async (req) => {
     if (!cliente_id || !image_url) {
       throw new Error("Payload inválido: cliente_id e image_url são obrigatórios.");
     }
-    console.log(`REGISTER-FACE: 1/7 - Payload recebido para cliente ${cliente_id}.`);
+    console.log(`REGISTER-FACE: 1/8 - Payload recebido para cliente ${cliente_id}.`);
+    console.log(`REGISTER-FACE: 2/8 - URL da imagem (iniciais): ${image_url.substring(0, 70)}...`);
+
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-    console.log("REGISTER-FACE: 2/7 - Cliente Supabase Admin criado.");
+    console.log("REGISTER-FACE: 3/8 - Cliente Supabase Admin criado.");
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
@@ -144,7 +148,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError) throw userError;
     if (!user) throw new Error("Usuário não autenticado.");
-    console.log(`REGISTER-FACE: 3/7 - Usuário autenticado: ${user.id}`);
+    console.log(`REGISTER-FACE: 4/8 - Usuário autenticado: ${user.id}`);
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -154,17 +158,17 @@ serve(async (req) => {
     
     if (settingsError) throw settingsError;
     const provider = settings?.ai_provider || 'simulacao';
-    console.log(`REGISTER-FACE: 4/7 - Provedor de IA: ${provider}`);
+    console.log(`REGISTER-FACE: 5/8 - Provedor de IA: ${provider}`);
 
     let embedding;
     if (provider === 'google_vision') {
-      console.log("REGISTER-FACE: 5/7 - Gerando embedding com Google Vision...");
+      console.log("REGISTER-FACE: 6/8 - Gerando embedding com Google Vision...");
       embedding = await getGoogleVisionEmbedding(image_url);
-      console.log("REGISTER-FACE: 6/7 - Embedding do Google Vision gerado.");
+      console.log("REGISTER-FACE: 7/8 - Embedding do Google Vision gerado.");
     } else {
-      console.log("REGISTER-FACE: 5/7 - Gerando embedding com Simulação...");
+      console.log("REGISTER-FACE: 6/8 - Gerando embedding com Simulação...");
       embedding = getSimulatedEmbedding();
-      console.log("REGISTER-FACE: 6/7 - Embedding de simulação gerado.");
+      console.log("REGISTER-FACE: 7/8 - Embedding de simulação gerado.");
     }
 
     const { error: upsertError } = await supabaseAdmin
@@ -177,7 +181,7 @@ serve(async (req) => {
       }, { onConflict: 'cliente_id' });
 
     if (upsertError) throw upsertError;
-    console.log("REGISTER-FACE: 7/7 - Embedding salvo no DB. SUCESSO.");
+    console.log("REGISTER-FACE: 8/8 - Embedding salvo no DB. SUCESSO.");
 
     return new Response(JSON.stringify({ success: true, message: `Rosto cadastrado com sucesso usando ${provider}.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
