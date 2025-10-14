@@ -88,14 +88,12 @@ export default function ClientesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const gostosObject = newCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
-
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id,
         p_nome: newCliente.nome,
         p_casado_com: newCliente.casado_com,
         p_whatsapp: newCliente.whatsapp,
-        p_gostos: gostosObject,
+        p_gostos: newCliente.gostos,
         p_avatar_url: newCliente.avatar_url,
         p_indicado_por_id: newCliente.indicado_por_id,
       });
@@ -128,18 +126,15 @@ export default function ClientesPage() {
     mutationFn: async (updatedCliente: any) => {
       const { id, filhos, ...clienteInfo } = updatedCliente;
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.user?.id;
-      if (!userId) throw new Error("Usuário não autenticado");
+      if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const gostosObject = updatedCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
-
-      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo, gostos: gostosObject }).eq("id", id);
+      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo }).eq("id", id);
       if (clienteError) throw new Error(clienteError.message);
 
       await supabase.from("filhos").delete().eq("cliente_id", id);
 
       if (filhos && filhos.length > 0) {
-        const filhosData = filhos.map((filho: any) => ({ nome: filho.nome, idade: filho.idade, cliente_id: id, user_id: userId }));
+        const filhosData = filhos.map((filho: any) => ({ nome: filho.nome, idade: filho.idade, cliente_id: id, user_id: user.id }));
         const { error: insertFilhosError } = await supabase.from("filhos").insert(filhosData);
         if (insertFilhosError) throw new Error(insertFilhosError.message);
       }
