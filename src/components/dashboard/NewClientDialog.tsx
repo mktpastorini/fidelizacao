@@ -10,15 +10,17 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "../ui/button";
 import { toast } from "sonner";
+import { Cliente } from "@/types/supabase";
 
 type NewClientDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onSubmit: (values: any) => void;
   isSubmitting: boolean;
+  clientes: Cliente[];
 };
 
-export function NewClientDialog({ isOpen, onOpenChange, onSubmit, isSubmitting }: NewClientDialogProps) {
+export function NewClientDialog({ isOpen, onOpenChange, onSubmit, isSubmitting, clientes }: NewClientDialogProps) {
   const [faceImageUrl, setFaceImageUrl] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
 
@@ -55,7 +57,11 @@ export function NewClientDialog({ isOpen, onOpenChange, onSubmit, isSubmitting }
           <div>
             <h3 className="text-lg font-semibold mb-2">2. Informações do Cliente</h3>
             {showForm ? (
-              <ClienteForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+              <ClienteForm 
+                onSubmit={handleSubmit} 
+                isSubmitting={isSubmitting} 
+                clientes={clientes} 
+              />
             ) : (
               <div className="h-full flex items-center justify-center text-center p-8 border-2 border-dashed rounded-lg">
                 <p className="text-muted-foreground">

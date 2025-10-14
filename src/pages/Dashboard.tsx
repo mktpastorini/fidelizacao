@@ -151,37 +151,35 @@ export default function Dashboard() {
   const addClienteAndRegisterFaceMutation = useMutation({
     mutationFn: async (newCliente: any) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const userId = user?.id;
-      if (!userId) throw new Error("Usuário não autenticado");
+      if (!user?.id) throw new Error("Usuário não autenticado");
 
-      let gostos = null;
-      try {
-        if (newCliente.gostos) gostos = JSON.parse(newCliente.gostos);
-      } catch (e) {
-        throw new Error("Formato de 'Gostos' inválido. Use JSON.");
-      }
+      const gostosObject = newCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
 
-      const { filhos, ...clienteDataToInsert } = newCliente;
-      const { data: clienteData, error: clienteError } = await supabase.from("clientes").insert([{ ...clienteDataToInsert, gostos, user_id: userId }]).select().single();
-      if (clienteError) throw new Error(`Erro ao criar cliente: ${clienteError.message}`);
+      const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
+        p_user_id: user.id,
+        p_nome: newCliente.nome,
+        p_casado_com: newCliente.casado_com,
+        p_whatsapp: newCliente.whatsapp,
+        p_gostos: gostosObject,
+        p_avatar_url: newCliente.avatar_url,
+        p_indicado_por_id: newCliente.indicado_por_id === 'none' ? null : newCliente.indicado_por_id,
+      });
+      if (rpcError) throw new Error(rpcError.message);
 
-      const newClientId = clienteData.id;
-
-      if (filhos && filhos.length > 0) {
-        const filhosData = filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: userId }));
+      if (newCliente.filhos && newCliente.filhos.length > 0) {
+        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
-
-      if (clienteData.avatar_url) {
+      
+      if (newCliente.avatar_url) {
         const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: newClientId, image_url: clienteData.avatar_url },
+          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
         });
         if (faceError) {
           showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
         }
       }
-      return clienteData;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
@@ -340,6 +338,7 @@ export default function Dashboard() {
         onOpenChange={setIsNewClientModalOpen}
         onSubmit={handleNewClientSubmit}
         isSubmitting={addClienteAndRegisterFaceMutation.isPending}
+        clientes={data?.clientes || []}
       />
 
       <ClientArrivalModal
