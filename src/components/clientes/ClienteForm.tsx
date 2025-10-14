@@ -21,7 +21,7 @@ const formSchema = z.object({
   casado_com: z.string().optional(),
   whatsapp: z.string().optional(),
   avatar_url: z.string().nullable().optional(),
-  indicado_por_id: z.string().uuid().optional().nullable(),
+  indicado_por_id: z.string().uuid().optional().nullable().or(z.literal("")).transform(val => val === "" ? null : val),
   gostos: z.array(
     z.object({
       key: z.string().min(1, { message: "O campo é obrigatório." }),
@@ -52,7 +52,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
       casado_com: defaultValues?.casado_com || "",
       whatsapp: defaultValues?.whatsapp || "",
       avatar_url: defaultValues?.avatar_url || null,
-      indicado_por_id: defaultValues?.indicado_por_id || null,
+      indicado_por_id: defaultValues?.indicado_por_id || "",
       gostos: defaultValues?.gostos ? Object.entries(defaultValues.gostos).map(([key, value]) => ({ key, value: String(value) })) : [],
       filhos: defaultValues?.filhos || [],
     },
@@ -143,7 +143,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="none">Ninguém / Indicação própria</SelectItem>
+                    <SelectItem value="">Ninguém / Indicação própria</SelectItem>
                     {clientes.map(cliente => (
                       <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
                     ))}

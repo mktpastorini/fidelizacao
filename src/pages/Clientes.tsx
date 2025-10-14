@@ -97,7 +97,7 @@ export default function ClientesPage() {
         p_whatsapp: newCliente.whatsapp,
         p_gostos: gostosObject,
         p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id === 'none' ? null : newCliente.indicado_por_id,
+        p_indicado_por_id: newCliente.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
 
