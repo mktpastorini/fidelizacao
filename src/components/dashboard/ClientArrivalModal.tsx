@@ -55,11 +55,11 @@ export function ClientArrivalModal({
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
-          <div className="p-4 border rounded-lg bg-gray-50/50">
-            <h3 className="font-semibold text-lg mb-2">{cliente.nome}</h3>
+          <div className="p-4 border rounded-lg bg-gray-50/50 space-y-2">
+            <h3 className="font-semibold text-lg">{cliente.nome}</h3>
             {cliente.casado_com && <p className="text-sm text-gray-600">Casado(a) com: {cliente.casado_com}</p>}
             {cliente.filhos && cliente.filhos.length > 0 && (
-              <div className="mt-2">
+              <div>
                 <h4 className="font-medium text-sm">Filhos:</h4>
                 <ul className="list-disc list-inside text-sm text-gray-600">
                   {cliente.filhos.map(filho => (
@@ -68,10 +68,14 @@ export function ClientArrivalModal({
                 </ul>
               </div>
             )}
-            {cliente.gostos && (
-                <div className="mt-2">
-                    <h4 className="font-medium text-sm">Preferências:</h4>
-                    <pre className="text-xs bg-gray-100 p-2 rounded-md whitespace-pre-wrap font-sans">{JSON.stringify(cliente.gostos, null, 2)}</pre>
+            {cliente.gostos && Object.keys(cliente.gostos).length > 0 && (
+                <div>
+                    <h4 className="font-medium text-sm mb-1">Preferências:</h4>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      {Object.entries(cliente.gostos).map(([key, value]) => (
+                        <p key={key}><span className="font-semibold capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</p>
+                      ))}
+                    </div>
                 </div>
             )}
           </div>

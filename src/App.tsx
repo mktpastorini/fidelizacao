@@ -11,6 +11,7 @@ import Produtos from "./pages/Produtos";
 import Mensagens from "./pages/Mensagens";
 import Mesas from "./pages/Mesas";
 import Historico from "./pages/Historico";
+import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
@@ -32,6 +33,7 @@ const App = () => (
               <Route path="/produtos" element={<Produtos />} />
               <Route path="/mesas" element={<Mesas />} />
               <Route path="/historico" element={<Historico />} />
+              <Route path="/relatorios" element={<Relatorios />} />
               <Route path="/mensagens" element={<Mensagens />} />
               <Route path="/configuracoes" element={<Configuracoes />} />
             </Route>
