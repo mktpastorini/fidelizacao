@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Copy, RefreshCw } from "lucide-react";
 
 type UserData = {
   profile: Profile | null;
@@ -114,6 +116,28 @@ export default function ConfiguracoesPage() {
     },
   });
 
+  const regenerateApiKeyMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('regenerate_api_key');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["userData"] });
+      showSuccess("Nova chave de API gerada com sucesso!");
+    },
+    onError: (error: Error) => {
+      showError(`Falha ao gerar chave: ${error.message}`);
+    },
+  });
+
+  const handleCopy = (text: string | null | undefined) => {
+    if (text) {
+      navigator.clipboard.writeText(text);
+      showSuccess("Chave de API copiada!");
+    }
+  };
+
   return (
     <div>
       <div className="mb-6">
@@ -132,7 +156,7 @@ export default function ConfiguracoesPage() {
 
         <TabsContent value="perfil" className="mt-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="lg:col-span-2">
+            <Card>
               <CardHeader>
                 <CardTitle>Perfil</CardTitle>
                 <CardDescription>Atualize seu nome e sobrenome.</CardDescription>
@@ -150,6 +174,27 @@ export default function ConfiguracoesPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle>Chave de API</CardTitle>
+                <CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Input readOnly value={data?.settings?.api_key || "Nenhuma chave gerada"} />
+                      <Button variant="outline" size="icon" onClick={() => handleCopy(data?.settings?.api_key)}><Copy className="w-4 h-4" /></Button>
+                    </div>
+                    <Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      {regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="lg:col-span-2">
+              <CardHeader>
                 <CardTitle>Integrações</CardTitle>
                 <CardDescription>Configure seu webhook para automações de WhatsApp.</CardDescription>
               </CardHeader>
@@ -166,7 +211,7 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="lg:col-span-2">
               <CardHeader>
                 <CardTitle>Inteligência Artificial</CardTitle>
                 <CardDescription>Selecione o provedor para o reconhecimento facial.</CardDescription>

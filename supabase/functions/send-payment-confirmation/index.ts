@@ -46,11 +46,7 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  let logPayload: any = {
-    user_id: userId,
-    cliente_id: clientId,
-    trigger_event: 'pagamento',
-  };
+  let logId: string | null = null;
 
   try {
     const { data: settings, error: settingsError } = await supabaseAdmin
@@ -63,7 +59,21 @@ serve(async (req) => {
     if (!settings?.webhook_url || !settings?.pagamento_template_id) {
       throw new Error('Webhook ou template de pagamento não configurado.');
     }
-    logPayload.template_id = settings.pagamento_template_id;
+
+    const { data: initialLog, error: logError } = await supabaseAdmin
+      .from('message_logs')
+      .insert({
+        user_id: userId,
+        cliente_id: clientId,
+        template_id: settings.pagamento_template_id,
+        trigger_event: 'pagamento',
+        status: 'processando',
+      })
+      .select('id')
+      .single();
+
+    if (logError) throw new Error(`Falha ao criar log inicial: ${logError.message}`);
+    logId = initialLog.id;
 
     const { data: template, error: templateError } = await supabaseAdmin
       .from('message_templates')
@@ -88,6 +98,7 @@ serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        log_id: logId,
         phone: client.whatsapp,
         message: personalizedMessage,
         client_name: client.nome,
@@ -95,24 +106,21 @@ serve(async (req) => {
     })
 
     const responseBody = await webhookResponse.json().catch(() => webhookResponse.text());
-    logPayload.webhook_response = responseBody;
 
     if (!webhookResponse.ok) {
       throw new Error(`Webhook de pagamento falhou com status: ${webhookResponse.status}. Resposta: ${JSON.stringify(responseBody)}`);
     }
 
-    logPayload.status = 'sucesso';
-    await supabaseAdmin.from('message_logs').insert(logPayload);
+    await supabaseAdmin.from('message_logs').update({ status: 'sucesso', webhook_response: responseBody }).eq('id', logId);
 
     return new Response(JSON.stringify({ success: true, message: 'Webhook de pagamento enviado com sucesso.' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
   } catch (error) {
-    logPayload.status = 'falha';
-    logPayload.error_message = error.message;
-    await supabaseAdmin.from('message_logs').insert(logPayload);
-
+    if (logId) {
+      await supabaseAdmin.from('message_logs').update({ status: 'falha', error_message: error.message }).eq('id', logId);
+    }
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

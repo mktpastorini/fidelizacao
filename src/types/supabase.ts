@@ -48,6 +48,7 @@ export type UserSettings = {
   webhook_url: string | null;
   chegada_template_id: string | null;
   pagamento_template_id: string | null;
+  api_key: string | null;
 };
 
 export type Pedido = {
@@ -85,4 +86,5 @@ export type MessageLog = {
   webhook_response: Record<string, any> | null;
   cliente: { nome: string } | null;
   template: { nome: string } | null;
+  delivery_status: 'pending' | 'delivered' | 'failed' | null;
 };

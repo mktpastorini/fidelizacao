@@ -116,6 +116,18 @@ export default function MensagensPage() {
     }
   };
 
+  const getDeliveryStatusBadge = (status: MessageLog['delivery_status']) => {
+    switch (status) {
+      case 'delivered':
+        return <Badge className="bg-green-600 hover:bg-green-700">Entregue</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Falhou</Badge>;
+      case 'pending':
+      default:
+        return <Badge variant="secondary">Pendente</Badge>;
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -172,7 +184,7 @@ export default function MensagensPage() {
           <div className="bg-white p-6 rounded-lg shadow-md">
             {isLoadingLogs ? <p>Carregando histórico...</p> : logs && logs.length > 0 ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Data</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Data</TableHead><TableHead>Status Webhook</TableHead><TableHead>Status Entrega</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {logs.map((log) => (
                     <TableRow key={log.id}>
@@ -183,6 +195,7 @@ export default function MensagensPage() {
                           {log.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>{getDeliveryStatusBadge(log.delivery_status)}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" onClick={() => handleLogModalOpen(log)}><Eye className="w-4 h-4 mr-2" />Detalhes</Button>
                       </TableCell>
