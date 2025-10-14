@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { MessageTemplate, MessageLog } from "@/types/supabase";
+import { MessageTemplate, MessageLog, Cliente } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,7 +9,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MessageTemplateForm } from "@/components/mensagens/MessageTemplateForm";
 import { DefaultTemplates } from "@/components/mensagens/DefaultTemplates";
 import { LogDetailsModal } from "@/components/mensagens/LogDetailsModal";
-import { PlusCircle, MoreHorizontal, Trash2, Edit, Eye } from "lucide-react";
+import { SendBulkMessageDialog } from "@/components/mensagens/SendBulkMessageDialog";
+import { PlusCircle, MoreHorizontal, Trash2, Edit, Eye, Send } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -32,10 +33,17 @@ async function fetchMessageLogs(): Promise<MessageLog[]> {
   return (data as any[]) || [];
 }
 
+async function fetchClientes(): Promise<Cliente[]> {
+  const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
 export default function MensagensPage() {
   const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
   const [selectedLog, setSelectedLog] = useState<MessageLog | null>(null);
 
@@ -49,9 +57,14 @@ export default function MensagensPage() {
     queryFn: fetchMessageLogs,
   });
 
-  const handleDialogChange = (isOpen: boolean) => {
+  const { data: clientes, isLoading: isLoadingClientes } = useQuery({
+    queryKey: ["clientes_list_simple"],
+    queryFn: fetchClientes,
+  });
+
+  const handleTemplateDialogChange = (isOpen: boolean) => {
     if (!isOpen) setEditingTemplate(null);
-    setIsDialogOpen(isOpen);
+    setIsTemplateDialogOpen(isOpen);
   };
 
   const handleLogModalOpen = (log: MessageLog) => {
@@ -69,7 +82,7 @@ export default function MensagensPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["message_templates"] });
       showSuccess("Template adicionado com sucesso!");
-      handleDialogChange(false);
+      handleTemplateDialogChange(false);
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -83,7 +96,7 @@ export default function MensagensPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["message_templates"] });
       showSuccess("Template atualizado com sucesso!");
-      handleDialogChange(false);
+      handleTemplateDialogChange(false);
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -100,7 +113,21 @@ export default function MensagensPage() {
     onError: (error: Error) => showError(error.message),
   });
 
-  const handleSubmit = (values: any) => {
+  const sendBulkMessageMutation = useMutation({
+    mutationFn: async (values: { template_id: string; client_ids: string[] }) => {
+      const { data, error } = await supabase.functions.invoke('send-bulk-message', { body: values });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["message_logs"] });
+      showSuccess(data.message || "Mensagens enviadas para a fila.");
+      setIsSendDialogOpen(false);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const handleTemplateSubmit = (values: any) => {
     if (editingTemplate) {
       editTemplateMutation.mutate({ ...values, id: editingTemplate.id });
     } else {
@@ -112,6 +139,7 @@ export default function MensagensPage() {
     switch (type) {
       case 'chegada': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
       case 'pagamento': return 'bg-green-100 text-green-800 hover:bg-green-200';
+      case 'manual': return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
       default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
   };
@@ -135,15 +163,21 @@ export default function MensagensPage() {
           <h1 className="text-3xl font-bold">Mensagens</h1>
           <p className="text-gray-600 mt-2">Crie templates e acompanhe o histórico de envios.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
-          <DialogTrigger asChild>
-            <Button><PlusCircle className="w-4 h-4 mr-2" />Adicionar Template</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader><DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle></DialogHeader>
-            <MessageTemplateForm onSubmit={handleSubmit} isSubmitting={addTemplateMutation.isPending || editTemplateMutation.isPending} defaultValues={editingTemplate || undefined} />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingTemplates || isLoadingClientes}>
+            <Send className="w-4 h-4 mr-2" />
+            Enviar Mensagem
+          </Button>
+          <Dialog open={isTemplateDialogOpen} onOpenChange={handleTemplateDialogChange}>
+            <DialogTrigger asChild>
+              <Button><PlusCircle className="w-4 h-4 mr-2" />Adicionar Template</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader><DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle></DialogHeader>
+              <MessageTemplateForm onSubmit={handleTemplateSubmit} isSubmitting={addTemplateMutation.isPending || editTemplateMutation.isPending} defaultValues={editingTemplate || undefined} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Tabs defaultValue="templates">
@@ -168,7 +202,7 @@ export default function MensagensPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => { setEditingTemplate(template); setIsDialogOpen(true); }}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setEditingTemplate(template); setIsTemplateDialogOpen(true); }}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
                             <DropdownMenuItem className="text-red-500" onClick={() => deleteTemplateMutation.mutate(template.id)} disabled={deleteTemplateMutation.isPending}><Trash2 className="w-4 h-4 mr-2" />Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -209,6 +243,15 @@ export default function MensagensPage() {
       </Tabs>
 
       <LogDetailsModal isOpen={isLogModalOpen} onOpenChange={setIsLogModalOpen} log={selectedLog} />
+      
+      <SendBulkMessageDialog
+        isOpen={isSendDialogOpen}
+        onOpenChange={setIsSendDialogOpen}
+        templates={templates || []}
+        clientes={clientes || []}
+        onSubmit={(values) => sendBulkMessageMutation.mutate(values)}
+        isSubmitting={sendBulkMessageMutation.isPending}
+      />
     </div>
   );
 }
