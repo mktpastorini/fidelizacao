@@ -85,30 +85,31 @@ export default function ClientesPage() {
 
   const addClienteMutation = useMutation({
     mutationFn: async (newCliente: any) => {
-      const { data: user } = await supabase.auth.getUser();
-      const userId = user?.user?.id;
-      if (!userId) throw new Error("Usuário não autenticado");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
 
-      let gostos = null;
-      try {
-        if (newCliente.gostos) gostos = JSON.parse(newCliente.gostos);
-      } catch (e) {
-        throw new Error("Formato de 'Gostos' inválido. Use JSON.");
-      }
+      const gostosObject = newCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
 
-      const { filhos, ...clienteDataToInsert } = newCliente;
-      const { data: clienteData, error: clienteError } = await supabase.from("clientes").insert([{ ...clienteDataToInsert, gostos, user_id: userId }]).select().single();
-      if (clienteError) throw new Error(clienteError.message);
+      const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
+        p_user_id: user.id,
+        p_nome: newCliente.nome,
+        p_casado_com: newCliente.casado_com,
+        p_whatsapp: newCliente.whatsapp,
+        p_gostos: gostosObject,
+        p_avatar_url: newCliente.avatar_url,
+        p_indicado_por_id: newCliente.indicado_por_id === 'none' ? null : newCliente.indicado_por_id,
+      });
+      if (rpcError) throw new Error(rpcError.message);
 
-      if (filhos && filhos.length > 0) {
-        const filhosData = filhos.map((filho: any) => ({ ...filho, cliente_id: clienteData.id, user_id: userId }));
+      if (newCliente.filhos && newCliente.filhos.length > 0) {
+        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
-        if (filhosError) throw new Error(filhosError.message);
+        if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      if (clienteData.avatar_url) {
+      if (newCliente.avatar_url) {
         const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: clienteData.id, image_url: clienteData.avatar_url },
+          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
         });
         if (faceError) {
           showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
@@ -126,18 +127,13 @@ export default function ClientesPage() {
   const editClienteMutation = useMutation({
     mutationFn: async (updatedCliente: any) => {
       const { id, filhos, ...clienteInfo } = updatedCliente;
-      const { data: user } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.user?.id;
       if (!userId) throw new Error("Usuário não autenticado");
 
-      let gostos = null;
-      try {
-        if (clienteInfo.gostos) gostos = JSON.parse(clienteInfo.gostos);
-      } catch (e) {
-        throw new Error("Formato de 'Gostos' inválido. Use JSON.");
-      }
+      const gostosObject = updatedCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
 
-      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo, gostos }).eq("id", id);
+      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo, gostos: gostosObject }).eq("id", id);
       if (clienteError) throw new Error(clienteError.message);
 
       await supabase.from("filhos").delete().eq("cliente_id", id);
@@ -228,7 +224,13 @@ export default function ClientesPage() {
               Preencha as informações abaixo. A foto é usada para o reconhecimento facial.
             </DialogDescription>
           </DialogHeader>
-          <ClienteForm onSubmit={handleSubmit} isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} defaultValues={editingCliente || undefined} />
+          <ClienteForm 
+            onSubmit={handleSubmit} 
+            isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} 
+            defaultValues={editingCliente || undefined}
+            clientes={clientes || []}
+            isEditing={!!editingCliente}
+          />
         </DialogContent>
       </Dialog>
 

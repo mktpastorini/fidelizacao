@@ -15,6 +15,7 @@ export type Cliente = {
   avatar_url: string | null;
   filhos: Filho[];
   created_at: string;
+  indicado_por_id: string | null;
 };
 
 export type Mesa = {
