@@ -75,3 +75,14 @@ export type Produto = {
   descricao: string | null;
   created_at: string;
 };
+
+export type MessageLog = {
+  id: string;
+  created_at: string;
+  status: 'sucesso' | 'falha';
+  trigger_event: 'chegada' | 'pagamento';
+  error_message: string | null;
+  webhook_response: Record<string, any> | null;
+  cliente: { nome: string } | null;
+  template: { nome: string } | null;
+};
