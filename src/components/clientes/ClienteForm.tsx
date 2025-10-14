@@ -15,6 +15,7 @@ import { ImageCapture } from "@/components/clientes/ImageCapture";
 import { Trash2, PlusCircle } from "lucide-react";
 import { Cliente, Filho } from "@/types/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Textarea } from "../ui/textarea";
 
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome é obrigatório." }),
@@ -22,12 +23,11 @@ const formSchema = z.object({
   whatsapp: z.string().optional(),
   avatar_url: z.string().nullable().optional(),
   indicado_por_id: z.string().uuid().optional().nullable().or(z.literal("none")).transform(val => val === "none" ? null : val),
-  gostos: z.array(
-    z.object({
-      key: z.string().min(1, { message: "O campo é obrigatório." }),
-      value: z.string().min(1, { message: "O valor é obrigatório." }),
-    })
-  ).optional(),
+  gostos: z.object({
+    pizza_favorita: z.string().optional(),
+    bebida_favorita: z.string().optional(),
+    apos_comer: z.string().optional(),
+  }).optional(),
   filhos: z.array(
     z.object({
       nome: z.string().min(1, { message: "Nome do filho é obrigatório." }),
@@ -53,7 +53,11 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
       whatsapp: defaultValues?.whatsapp || "",
       avatar_url: defaultValues?.avatar_url || null,
       indicado_por_id: defaultValues?.indicado_por_id || "none",
-      gostos: defaultValues?.gostos ? Object.entries(defaultValues.gostos).map(([key, value]) => ({ key, value: String(value) })) : [],
+      gostos: {
+        pizza_favorita: defaultValues?.gostos?.pizza_favorita || "",
+        bebida_favorita: defaultValues?.gostos?.bebida_favorita || "",
+        apos_comer: defaultValues?.gostos?.apos_comer || "",
+      },
       filhos: defaultValues?.filhos || [],
     },
   });
@@ -61,11 +65,6 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
   const { fields: filhosFields, append: appendFilho, remove: removeFilho } = useFieldArray({
     control: form.control,
     name: "filhos",
-  });
-
-  const { fields: gostosFields, append: appendGosto, remove: removeGosto } = useFieldArray({
-    control: form.control,
-    name: "gostos",
   });
 
   return (
@@ -157,16 +156,11 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
 
         <div>
           <FormLabel>Gostos e Preferências</FormLabel>
-          <div className="space-y-2 mt-2">
-            {gostosFields.map((field, index) => (
-              <div key={field.id} className="flex items-center gap-2">
-                <FormField control={form.control} name={`gostos.${index}.key`} render={({ field }) => (<FormItem className="flex-1"><FormControl><Input placeholder="Campo (ex: pizza_favorita)" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name={`gostos.${index}.value`} render={({ field }) => (<FormItem className="flex-1"><FormControl><Input placeholder="Valor (ex: Calabresa)" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <Button type="button" variant="destructive" size="icon" onClick={() => removeGosto(index)}><Trash2 className="h-4 w-4" /></Button>
-              </div>
-            ))}
+          <div className="space-y-4 mt-2 p-4 border rounded-md">
+            <FormField control={form.control} name="gostos.pizza_favorita" render={({ field }) => (<FormItem><FormLabel className="text-sm">Pizza Favorita</FormLabel><FormControl><Input placeholder="Calabresa, 4 Queijos..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="gostos.bebida_favorita" render={({ field }) => (<FormItem><FormLabel className="text-sm">Bebida Favorita</FormLabel><FormControl><Input placeholder="Coca-Cola, Suco de Laranja..." {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="gostos.apos_comer" render={({ field }) => (<FormItem><FormLabel className="text-sm">Após Comer (Sobremesa/Café)</FormLabel><FormControl><Textarea placeholder="Café expresso, Petit Gâteau..." {...field} /></FormControl><FormMessage /></FormItem>)} />
           </div>
-          <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => appendGosto({ key: "", value: "" })}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Preferência</Button>
         </div>
 
         <div>

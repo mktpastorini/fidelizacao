@@ -85,16 +85,27 @@ export default function Dashboard() {
       });
 
       if (error) {
-        const detailedError = (error as any).context?.error || error.message;
-        throw new Error(detailedError);
+        const detailedError = (error as any).context?.error || error;
+        throw new Error(detailedError.message || "Falha ao enviar webhook.");
       }
     },
   });
 
   const allocateTableMutation = useMutation({
     mutationFn: async ({ clienteId, mesaId }: { clienteId: string; mesaId: string }) => {
-      const { error } = await supabase.from("mesas").update({ cliente_id: clienteId }).eq("id", mesaId);
-      if (error) throw new Error(error.message);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error: mesaError } = await supabase.from("mesas").update({ cliente_id: clienteId }).eq("id", mesaId);
+      if (mesaError) throw new Error(`Erro ao alocar mesa: ${mesaError.message}`);
+
+      const { error: pedidoError } = await supabase.from("pedidos").insert({
+        mesa_id: mesaId,
+        cliente_id: clienteId,
+        user_id: user.id,
+        status: "aberto"
+      });
+      if (pedidoError) throw new Error(`Erro ao criar pedido: ${pedidoError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboardData"] });
@@ -111,16 +122,14 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const gostosObject = newCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
-
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id,
         p_nome: newCliente.nome,
         p_casado_com: newCliente.casado_com,
         p_whatsapp: newCliente.whatsapp,
-        p_gostos: gostosObject,
+        p_gostos: newCliente.gostos,
         p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id === 'none' ? null : newCliente.indicado_por_id,
+        p_indicado_por_id: newCliente.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
 
@@ -153,16 +162,14 @@ export default function Dashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const gostosObject = newCliente.gostos?.reduce((acc: any, curr: any) => ({ ...acc, [curr.key]: curr.value }), {}) || null;
-
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id,
         p_nome: newCliente.nome,
         p_casado_com: newCliente.casado_com,
         p_whatsapp: newCliente.whatsapp,
-        p_gostos: gostosObject,
+        p_gostos: newCliente.gostos,
         p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id === 'none' ? null : newCliente.indicado_por_id,
+        p_indicado_por_id: newCliente.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
 
