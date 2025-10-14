@@ -121,18 +121,28 @@ serve(async (req) => {
   }
 
   try {
-    const { cliente_id, image_url } = await req.json()
+    console.log("--- REGISTER-FACE: INICIANDO ---");
+    const { cliente_id, image_url } = await req.json();
     if (!cliente_id || !image_url) {
-      throw new Error("cliente_id e image_url são obrigatórios.")
+      throw new Error("Payload inválido: cliente_id e image_url são obrigatórios.");
     }
+    console.log(`REGISTER-FACE: 1/7 - Payload recebido para cliente ${cliente_id}.`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
+    console.log("REGISTER-FACE: 2/7 - Cliente Supabase Admin criado.");
 
-    const { data: { user } } = await supabaseAdmin.auth.getUser(req.headers.get('Authorization')!.replace('Bearer ', ''))
-    if (!user) throw new Error("Usuário não autenticado.")
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error("Cabeçalho de autorização não encontrado.");
+    }
+
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (userError) throw userError;
+    if (!user) throw new Error("Usuário não autenticado.");
+    console.log(`REGISTER-FACE: 3/7 - Usuário autenticado: ${user.id}`);
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -142,13 +152,17 @@ serve(async (req) => {
     
     if (settingsError) throw settingsError;
     const provider = settings?.ai_provider || 'simulacao';
+    console.log(`REGISTER-FACE: 4/7 - Provedor de IA: ${provider}`);
 
     let embedding;
-
     if (provider === 'google_vision') {
+      console.log("REGISTER-FACE: 5/7 - Gerando embedding com Google Vision...");
       embedding = await getGoogleVisionEmbedding(image_url);
+      console.log("REGISTER-FACE: 6/7 - Embedding do Google Vision gerado.");
     } else {
+      console.log("REGISTER-FACE: 5/7 - Gerando embedding com Simulação...");
       embedding = getSimulatedEmbedding();
+      console.log("REGISTER-FACE: 6/7 - Embedding de simulação gerado.");
     }
 
     const { error: upsertError } = await supabaseAdmin
@@ -158,19 +172,23 @@ serve(async (req) => {
         user_id: user.id,
         embedding: embedding,
         ai_provider: provider,
-      }, { onConflict: 'cliente_id' })
+      }, { onConflict: 'cliente_id' });
 
-    if (upsertError) throw upsertError
+    if (upsertError) throw upsertError;
+    console.log("REGISTER-FACE: 7/7 - Embedding salvo no DB. SUCESSO.");
 
     return new Response(JSON.stringify({ success: true, message: `Rosto cadastrado com sucesso usando ${provider}.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
-    })
+    });
 
   } catch (error) {
+    console.error("--- ERRO NA FUNÇÃO REGISTER-FACE ---");
+    console.error(`MENSAGEM: ${error.message}`);
+    console.error(`STACK: ${error.stack}`);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
-    })
+    });
   }
 })
