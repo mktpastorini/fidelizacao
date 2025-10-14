@@ -82,7 +82,7 @@ serve(async (req) => {
       user_id: user.id,
       cliente_id: client.id,
       template_id: template_id,
-      trigger_event: 'manual',
+      trigger_event: 'manual', // Novo tipo de gatilho
       status: 'processando',
     }));
 
