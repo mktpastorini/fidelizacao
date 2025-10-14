@@ -102,6 +102,7 @@ serve(async (req) => {
         phone: client.whatsapp,
         message: personalizedMessage,
         client_name: client.nome,
+        callback_endpoint: `${Deno.env.get('SUPABASE_URL')}/functions/v1/update-message-status`,
       }),
     })
 

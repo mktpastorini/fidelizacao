@@ -6,7 +6,8 @@ const arrivalPayload = `{
   "log_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
   "phone": "5511999998888",
   "message": "Olá João! Que bom ver você novamente!",
-  "client_name": "João da Silva"
+  "client_name": "João da Silva",
+  "callback_endpoint": "https://.../functions/v1/update-message-status"
 }`;
 
 const updateStatusPayload = `{
@@ -48,6 +49,7 @@ export function ApiDocumentation() {
             <li><code className="bg-gray-100 p-1 rounded">phone</code>: O número de WhatsApp do cliente (string).</li>
             <li><code className="bg-gray-100 p-1 rounded">message</code>: A mensagem final, já personalizada (string).</li>
             <li><code className="bg-gray-100 p-1 rounded">client_name</code>: O nome completo do cliente (string).</li>
+            <li><code className="bg-gray-100 p-1 rounded">callback_endpoint</code>: A URL de callback que seu sistema deve chamar para nos informar o status da entrega (string, URL).</li>
           </ul>
         </CardContent>
       </Card>
