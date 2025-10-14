@@ -6,28 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function personalizeMessage(content: string, client: any): string {
-  let personalized = content;
-  const clientData = {
-    nome: client.nome || '',
-    conjuge: client.casado_com || '',
-    indicacoes: client.indicacoes?.toString() || '0',
-  };
-
-  for (const [key, value] of Object.entries(clientData)) {
-    personalized = personalized.replace(new RegExp(`{${key}}`, 'g'), value);
-  }
-
-  if (client.gostos && typeof client.gostos === 'object') {
-    for (const [key, value] of Object.entries(client.gostos)) {
-      personalized = personalized.replace(new RegExp(`{${key}}`, 'g'), String(value));
-    }
-  }
-
-  personalized = personalized.replace(/{[a-zA-Z_]+}/g, '');
-  return personalized;
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -39,16 +17,19 @@ serve(async (req) => {
       throw new Error("`template_id` e um array de `client_ids` são obrigatórios.");
     }
 
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw userError || new Error("Usuário não autenticado.");
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error("Cabeçalho de autorização não encontrado.");
-    
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw userError || new Error("Usuário não autenticado.");
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -82,7 +63,7 @@ serve(async (req) => {
       user_id: user.id,
       cliente_id: client.id,
       template_id: template_id,
-      trigger_event: 'manual', // Novo tipo de gatilho
+      trigger_event: 'manual',
       status: 'processando',
     }));
 
@@ -97,16 +78,25 @@ serve(async (req) => {
       return {
         log_id: log?.id,
         phone: client.whatsapp,
-        message: personalizeMessage(template.conteudo, client),
-        client_name: client.nome,
-        callback_endpoint: `${Deno.env.get('SUPABASE_URL')}/functions/v1/update-message-status`,
+        personalization_data: {
+          nome: client.nome,
+          conjuge: client.casado_com,
+          indicacoes: client.indicacoes,
+          ...client.gostos,
+        },
       };
     });
+
+    const webhookPayload = {
+      message_template: template.conteudo,
+      callback_endpoint: `${Deno.env.get('SUPABASE_URL')}/functions/v1/update-message-status`,
+      recipients: recipients,
+    };
 
     const webhookResponse = await fetch(settings.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipients }),
+      body: JSON.stringify(webhookPayload),
     });
 
     const responseBody = await webhookResponse.json().catch(() => webhookResponse.text());
