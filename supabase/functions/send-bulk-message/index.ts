@@ -39,16 +39,19 @@ serve(async (req) => {
       throw new Error("`template_id` e um array de `client_ids` são obrigatórios.");
     }
 
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    if (userError || !user) throw userError || new Error("Usuário não autenticado.");
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error("Cabeçalho de autorização não encontrado.");
-    
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw userError || new Error("Usuário não autenticado.");
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -82,7 +85,7 @@ serve(async (req) => {
       user_id: user.id,
       cliente_id: client.id,
       template_id: template_id,
-      trigger_event: 'manual', // Novo tipo de gatilho
+      trigger_event: 'manual',
       status: 'processando',
     }));
 
