@@ -48,7 +48,7 @@ export function RecentArrivalsCard() {
         ) : recentArrivals && recentArrivals.length > 0 ? (
           <div className="space-y-4">
             {recentArrivals.map((arrival) => (
-              <div key={arrival.cliente_id} className="flex items-center gap-4">
+              <div key={arrival.cliente_id + arrival.arrival_time} className="flex items-center gap-4">
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={arrival.avatar_url || undefined} />
                   <AvatarFallback>

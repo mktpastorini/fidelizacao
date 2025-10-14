@@ -85,9 +85,9 @@ export function ApiDocumentation() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm">
+          <div className="text-sm">
             <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/update-message-status`
-          </p>
+          </div>
           <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
             <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
