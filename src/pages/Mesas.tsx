@@ -37,7 +37,6 @@ async function fetchMesas(): Promise<MesaComOcupantes[]> {
     .order("numero", { ascending: true });
   if (error) throw new Error(error.message);
   
-  // O Supabase retorna um array para a contagem, então precisamos achatá-lo.
   return (data || []).map(m => ({
     ...m,
     ocupantes_count: m.ocupantes_count[0]?.count || (m.cliente ? 1 : 0),
@@ -57,6 +56,7 @@ export default function MesasPage() {
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
+  const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
 
   const { data: mesas, isLoading, isError } = useQuery({ queryKey: ["mesas"], queryFn: fetchMesas });
   const { data: clientes } = useQuery({ queryKey: ["clientes_list"], queryFn: fetchClientes });
@@ -117,11 +117,9 @@ export default function MesasPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      // 1. Atualiza a mesa com o cliente principal
       const { error: mesaError } = await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
       if (mesaError) throw new Error(`Erro ao ocupar mesa: ${mesaError.message}`);
 
-      // 2. Limpa ocupantes antigos e insere os novos
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
       const todosOcupantes = [clientePrincipalId, ...acompanhanteIds];
       const ocupantesData = todosOcupantes.map(clienteId => ({
@@ -142,13 +140,27 @@ export default function MesasPage() {
 
   const unassignClienteMutation = useMutation({
     mutationFn: async (mesaId: string) => {
-      // Libera a mesa e remove os ocupantes
+      let orderWasCancelled = false;
+      const { data: openOrder, error: findError } = await supabase.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').single();
+      if (findError && findError.code !== 'PGRST116') throw findError;
+
+      if (openOrder) {
+        const { error: updateError } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
+        if (updateError) throw updateError;
+        orderWasCancelled = true;
+      }
+
       await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
+      return { orderWasCancelled };
     },
-    onSuccess: () => {
+    onSuccess: ({ orderWasCancelled }) => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      showSuccess("Mesa liberada!");
+      if (orderWasCancelled) {
+        showSuccess("Mesa liberada e pedido cancelado!");
+      } else {
+        showSuccess("Mesa liberada!");
+      }
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -189,7 +201,7 @@ export default function MesasPage() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta ação irá liberar todas as mesas ocupadas. Os pedidos abertos não serão fechados.
+                  Esta ação irá liberar todas as mesas ocupadas e cancelar quaisquer pedidos abertos associados a elas. Deseja continuar?
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -216,7 +228,7 @@ export default function MesasPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {mesa.cliente_id && (
-                    <DropdownMenuItem onClick={() => unassignClienteMutation.mutate(mesa.id)}>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMesaToFree(mesa); }}>
                       <UserMinus className="w-4 h-4 mr-2" /> Liberar Mesa
                     </DropdownMenuItem>
                   )}
@@ -275,6 +287,26 @@ export default function MesasPage() {
         onOpenChange={setIsPedidoOpen}
         mesa={selectedMesa}
       />
+
+      <AlertDialog open={!!mesaToFree} onOpenChange={() => setMesaToFree(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Liberar Mesa {mesaToFree?.numero}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá desassociar o cliente da mesa e cancelar qualquer pedido aberto associado. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (mesaToFree) unassignClienteMutation.mutate(mesaToFree.id);
+              setMesaToFree(null);
+            }}>
+              Sim, Liberar Mesa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
