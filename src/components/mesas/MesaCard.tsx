@@ -1,34 +1,18 @@
 import { Mesa } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Users, User } from "lucide-react";
 
-type Ocupante = {
-  cliente: {
-    id: string;
-    nome: string;
-  } | null;
-};
-
 type MesaCardProps = {
-  mesa: Mesa & { ocupantes?: Ocupante[] };
+  mesa: Mesa;
+  ocupantesCount: number;
   onClick: () => void;
   children?: React.ReactNode;
 };
 
-export function MesaCard({ mesa, onClick, children }: MesaCardProps) {
+export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardProps) {
   const isOcupada = !!mesa.cliente;
-  const acompanhantes = (mesa.ocupantes || [])
-    .map(o => o.cliente?.nome)
-    .filter(Boolean) as string[];
-  
-  const acompanhantesCount = acompanhantes.length > 0 ? acompanhantes.length -1 : 0;
+  const acompanhantesCount = ocupantesCount > 1 ? ocupantesCount - 1 : 0;
 
   return (
     <Card
@@ -56,21 +40,7 @@ export function MesaCard({ mesa, onClick, children }: MesaCardProps) {
             <User className="w-4 h-4 text-blue-600" />
             <span className="font-semibold text-blue-800">{mesa.cliente?.nome}</span>
             {acompanhantesCount > 0 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="text-xs text-gray-500 cursor-pointer">(+{acompanhantesCount})</span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-semibold">Acompanhantes:</p>
-                    <ul className="list-disc list-inside">
-                      {acompanhantes.filter(nome => nome !== mesa.cliente?.nome).map((nome, index) => (
-                        <li key={index}>{nome}</li>
-                      ))}
-                    </ul>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <span className="text-xs text-gray-500">(+{acompanhantesCount})</span>
             )}
           </div>
         ) : (
