@@ -235,7 +235,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
     const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
     const requerPreparo = produtoSelecionado?.requer_preparo ?? true;
-    const status = requerPreparo ? 'pendente' : 'entregue';
+    const status = 'pendente';
     addItemMutation.mutate({ ...values, status, requer_preparo: requerPreparo });
   };
 
