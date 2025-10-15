@@ -78,15 +78,31 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado.");
 
-      let pedidoId = pedido?.id;
+      let { data: existingPedido } = await supabase
+        .from("pedidos")
+        .select("id")
+        .eq("mesa_id", mesa.id)
+        .eq("status", "aberto")
+        .maybeSingle();
+
+      let pedidoId = existingPedido?.id;
+
       if (!pedidoId) {
-        const { data: novoPedido, error: pedidoError } = await supabase.from("pedidos").insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.id, status: "aberto" }).select("id").single();
-        if (pedidoError) throw new Error(pedidoError.message);
+        const { data: novoPedido, error: createError } = await supabase
+          .from("pedidos")
+          .insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.id, status: "aberto" })
+          .select("id")
+          .single();
+        
+        if (createError) throw new Error(`Erro ao criar pedido: ${createError.message}`);
         pedidoId = novoPedido.id;
       }
 
-      const { error: itemError } = await supabase.from("itens_pedido").insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
-      if (itemError) throw new Error(itemError.message);
+      const { error: itemError } = await supabase
+        .from("itens_pedido")
+        .insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
+      
+      if (itemError) throw new Error(`Erro ao adicionar item: ${itemError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
