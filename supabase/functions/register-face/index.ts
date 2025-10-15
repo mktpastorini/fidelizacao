@@ -56,8 +56,8 @@ serve(async (req) => {
       .upsert({
         cliente_id: cliente_id,
         user_id: user.id,
-        embedding: Array.from(embedding),
-        ai_provider: 'face-api.js', // Especifica o provedor
+        embedding: Array.from(embedding), // Converte Float32Array para array normal
+        ai_provider: 'face-api.js',
       }, { onConflict: 'cliente_id' });
 
     if (upsertError) throw upsertError;
