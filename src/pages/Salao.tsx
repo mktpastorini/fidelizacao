@@ -101,6 +101,119 @@ export default function SalaoPage() {
     onError: (error: Error) => showError(error.message),
   });
 
+  const allocateTableMutation = useMutation({
+    mutationFn: async ({ clienteId, mesaId }: { clienteId: string; mesaId: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      const cliente = data?.clientes.find(c => c.id === clienteId);
+      if (!cliente) throw new Error("Cliente não encontrado");
+
+      await supabase.from("mesas").update({ cliente_id: clienteId }).eq("id", mesaId);
+      await supabase.from("pedidos").insert({
+        mesa_id: mesaId,
+        cliente_id: clienteId,
+        user_id: user.id,
+        status: "aberto",
+        acompanhantes: [{ id: cliente.id, nome: cliente.nome }],
+      });
+      await supabase.from("mesa_ocupantes").insert({
+        mesa_id: mesaId,
+        cliente_id: clienteId,
+        user_id: user.id,
+      });
+
+      const { error: functionError } = await supabase.functions.invoke('send-welcome-message', {
+        body: { clientId, userId: user.id },
+      });
+      if (functionError) {
+        showError(`Mesa alocada, mas falha ao enviar mensagem: ${functionError.message}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      showSuccess("Cliente alocado à mesa com sucesso!");
+      setIsArrivalOpen(false);
+      setRecognizedClient(null);
+    },
+    onError: (error: Error) => showError(`Erro ao alocar mesa: ${error.message}`),
+  });
+
+  const addClientMutation = useMutation({
+    mutationFn: async (newCliente: any) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
+        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: newCliente.casado_com,
+        p_whatsapp: newCliente.whatsapp, p_gostos: newCliente.gostos, p_avatar_url: newCliente.avatar_url,
+        p_indicado_por_id: newCliente.indicado_por_id,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+
+      if (newCliente.filhos && newCliente.filhos.length > 0) {
+        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+        const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
+        if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
+      }
+      
+      if (newCliente.avatar_url) {
+        const { error: faceError } = await supabase.functions.invoke('register-face', {
+          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
+        });
+        if (faceError) showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      showSuccess("Novo cliente cadastrado com sucesso!");
+      setIsNewClientOpen(false);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const ocuparMesaMutation = useMutation({
+    mutationFn: async ({ clientePrincipalId, acompanhanteIds }: { clientePrincipalId: string, acompanhanteIds: string[] }) => {
+      if (!selectedMesa) throw new Error("Nenhuma mesa selecionada");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
+  
+      const todosOcupantesIds = [clientePrincipalId, ...acompanhanteIds];
+      const todosOcupantes = data?.clientes?.filter(c => todosOcupantesIds.includes(c.id)) || [];
+      const acompanhantesJson = todosOcupantes.map(c => ({ id: c.id, nome: c.nome }));
+  
+      await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
+      await supabase.from("pedidos").insert({
+        mesa_id: selectedMesa.id,
+        cliente_id: clientePrincipalId,
+        user_id: user.id,
+        status: "aberto",
+        acompanhantes: acompanhantesJson,
+      });
+  
+      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
+      const ocupantesData = todosOcupantesIds.map(clienteId => ({
+        mesa_id: selectedMesa.id,
+        cliente_id: clienteId,
+        user_id: user.id,
+      }));
+      await supabase.from("mesa_ocupantes").insert(ocupantesData);
+
+      const { error: functionError } = await supabase.functions.invoke('send-welcome-message', {
+        body: { clientId: clientePrincipalId, userId: user.id },
+      });
+      if (functionError) {
+        showError(`Mesa ocupada, mas falha ao enviar mensagem: ${functionError.message}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      showSuccess("Mesa ocupada com sucesso!");
+      setIsOcuparMesaOpen(false);
+    },
+    onError: (err: Error) => showError(err.message),
+  });
+
   const mesasComPedidos = data?.mesas.map(mesa => {
     const pedido = data.pedidosAbertos.find(p => p.mesa_id === mesa.id);
     return { ...mesa, pedido };
@@ -201,10 +314,10 @@ export default function SalaoPage() {
       </div>
 
       <FacialRecognitionDialog isOpen={isRecognitionOpen} onOpenChange={setIsRecognitionOpen} onClientRecognized={handleClientRecognized} onNewClient={() => setIsNewClientOpen(true)} />
-      <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={() => {}} isSubmitting={false} />
-      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={() => {}} isAllocating={false} />
+      <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
+      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ clienteId: recognizedClient.id, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
-      <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={() => {}} isSubmitting={false} />
+      <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={(clientePrincipalId, acompanhanteIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds })} isSubmitting={ocuparMesaMutation.isPending} />
     </div>
   );
 }
