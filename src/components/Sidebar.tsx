@@ -12,7 +12,6 @@ const navItems = [
   { to: "/mesas", icon: Table, label: "Gerenciar Mesas" },
   { to: "/cozinha", icon: ChefHat, label: "Cozinha" },
   { to: "/historico", icon: History, label: "Pedidos Fechados" },
-  { to: "/relatorios", icon: BarChart2, label: "Relatórios" },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens" },
   { to: "/configuracoes", icon: Settings, label: "Configurações" },
 ];
