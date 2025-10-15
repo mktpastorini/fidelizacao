@@ -5,12 +5,14 @@ import { Users, User } from "lucide-react";
 
 type MesaCardProps = {
   mesa: Mesa;
+  ocupantesCount: number;
   onClick: () => void;
   children?: React.ReactNode;
 };
 
-export function MesaCard({ mesa, onClick, children }: MesaCardProps) {
+export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardProps) {
   const isOcupada = !!mesa.cliente;
+  const acompanhantesCount = ocupantesCount > 1 ? ocupantesCount - 1 : 0;
 
   return (
     <Card
@@ -37,6 +39,9 @@ export function MesaCard({ mesa, onClick, children }: MesaCardProps) {
           <div className="flex items-center gap-2 pt-2">
             <User className="w-4 h-4 text-blue-600" />
             <span className="font-semibold text-blue-800">{mesa.cliente?.nome}</span>
+            {acompanhantesCount > 0 && (
+              <span className="text-xs text-gray-500">(+{acompanhantesCount})</span>
+            )}
           </div>
         ) : (
           <p className="text-sm text-green-600 font-semibold pt-2">Livre</p>

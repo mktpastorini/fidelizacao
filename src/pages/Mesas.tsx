@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Mesa, Cliente } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MesaForm } from "@/components/mesas/MesaForm";
-import { AssignClienteDialog } from "@/components/mesas/AssignClienteDialog";
+import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle, UserMinus, MoreVertical, Edit, Trash2 } from "lucide-react";
@@ -28,17 +28,24 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-async function fetchMesas(): Promise<Mesa[]> {
+type MesaComOcupantes = Mesa & { ocupantes_count: number };
+
+async function fetchMesas(): Promise<MesaComOcupantes[]> {
   const { data, error } = await supabase
     .from("mesas")
-    .select("*, cliente:clientes(id, nome)")
+    .select("*, cliente:clientes(id, nome), ocupantes_count:mesa_ocupantes(count)")
     .order("numero", { ascending: true });
   if (error) throw new Error(error.message);
-  return data || [];
+  
+  // O Supabase retorna um array para a contagem, então precisamos achatá-lo.
+  return (data || []).map(m => ({
+    ...m,
+    ocupantes_count: m.ocupantes_count[0]?.count || (m.cliente ? 1 : 0),
+  }));
 }
 
-async function fetchClientes(): Promise<Pick<Cliente, 'id' | 'nome'>[]> {
-  const { data, error } = await supabase.from("clientes").select("id, nome").order("nome");
+async function fetchClientes(): Promise<Cliente[]> {
+  const { data, error } = await supabase.from("clientes").select("*").order("nome");
   if (error) throw new Error(error.message);
   return data || [];
 }
@@ -46,7 +53,7 @@ async function fetchClientes(): Promise<Pick<Cliente, 'id' | 'nome'>[]> {
 export default function MesasPage() {
   const queryClient = useQueryClient();
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
@@ -104,24 +111,40 @@ export default function MesasPage() {
     onError: (err: Error) => showError(err.message),
   });
 
-  const assignClienteMutation = useMutation({
-    mutationFn: async (clienteId: string) => {
+  const ocuparMesaMutation = useMutation({
+    mutationFn: async ({ clientePrincipalId, acompanhanteIds }: { clientePrincipalId: string, acompanhanteIds: string[] }) => {
       if (!selectedMesa) throw new Error("Nenhuma mesa selecionada");
-      const { error } = await supabase.from("mesas").update({ cliente_id: clienteId }).eq("id", selectedMesa.id);
-      if (error) throw error;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      // 1. Atualiza a mesa com o cliente principal
+      const { error: mesaError } = await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
+      if (mesaError) throw new Error(`Erro ao ocupar mesa: ${mesaError.message}`);
+
+      // 2. Limpa ocupantes antigos e insere os novos
+      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
+      const todosOcupantes = [clientePrincipalId, ...acompanhanteIds];
+      const ocupantesData = todosOcupantes.map(clienteId => ({
+        mesa_id: selectedMesa.id,
+        cliente_id: clienteId,
+        user_id: user.id,
+      }));
+      const { error: ocupantesError } = await supabase.from("mesa_ocupantes").insert(ocupantesData);
+      if (ocupantesError) throw new Error(`Erro ao adicionar ocupantes: ${ocupantesError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      showSuccess("Mesa ocupada!");
-      setIsAssignOpen(false);
+      showSuccess("Mesa ocupada com sucesso!");
+      setIsOcuparMesaOpen(false);
     },
     onError: (err: Error) => showError(err.message),
   });
 
   const unassignClienteMutation = useMutation({
     mutationFn: async (mesaId: string) => {
-      const { error } = await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
-      if (error) throw error;
+      // Libera a mesa e remove os ocupantes
+      await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
+      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
@@ -135,7 +158,7 @@ export default function MesasPage() {
     if (mesa.cliente_id) {
       setIsPedidoOpen(true);
     } else {
-      setIsAssignOpen(true);
+      setIsOcuparMesaOpen(true);
     }
   };
 
@@ -184,7 +207,7 @@ export default function MesasPage() {
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-red-500">Erro ao carregar mesas.</p> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {mesas?.map((mesa) => (
-            <MesaCard key={mesa.id} mesa={mesa} onClick={() => handleMesaClick(mesa)}>
+            <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes_count} onClick={() => handleMesaClick(mesa)}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -234,12 +257,13 @@ export default function MesasPage() {
         </DialogContent>
       </Dialog>
 
-      <AssignClienteDialog
-        isOpen={isAssignOpen}
-        onOpenChange={setIsAssignOpen}
+      <OcuparMesaDialog
+        isOpen={isOcuparMesaOpen}
+        onOpenChange={setIsOcuparMesaOpen}
+        mesa={selectedMesa}
         clientes={clientes || []}
-        onSubmit={assignClienteMutation.mutate}
-        isSubmitting={assignClienteMutation.isPending}
+        onSubmit={(clientePrincipalId, acompanhanteIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds })}
+        isSubmitting={ocuparMesaMutation.isPending}
       />
       <PedidoModal
         isOpen={isPedidoOpen}
