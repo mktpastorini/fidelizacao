@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Users } from "lucide-react";
 
 type DetalhesPedidoModalProps = {
   isOpen: boolean;
@@ -39,6 +40,16 @@ export function DetalhesPedidoModal({ isOpen, onOpenChange, pedido }: DetalhesPe
         <div className="mt-4 space-y-4">
           <p><strong>Cliente:</strong> {pedido.cliente?.nome || "Não identificado"}</p>
           
+          {pedido.acompanhantes && pedido.acompanhantes.length > 0 && (
+            <div className="flex items-start gap-2 text-sm">
+              <Users className="w-4 h-4 mt-1 text-gray-600" />
+              <div>
+                <strong className="font-semibold">Acompanhantes:</strong>
+                <span className="text-gray-700 ml-1">{pedido.acompanhantes.map(a => a.nome).join(', ')}</span>
+              </div>
+            </div>
+          )}
+
           <div>
             <h4 className="font-semibold mb-2">Itens Consumidos</h4>
             <Table>

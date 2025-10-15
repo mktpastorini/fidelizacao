@@ -49,6 +49,8 @@ export type UserSettings = {
   chegada_template_id: string | null;
   pagamento_template_id: string | null;
   api_key: string | null;
+  auto_add_item_enabled?: boolean;
+  default_produto_id?: string | null;
 };
 
 export type Pedido = {
@@ -59,6 +61,7 @@ export type Pedido = {
   created_at: string;
   closed_at: string | null;
   itens_pedido: ItemPedido[];
+  acompanhantes?: { id: string; nome: string }[];
 };
 
 export type ItemPedido = {

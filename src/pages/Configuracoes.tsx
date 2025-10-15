@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Profile, UserSettings, MessageTemplate } from "@/types/supabase";
+import { Profile, UserSettings, MessageTemplate, Produto } from "@/types/supabase";
 import { ProfileForm } from "@/components/configuracoes/ProfileForm";
 import { WebhookForm } from "@/components/configuracoes/WebhookForm";
 import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSettingsForm";
@@ -14,39 +14,32 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Copy, RefreshCw } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 type UserData = {
   profile: Profile | null;
   settings: UserSettings | null;
   templates: MessageTemplate[];
+  produtos: Produto[];
 };
 
 async function fetchUserData(): Promise<UserData> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { profile: null, settings: null, templates: [] };
+  if (!user) return { profile: null, settings: null, templates: [], produtos: [] };
 
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("id, first_name, last_name, updated_at")
-    .eq("id", user.id)
-    .limit(1);
-  if (profileError) throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
-  const profile = profiles?.[0] || null;
+  const { data: profiles, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+  if (profileError && profileError.code !== 'PGRST116') throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
+  
+  const { data: settings, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", user.id).single();
+  if (settingsError && settingsError.code !== 'PGRST116') throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
 
-  const { data: settingsList, error: settingsError } = await supabase
-    .from("user_settings")
-    .select("*")
-    .eq("id", user.id)
-    .limit(1);
-  if (settingsError) throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
-  const settings = settingsList?.[0] || null;
-
-  const { data: templates, error: templatesError } = await supabase
-    .from("message_templates")
-    .select("*");
+  const { data: templates, error: templatesError } = await supabase.from("message_templates").select("*");
   if (templatesError) throw new Error(`Erro ao buscar templates: ${templatesError.message}`);
 
-  return { profile, settings, templates: templates || [] };
+  const { data: produtos, error: produtosError } = await supabase.from("produtos").select("*").order("nome");
+  if (produtosError) throw new Error(`Erro ao buscar produtos: ${produtosError.message}`);
+
+  return { profile: profiles, settings, templates: templates || [], produtos: produtos || [] };
 }
 
 export default function ConfiguracoesPage() {
@@ -252,22 +245,62 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="automacao" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Automação de Mensagens</CardTitle>
-              <CardDescription>Escolha os templates para cada evento automático.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar os templates.</p> : (
-                <TemplateSettingsForm
-                  onSubmit={(values) => updateSettingsMutation.mutate(values)}
-                  isSubmitting={updateSettingsMutation.isPending}
-                  defaultValues={data?.settings || undefined}
-                  templates={data?.templates || []}
-                />
-              )}
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Automação de Mensagens</CardTitle>
+                <CardDescription>Escolha os templates para cada evento automático.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar os templates.</p> : (
+                  <TemplateSettingsForm
+                    onSubmit={(values) => updateSettingsMutation.mutate(values)}
+                    isSubmitting={updateSettingsMutation.isPending}
+                    defaultValues={data?.settings || undefined}
+                    templates={data?.templates || []}
+                  />
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Automação de Pedidos</CardTitle>
+                <CardDescription>Configure um item para ser adicionado automaticamente quando um cliente senta à mesa.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-32 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="auto-add-item"
+                        checked={data?.settings?.auto_add_item_enabled}
+                        onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_add_item_enabled: checked })}
+                      />
+                      <Label htmlFor="auto-add-item">Habilitar item de entrada automático</Label>
+                    </div>
+                    {data?.settings?.auto_add_item_enabled && (
+                      <div className="space-y-2">
+                        <Label htmlFor="default-product">Produto Padrão</Label>
+                        <Select
+                          value={data?.settings?.default_produto_id || ""}
+                          onValueChange={(value) => updateSettingsMutation.mutate({ default_produto_id: value })}
+                        >
+                          <SelectTrigger id="default-product">
+                            <SelectValue placeholder="Selecione o produto padrão" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {data?.produtos.map(produto => (
+                              <SelectItem key={produto.id} value={produto.id}>{produto.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="api" className="mt-6">
