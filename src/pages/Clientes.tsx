@@ -179,21 +179,22 @@ export default function ClientesPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Clientes</h1>
-        <p className="text-gray-600 mt-2">Gerencie as informações dos seus clientes aqui.</p>
-      </div>
-
       <div className="flex items-center justify-between mb-6">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Buscar por nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+        <div>
+          <h1 className="text-3xl font-bold">Clientes</h1>
+          <p className="text-muted-foreground mt-1">Gerencie as informações dos seus clientes aqui.</p>
         </div>
-        <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cliente</Button>
+        <div className="flex items-center gap-4">
+            <div className="relative w-full max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Buscar cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+            </div>
+            <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cliente</Button>
+        </div>
       </div>
 
       {isLoading ? <p>Carregando clientes...</p> : isError ? <p className="text-red-500">Erro ao carregar clientes.</p> : clientes && clientes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {clientes.map((cliente) => (
             <ClienteCard
               key={cliente.id}
@@ -205,9 +206,9 @@ export default function ClientesPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <p className="text-gray-500">{debouncedSearchTerm ? `Nenhum cliente encontrado para "${debouncedSearchTerm}".` : "Nenhum cliente cadastrado ainda."}</p>
-          {!debouncedSearchTerm && <p className="text-gray-500">Clique em "Adicionar Cliente" para começar.</p>}
+        <div className="text-center py-12 bg-card rounded-lg">
+          <p className="text-muted-foreground">{debouncedSearchTerm ? `Nenhum cliente encontrado para "${debouncedSearchTerm}".` : "Nenhum cliente cadastrado ainda."}</p>
+          {!debouncedSearchTerm && <p className="text-muted-foreground">Clique em "Adicionar Cliente" para começar.</p>}
         </div>
       )}
 

@@ -3,17 +3,17 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Pedido, ItemPedido } from "@/types/supabase";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Heart, Users, ThumbsUp, Star, User, BarChart2, ShoppingCart, Repeat } from "lucide-react";
+import { Phone, Heart, Users, ThumbsUp, Star, User } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -38,22 +38,19 @@ async function fetchHistoricoCliente(clienteId: string): Promise<PedidoComItens[
 }
 
 const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: React.ElementType, children: React.ReactNode }) => (
-  <div>
-    <h4 className="flex items-center font-semibold text-gray-700 mb-2">
-      <Icon className="w-5 h-5 mr-2 text-blue-500" />
+  <div className="p-4 bg-background/50 rounded-lg">
+    <h4 className="flex items-center font-semibold text-foreground mb-2">
+      <Icon className="w-5 h-5 mr-2 text-primary" />
       {title}
     </h4>
-    <div className="pl-7 text-gray-600 space-y-1">{children}</div>
+    <div className="pl-7 text-muted-foreground space-y-1 text-sm">{children}</div>
   </div>
 );
 
-const StatDisplay = ({ title, value, icon: Icon }: { title: string, value: string | number, icon: React.ElementType }) => (
-  <div className="p-4 bg-gray-50 rounded-lg text-center">
-    <div className="flex justify-center items-center mb-1">
-      <Icon className="w-4 h-4 mr-2 text-gray-500" />
-      <p className="text-sm text-gray-500">{title}</p>
-    </div>
-    <p className="text-2xl font-bold">{value}</p>
+const StatDisplay = ({ title, value, className }: { title: string, value: string | number, className?: string }) => (
+  <div className={`p-3 rounded-lg text-center ${className}`}>
+    <p className="text-xs text-primary-foreground/80">{title}</p>
+    <p className="text-xl font-bold text-primary-foreground">{value}</p>
   </div>
 );
 
@@ -81,102 +78,104 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
   }, [historico]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-md p-0 flex flex-col">
         {cliente && (
           <>
-            <DialogHeader className="items-center text-center pb-4 border-b">
-              <Avatar className="h-24 w-24 mb-4">
+            <SheetHeader className="items-center text-center p-6 space-y-2 bg-card border-b">
+              <Avatar className="h-24 w-24 mb-2 ring-2 ring-primary ring-offset-4 ring-offset-card">
                 <AvatarImage src={cliente.avatar_url || undefined} />
                 <AvatarFallback>
                   <User className="h-12 w-12 text-gray-400" />
                 </AvatarFallback>
               </Avatar>
-              <DialogTitle className="text-2xl">{cliente.nome}</DialogTitle>
-              <DialogDescription>
+              <SheetTitle className="text-2xl uppercase font-bold tracking-wider">{cliente.nome}</SheetTitle>
+              <SheetDescription>
                 Cliente desde {format(new Date(cliente.cliente_desde), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </DialogDescription>
-            </DialogHeader>
+              </SheetDescription>
+            </SheetHeader>
             
-            <Tabs defaultValue="perfil" className="w-full pt-4">
+            <div className="p-6">
+                <div className="grid grid-cols-3 gap-2">
+                    <StatDisplay title="Total de Visitas" value={stats.totalVisits} className="bg-primary/80" />
+                    <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} className="bg-primary/80" />
+                    <StatDisplay title="Ticket Médio" value={formatCurrency(stats.averageTicket)} className="bg-primary/80" />
+                </div>
+            </div>
+
+            <Tabs defaultValue="historico" className="w-full px-6 flex-1 flex flex-col">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="perfil">Perfil</TabsTrigger>
                 <TabsTrigger value="historico">Histórico</TabsTrigger>
                 <TabsTrigger value="preferencias">Preferências</TabsTrigger>
               </TabsList>
               
-              <TabsContent value="perfil" className="py-4 space-y-6">
-                <DetailSection title="Contato" icon={Phone}>
-                  <p>WhatsApp: {cliente.whatsapp || "Não informado"}</p>
-                </DetailSection>
-                <DetailSection title="Família" icon={Heart}>
-                  <p>Cônjuge: {cliente.casado_com || "Não informado"}</p>
-                  {cliente.filhos && cliente.filhos.length > 0 && (
-                    <div>
-                      <p className="font-medium">Filhos:</p>
-                      <ul className="list-disc list-inside">
-                        {cliente.filhos.map(filho => (
-                          <li key={filho.id}>{filho.nome} ({filho.idade || '?'} anos)</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </DetailSection>
-                <DetailSection title="Fidelidade" icon={ThumbsUp}>
-                  <p>Indicou {cliente.indicacoes} cliente(s).</p>
-                  {cliente.indicado_por && <p>Indicado por: <span className="font-semibold">{cliente.indicado_por.nome}</span></p>}
-                </DetailSection>
-              </TabsContent>
+              <div className="flex-1 overflow-y-auto mt-4">
+                <TabsContent value="perfil" className="space-y-4">
+                  <DetailSection title="Contato" icon={Phone}>
+                    <p>WhatsApp: {cliente.whatsapp || "Não informado"}</p>
+                  </DetailSection>
+                  <DetailSection title="Família" icon={Heart}>
+                    <p>Cônjuge: {cliente.casado_com || "Não informado"}</p>
+                    {cliente.filhos && cliente.filhos.length > 0 && (
+                      <div>
+                        <p className="font-medium">Filhos:</p>
+                        <ul className="list-disc list-inside">
+                          {cliente.filhos.map(filho => (
+                            <li key={filho.id}>{filho.nome} ({filho.idade || '?'} anos)</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </DetailSection>
+                  <DetailSection title="Fidelidade" icon={ThumbsUp}>
+                    <p>Indicou {cliente.indicacoes} cliente(s).</p>
+                    {cliente.indicado_por && <p>Indicado por: <span className="font-semibold">{cliente.indicado_por.nome}</span></p>}
+                  </DetailSection>
+                </TabsContent>
 
-              <TabsContent value="historico" className="py-4">
-                {isHistoryLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                    <Skeleton className="h-8 w-full" />
-                  </div>
-                ) : historico && historico.length > 0 ? (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <StatDisplay title="Total de Visitas" value={stats.totalVisits} icon={Repeat} />
-                      <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} icon={ShoppingCart} />
-                      <StatDisplay title="Ticket Médio" value={formatCurrency(stats.averageTicket)} icon={BarChart2} />
+                <TabsContent value="historico">
+                  {isHistoryLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-8 w-full" />
+                      <Skeleton className="h-8 w-full" />
                     </div>
+                  ) : historico && historico.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Data</TableHead>
-                          <TableHead className="text-right">Valor Total</TableHead>
+                          <TableHead className="text-right">Valor</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {historico.map(pedido => (
                           <TableRow key={pedido.id}>
-                            <TableCell>{pedido.closed_at ? format(new Date(pedido.closed_at), "dd/MM/yyyy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
+                            <TableCell className="text-xs">{pedido.closed_at ? format(new Date(pedido.closed_at), "dd/MM/yy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
                             <TableCell className="text-right font-medium">{formatCurrency(calculateTotal(pedido.itens_pedido))}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
-                ) : (
-                  <p className="text-center text-gray-500 py-8">Nenhum histórico de compras encontrado.</p>
-                )}
-              </TabsContent>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">Nenhum histórico de compras.</p>
+                  )}
+                </TabsContent>
 
-              <TabsContent value="preferencias" className="py-4 space-y-4">
-                <DetailSection title="Gostos e Observações" icon={Star}>
-                  {cliente.gostos && typeof cliente.gostos === 'object' && Object.keys(cliente.gostos).length > 0 ? (
-                    Object.entries(cliente.gostos).map(([key, value]) => (
-                      <p key={key}><span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</p>
-                    ))
-                  ) : <p>Nenhuma preferência cadastrada.</p>}
-                </DetailSection>
-              </TabsContent>
+                <TabsContent value="preferencias" className="space-y-4">
+                  <DetailSection title="Gostos e Observações" icon={Star}>
+                    {cliente.gostos && typeof cliente.gostos === 'object' && Object.keys(cliente.gostos).length > 0 ? (
+                      Object.entries(cliente.gostos).map(([key, value]) => (
+                        value && <p key={key}><span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</p>
+                      ))
+                    ) : <p>Nenhuma preferência cadastrada.</p>}
+                  </DetailSection>
+                </TabsContent>
+              </div>
             </Tabs>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
