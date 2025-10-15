@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import { SettingsProvider } from "./contexts/SettingsContext";
+import { ThemeProvider } from "./components/ThemeProvider";
 import DashboardPage from "./pages/Dashboard";
 import SalaoPage from "./pages/Salao";
 import Clientes from "./pages/Clientes";
@@ -22,35 +23,37 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route
-            element={
-              <SettingsProvider>
-                <AuthLayout />
-              </SettingsProvider>
-            }
-          >
-            <Route element={<Layout />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/" element={<SalaoPage />} />
-              <Route path="/clientes" element={<Clientes />} />
-              <Route path="/produtos" element={<Produtos />} />
-              <Route path="/mesas" element={<Mesas />} />
-              <Route path="/cozinha" element={<Cozinha />} />
-              <Route path="/historico" element={<Historico />} />
-              <Route path="/mensagens" element={<Mensagens />} />
-              <Route path="/configuracoes" element={<Configuracoes />} />
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              element={
+                <SettingsProvider>
+                  <AuthLayout />
+                </SettingsProvider>
+              }
+            >
+              <Route element={<Layout />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/" element={<SalaoPage />} />
+                <Route path="/clientes" element={<Clientes />} />
+                <Route path="/produtos" element={<Produtos />} />
+                <Route path="/mesas" element={<Mesas />} />
+                <Route path="/cozinha" element={<Cozinha />} />
+                <Route path="/historico" element={<Historico />} />
+                <Route path="/mensagens" element={<Mensagens />} />
+                <Route path="/configuracoes" element={<Configuracoes />} />
+              </Route>
             </Route>
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 
