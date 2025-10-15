@@ -3,9 +3,9 @@ import Webcam from 'react-webcam';
 import { Cliente } from '@/types/supabase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { User, Check, X, UserPlus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Check, X, UserPlus, Loader2 } from 'lucide-react';
 import { showError } from '@/utils/toast';
+import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 
 type FacialRecognitionDialogProps = {
   isOpen: boolean;
@@ -19,57 +19,64 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   const [isScanning, setIsScanning] = useState(false);
   const [match, setMatch] = useState<Cliente | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Inicializando câmera...");
+  const [statusMessage, setStatusMessage] = useState("Inicializando...");
+
+  const { isReady, error: recognitionError, recognize, getClientById } = useFaceRecognition();
 
   const resetState = useCallback(() => {
     setIsScanning(false);
     setMatch(null);
     setSnapshot(null);
-    setStatusMessage("Inicializando câmera...");
+    setStatusMessage("Inicializando...");
   }, []);
 
   useEffect(() => {
     if (!isOpen) {
       resetState();
+    } else {
+      setStatusMessage(isReady ? "Aponte a câmera para o rosto" : "Carregando modelos de IA...");
     }
-  }, [isOpen, resetState]);
+  }, [isOpen, isReady, resetState]);
 
-  const performRecognition = useCallback(async (imageUrl: string) => {
+  useEffect(() => {
+    if (recognitionError) {
+      showError(recognitionError);
+      onOpenChange(false);
+    }
+  }, [recognitionError, onOpenChange]);
+
+  const performRecognition = useCallback(async (imageSrc: string) => {
+    if (!isReady || !recognize) return;
+
     setIsScanning(true);
     setMatch(null);
     setStatusMessage("Analisando...");
 
-    try {
-      const { data, error } = await supabase.functions.invoke('recognize-face', {
-        body: { image_url: imageUrl },
-      });
-
-      if (error) throw error;
-
-      setMatch(data.match || null);
-    } catch (err: any) {
-      showError(`Erro no reconhecimento: ${err.message}`);
-      setMatch(null);
-    } finally {
-      setIsScanning(false);
-    }
-  }, []);
-
-  const handleUserMedia = useCallback(() => {
-    setStatusMessage("Câmera pronta. Capturando imagem...");
-    setTimeout(() => {
-      if (webcamRef.current) {
-        const imageSrc = webcamRef.current.getScreenshot();
-        if (imageSrc && imageSrc.includes('base64,')) {
-          setSnapshot(imageSrc);
-          performRecognition(imageSrc);
-        } else {
-          showError("Não foi possível capturar uma imagem válida. Tente novamente.");
-          onOpenChange(false);
-        }
+    const image = new Image();
+    image.src = imageSrc;
+    image.onload = async () => {
+      const result = await recognize(image);
+      if (result && result.label !== 'unknown') {
+        const client = getClientById(result.label);
+        setMatch(client);
+      } else {
+        setMatch(null);
       }
-    }, 500);
-  }, [performRecognition, onOpenChange]);
+      setIsScanning(false);
+    };
+  }, [isReady, recognize, getClientById]);
+
+  const handleCapture = useCallback(() => {
+    if (webcamRef.current) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) {
+        setSnapshot(imageSrc);
+        performRecognition(imageSrc);
+      } else {
+        showError("Não foi possível capturar a imagem.");
+      }
+    }
+  }, [performRecognition]);
 
   const handleConfirm = () => {
     if (match) {
@@ -84,17 +91,68 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   };
 
   const handleRetry = () => {
-    resetState();
-    // A onUserMedia não dispara novamente, então re-executamos a lógica de captura manualmente.
-    handleUserMedia();
-  }
+    setSnapshot(null);
+    setMatch(null);
+    setStatusMessage("Aponte a câmera para o rosto");
+  };
+
+  const renderContent = () => {
+    if (!isReady) {
+      return (
+        <div className="text-center h-24 flex flex-col justify-center items-center">
+          <Loader2 className="w-8 h-8 animate-spin mb-2" />
+          <p className="text-lg">{statusMessage}</p>
+        </div>
+      );
+    }
+
+    if (isScanning) {
+      return (
+        <div className="text-center h-24 flex flex-col justify-center items-center">
+          <Loader2 className="w-8 h-8 animate-spin mb-2" />
+          <p className="text-lg animate-pulse">{statusMessage}</p>
+        </div>
+      );
+    }
+
+    if (snapshot && match) {
+      return (
+        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
+          <p className="text-lg">Cliente reconhecido:</p>
+          <p className="text-2xl font-bold">{match.nome}</p>
+          <div className="flex gap-2 justify-center pt-2">
+            <Button variant="outline" onClick={handleRetry}><X className="w-4 h-4 mr-2" />Incorreto</Button>
+            <Button onClick={handleConfirm}><Check className="w-4 h-4 mr-2" />Confirmar</Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (snapshot && !match) {
+      return (
+        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
+          <p className="text-lg font-bold text-red-600">Cliente não encontrado.</p>
+          <div className="flex gap-2 justify-center pt-2">
+            <Button variant="outline" onClick={handleRetry}>Tentar Novamente</Button>
+            <Button onClick={handleNewClient}><UserPlus className="w-4 h-4 mr-2" />Cadastrar Novo Cliente</Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-center h-24 flex flex-col justify-center items-center">
+        <Button onClick={handleCapture}>Capturar Imagem</Button>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Analisando Rosto</DialogTitle>
-          <DialogDescription>Aguarde enquanto identificamos o cliente.</DialogDescription>
+          <DialogTitle>Reconhecimento Facial</DialogTitle>
+          <DialogDescription>{statusMessage}</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
           <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
@@ -107,7 +165,6 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
                 screenshotFormat="image/jpeg"
                 videoConstraints={{ width: 400, height: 400, facingMode: 'user' }}
                 className="w-full h-full object-cover"
-                onUserMedia={handleUserMedia}
                 onUserMediaError={() => {
                   showError("Não foi possível acessar a câmera.");
                   onOpenChange(false);
@@ -115,29 +172,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
               />
             )}
           </div>
-          
-          <div className="text-center h-24 flex flex-col justify-center items-center">
-            {isScanning || (!snapshot && isOpen) ? (
-              <p className="text-lg animate-pulse">{statusMessage}</p>
-            ) : match ? (
-              <div className="space-y-2">
-                <p className="text-lg">Cliente reconhecido:</p>
-                <p className="text-2xl font-bold">{match.nome}</p>
-                <div className="flex gap-2 justify-center pt-2">
-                  <Button variant="outline" onClick={handleRetry}><X className="w-4 h-4 mr-2" />Incorreto</Button>
-                  <Button onClick={handleConfirm}><Check className="w-4 h-4 mr-2" />Confirmar</Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-lg font-bold text-red-600">Cliente não encontrado.</p>
-                <div className="flex gap-2 justify-center pt-2">
-                  <Button variant="outline" onClick={handleRetry}>Tentar Novamente</Button>
-                  <Button onClick={handleNewClient}><UserPlus className="w-4 h-4 mr-2" />Cadastrar Novo Cliente</Button>
-                </div>
-              </div>
-            )}
-          </div>
+          {renderContent()}
         </div>
       </DialogContent>
     </Dialog>
