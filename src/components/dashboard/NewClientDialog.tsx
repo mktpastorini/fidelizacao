@@ -36,7 +36,7 @@ export function NewClientDialog({ isOpen, onOpenChange, onSubmit, isSubmitting, 
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Cadastrar Novo Cliente</DialogTitle>
           <DialogDescription>

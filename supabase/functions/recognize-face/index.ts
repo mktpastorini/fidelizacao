@@ -115,10 +115,6 @@ async function getGoogleVisionEmbedding(imageUrl: string) {
   return embedding;
 }
 
-function getSimulatedEmbedding() {
-  return Array(512).fill(0).map(() => Math.random() * 0.1);
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -160,16 +156,57 @@ serve(async (req) => {
     const provider = settings?.ai_provider || 'simulacao';
     console.log(`RECOGNIZE-FACE: 5/11 - Provedor de IA: ${provider}`);
 
-    let embedding;
-    if (provider === 'google_vision') {
-      console.log("RECOGNIZE-FACE: 6/11 - Gerando embedding com Google Vision...");
-      embedding = await getGoogleVisionEmbedding(image_url);
-      console.log("RECOGNIZE-FACE: 7/11 - Embedding do Google Vision gerado.");
-    } else {
-      console.log("RECOGNIZE-FACE: 6/11 - Gerando embedding com Simulação...");
-      embedding = getSimulatedEmbedding();
-      console.log("RECOGNIZE-FACE: 7/11 - Embedding de simulação gerado.");
+    if (provider === 'simulacao') {
+      console.log("RECOGNIZE-FACE: 6/11 - Executando simulação...");
+
+      const { data: faces, error: facesError } = await supabaseAdmin
+        .from('customer_faces')
+        .select('cliente_id')
+        .eq('user_id', user.id);
+
+      if (facesError) throw facesError;
+
+      if (!faces || faces.length === 0) {
+        console.log("RECOGNIZE-FACE: 7/11 - Simulação: Nenhum rosto cadastrado para simular.");
+        return new Response(JSON.stringify({ match: null, message: 'Nenhum cliente correspondente encontrado (simulação).' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
+      // 80% chance of finding a match
+      if (Math.random() < 0.8) {
+        const randomFace = faces[Math.floor(Math.random() * faces.length)];
+        const matchedClientId = randomFace.cliente_id;
+        console.log(`RECOGNIZE-FACE: 7/11 - Simulação: Sucesso! Reconhecido cliente ${matchedClientId}`);
+
+        const { data: cliente, error: clientError } = await supabaseAdmin
+          .from('clientes')
+          .select('*, filhos(*)')
+          .eq('id', matchedClientId)
+          .single();
+
+        if (clientError) throw clientError;
+        console.log("RECOGNIZE-FACE: 8/11 - Detalhes do cliente (simulado) buscados. SUCESSO.");
+
+        return new Response(JSON.stringify({ match: cliente }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      } else {
+        console.log("RECOGNIZE-FACE: 7/11 - Simulação: Falha! Nenhum cliente reconhecido.");
+        return new Response(JSON.stringify({ match: null, message: 'Nenhum cliente correspondente encontrado (simulação).' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
     }
+
+    // --- Logic for Google Vision ---
+    let embedding;
+    console.log("RECOGNIZE-FACE: 6/11 - Gerando embedding com Google Vision...");
+    embedding = await getGoogleVisionEmbedding(image_url);
+    console.log("RECOGNIZE-FACE: 7/11 - Embedding do Google Vision gerado.");
 
     console.log("RECOGNIZE-FACE: 8/11 - Buscando correspondência no DB...");
     const { data: match, error: rpcError } = await supabaseAdmin.rpc('match_customer_face', {

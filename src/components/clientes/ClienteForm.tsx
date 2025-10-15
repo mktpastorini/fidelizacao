@@ -9,6 +9,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ImageCapture } from "@/components/clientes/ImageCapture";
@@ -128,31 +129,32 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
           />
         </div>
         
-        {!isEditing && (
-          <FormField
-            control={form.control}
-            name="indicado_por_id"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Indicado por</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value || "none"}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione quem indicou este cliente" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="none">Ninguém / Indicação própria</SelectItem>
-                    {clientes.map(cliente => (
+        <FormField
+          control={form.control}
+          name="indicado_por_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Indicado por</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value || "none"} disabled={isEditing}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione quem indicou este cliente" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="none">Ninguém / Indicação própria</SelectItem>
+                  {clientes
+                    .filter(c => c.id !== defaultValues?.id)
+                    .map(cliente => (
                       <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        )}
+                  ))}
+                </SelectContent>
+              </Select>
+              {isEditing && <FormDescription>A indicação não pode ser alterada após o cadastro.</FormDescription>}
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div>
           <FormLabel>Gostos e Preferências</FormLabel>

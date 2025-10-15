@@ -3,12 +3,12 @@ import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Pedido, ItemPedido } from "@/types/supabase";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -78,24 +78,24 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
   }, [historico]);
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-md p-0 flex flex-col">
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
         {cliente && (
           <>
-            <SheetHeader className="items-center text-center p-6 space-y-2 bg-card border-b">
+            <DialogHeader className="items-center text-center p-6 space-y-2 bg-card border-b shrink-0">
               <Avatar className="h-24 w-24 mb-2 ring-2 ring-primary ring-offset-4 ring-offset-card">
                 <AvatarImage src={cliente.avatar_url || undefined} />
                 <AvatarFallback>
                   <User className="h-12 w-12 text-gray-400" />
                 </AvatarFallback>
               </Avatar>
-              <SheetTitle className="text-2xl uppercase font-bold tracking-wider">{cliente.nome}</SheetTitle>
-              <SheetDescription>
+              <DialogTitle className="text-2xl uppercase font-bold tracking-wider">{cliente.nome}</DialogTitle>
+              <DialogDescription>
                 Cliente desde {format(new Date(cliente.cliente_desde), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </SheetDescription>
-            </SheetHeader>
+              </DialogDescription>
+            </DialogHeader>
             
-            <div className="p-6">
+            <div className="p-6 shrink-0">
                 <div className="grid grid-cols-3 gap-2">
                     <StatDisplay title="Total de Visitas" value={stats.totalVisits} className="bg-primary/80" />
                     <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} className="bg-primary/80" />
@@ -103,79 +103,81 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
                 </div>
             </div>
 
-            <Tabs defaultValue="historico" className="w-full px-6 flex-1 flex flex-col">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="perfil">Perfil</TabsTrigger>
-                <TabsTrigger value="historico">Histórico</TabsTrigger>
-                <TabsTrigger value="preferencias">Preferências</TabsTrigger>
-              </TabsList>
-              
-              <div className="flex-1 overflow-y-auto mt-4">
-                <TabsContent value="perfil" className="space-y-4">
-                  <DetailSection title="Contato" icon={Phone}>
-                    <p>WhatsApp: {cliente.whatsapp || "Não informado"}</p>
-                  </DetailSection>
-                  <DetailSection title="Família" icon={Heart}>
-                    <p>Cônjuge: {cliente.casado_com || "Não informado"}</p>
-                    {cliente.filhos && cliente.filhos.length > 0 && (
-                      <div>
-                        <p className="font-medium">Filhos:</p>
-                        <ul className="list-disc list-inside">
-                          {cliente.filhos.map(filho => (
-                            <li key={filho.id}>{filho.nome} ({filho.idade || '?'} anos)</li>
-                          ))}
-                        </ul>
+            <div className="px-6 pb-6 flex-1 min-h-0">
+              <Tabs defaultValue="historico" className="w-full h-full flex flex-col">
+                <TabsList className="grid w-full grid-cols-3 shrink-0">
+                  <TabsTrigger value="perfil">Perfil</TabsTrigger>
+                  <TabsTrigger value="historico">Histórico</TabsTrigger>
+                  <TabsTrigger value="preferencias">Preferências</TabsTrigger>
+                </TabsList>
+                
+                <div className="flex-1 overflow-y-auto mt-4">
+                  <TabsContent value="perfil" className="space-y-4">
+                    <DetailSection title="Contato" icon={Phone}>
+                      <p>WhatsApp: {cliente.whatsapp || "Não informado"}</p>
+                    </DetailSection>
+                    <DetailSection title="Família" icon={Heart}>
+                      <p>Cônjuge: {cliente.casado_com || "Não informado"}</p>
+                      {cliente.filhos && cliente.filhos.length > 0 && (
+                        <div>
+                          <p className="font-medium">Filhos:</p>
+                          <ul className="list-disc list-inside">
+                            {cliente.filhos.map(filho => (
+                              <li key={filho.id}>{filho.nome} ({filho.idade || '?'} anos)</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </DetailSection>
+                    <DetailSection title="Fidelidade" icon={ThumbsUp}>
+                      <p>Indicou {cliente.indicacoes} cliente(s).</p>
+                      {cliente.indicado_por && <p>Indicado por: <span className="font-semibold">{cliente.indicado_por.nome}</span></p>}
+                    </DetailSection>
+                  </TabsContent>
+
+                  <TabsContent value="historico">
+                    {isHistoryLoading ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
                       </div>
-                    )}
-                  </DetailSection>
-                  <DetailSection title="Fidelidade" icon={ThumbsUp}>
-                    <p>Indicou {cliente.indicacoes} cliente(s).</p>
-                    {cliente.indicado_por && <p>Indicado por: <span className="font-semibold">{cliente.indicado_por.nome}</span></p>}
-                  </DetailSection>
-                </TabsContent>
-
-                <TabsContent value="historico">
-                  {isHistoryLoading ? (
-                    <div className="space-y-2">
-                      <Skeleton className="h-8 w-full" />
-                      <Skeleton className="h-8 w-full" />
-                    </div>
-                  ) : historico && historico.length > 0 ? (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Data</TableHead>
-                          <TableHead className="text-right">Valor</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {historico.map(pedido => (
-                          <TableRow key={pedido.id}>
-                            <TableCell className="text-xs">{pedido.closed_at ? format(new Date(pedido.closed_at), "dd/MM/yy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(calculateTotal(pedido.itens_pedido))}</TableCell>
+                    ) : historico && historico.length > 0 ? (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Data</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <p className="text-center text-muted-foreground py-8">Nenhum histórico de compras.</p>
-                  )}
-                </TabsContent>
+                        </TableHeader>
+                        <TableBody>
+                          {historico.map(pedido => (
+                            <TableRow key={pedido.id}>
+                              <TableCell className="text-xs">{pedido.closed_at ? format(new Date(pedido.closed_at), "dd/MM/yy HH:mm", { locale: ptBR }) : 'N/A'}</TableCell>
+                              <TableCell className="text-right font-medium">{formatCurrency(calculateTotal(pedido.itens_pedido))}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">Nenhum histórico de compras.</p>
+                    )}
+                  </TabsContent>
 
-                <TabsContent value="preferencias" className="space-y-4">
-                  <DetailSection title="Gostos e Observações" icon={Star}>
-                    {cliente.gostos && typeof cliente.gostos === 'object' && Object.keys(cliente.gostos).length > 0 ? (
-                      Object.entries(cliente.gostos).map(([key, value]) => (
-                        value && <p key={key}><span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</p>
-                      ))
-                    ) : <p>Nenhuma preferência cadastrada.</p>}
-                  </DetailSection>
-                </TabsContent>
-              </div>
-            </Tabs>
+                  <TabsContent value="preferencias" className="space-y-4">
+                    <DetailSection title="Gostos e Observações" icon={Star}>
+                      {cliente.gostos && typeof cliente.gostos === 'object' && Object.keys(cliente.gostos).length > 0 ? (
+                        Object.entries(cliente.gostos).map(([key, value]) => (
+                          value && <p key={key}><span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</p>
+                        ))
+                      ) : <p>Nenhuma preferência cadastrada.</p>}
+                    </DetailSection>
+                  </TabsContent>
+                </div>
+              </Tabs>
+            </div>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
