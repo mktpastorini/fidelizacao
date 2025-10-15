@@ -4,6 +4,8 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSound } from "@/hooks/useSound";
+import { useRef, useEffect, useState } from "react";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -32,6 +34,9 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
+  const playNotification = useSound('/notification.mp3');
+  const prevPendingCount = useRef<number | null>(null);
+  const [newItemArrived, setNewItemArrived] = useState(false);
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
@@ -62,6 +67,22 @@ export default function CozinhaPage() {
   const preparingItems = items?.filter(item => item.status === 'preparando') || [];
   const deliveredItems = items?.filter(item => item.status === 'entregue') || [];
 
+  useEffect(() => {
+    if (prevPendingCount.current === null && !isLoading) {
+      prevPendingCount.current = pendingItems.length;
+      return;
+    }
+
+    if (prevPendingCount.current !== null && pendingItems.length > prevPendingCount.current) {
+      playNotification();
+      setNewItemArrived(true);
+      const timer = setTimeout(() => setNewItemArrived(false), 3000); // Pulse for 3 seconds
+      return () => clearTimeout(timer);
+    }
+
+    prevPendingCount.current = pendingItems.length;
+  }, [pendingItems.length, isLoading, playNotification]);
+
   return (
     <div className="h-full flex flex-col">
       <div className="mb-6">
@@ -79,7 +100,7 @@ export default function CozinhaPage() {
         <p className="text-red-500">Erro ao carregar os pedidos.</p>
       ) : (
         <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-red-500" />
+          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-red-500" highlight={newItemArrived} />
           <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-blue-500" />
           <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-green-500" />
         </div>
