@@ -16,7 +16,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Cliente, Mesa } from "@/types/supabase";
 import { useState } from "react";
-import { Badge } from "../ui/badge";
 
 type ClientArrivalModalProps = {
   isOpen: boolean;
@@ -45,35 +44,30 @@ export function ClientArrivalModal({
     }
   };
 
+  const preferences = cliente.gostos ? Object.entries(cliente.gostos).filter(([_, value]) => value) : [];
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Cliente Reconhecido!</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">Cliente Reconhecido!</DialogTitle>
           <DialogDescription>
             Boas-vindas de volta, {cliente.nome}!
           </DialogDescription>
         </DialogHeader>
-        <div className="py-4 space-y-4">
-          <div className="p-4 border rounded-lg bg-gray-50/50 space-y-2">
-            <h3 className="font-semibold text-lg">{cliente.nome}</h3>
-            {cliente.casado_com && <p className="text-sm text-gray-600">Casado(a) com: {cliente.casado_com}</p>}
-            {cliente.filhos && cliente.filhos.length > 0 && (
-              <div>
-                <h4 className="font-medium text-sm">Filhos:</h4>
-                <ul className="list-disc list-inside text-sm text-gray-600">
-                  {cliente.filhos.map(filho => (
-                    <li key={filho.id}>{filho.nome} ({filho.idade || '?'} anos)</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {cliente.gostos && Object.keys(cliente.gostos).length > 0 && (
-                <div>
-                    <h4 className="font-medium text-sm mb-1">Preferências:</h4>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      {Object.entries(cliente.gostos).map(([key, value]) => (
-                        <p key={key}><span className="font-semibold capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}</p>
+        <div className="py-4 space-y-6">
+          <div className="p-4 rounded-lg bg-secondary space-y-2">
+            <h3 className="font-bold text-lg text-secondary-foreground">{cliente.nome}</h3>
+            {cliente.casado_com && <p className="text-sm text-muted-foreground">Casado(a) com: {cliente.casado_com}</p>}
+            
+            {preferences.length > 0 && (
+                <div className="pt-2">
+                    <h4 className="font-semibold text-sm text-secondary-foreground mb-1">Preferências:</h4>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {preferences.map(([key, value]) => (
+                        <p key={key}>
+                          <span className="capitalize">{key.replace(/_/g, ' ')}:</span> {String(value)}
+                        </p>
                       ))}
                     </div>
                 </div>
@@ -93,7 +87,7 @@ export function ClientArrivalModal({
                     </SelectItem>
                   ))
                 ) : (
-                  <div className="p-2 text-sm text-gray-500">Nenhuma mesa livre.</div>
+                  <div className="p-2 text-sm text-muted-foreground">Nenhuma mesa livre.</div>
                 )}
               </SelectContent>
             </Select>
