@@ -26,6 +26,7 @@ import { ClienteDetalhesModal } from "@/components/clientes/ClienteDetalhesModal
 import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
+import * as faceapi from 'face-api.js';
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
@@ -44,6 +45,24 @@ async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   }
 
   return clientes || [];
+}
+
+// Helper para gerar embeddings no navegador
+async function generateEmbeddings(imageUrls: string[]): Promise<Float32Array[]> {
+  const embeddings: Float32Array[] = [];
+  for (const url of imageUrls) {
+    try {
+      const img = await faceapi.fetchImage(url);
+      const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+      if (detection) {
+        embeddings.push(detection.descriptor);
+      }
+    } catch (error) {
+      console.error(`Falha ao processar a imagem: ${url}`, error);
+      showError(`Não foi possível processar uma das imagens. Tente uma foto mais nítida.`);
+    }
+  }
+  return embeddings;
 }
 
 export default function ClientesPage() {
@@ -89,14 +108,15 @@ export default function ClientesPage() {
       if (!user?.id) throw new Error("Usuário não autenticado");
 
       const { avatar_urls, ...clienteData } = newCliente;
+      
+      const embeddings = await generateEmbeddings(avatar_urls);
+      if (embeddings.length === 0) {
+        throw new Error("Nenhum rosto detectado nas imagens. O cadastro foi cancelado.");
+      }
 
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
-        p_user_id: user.id,
-        p_nome: clienteData.nome,
-        p_casado_com: clienteData.casado_com,
-        p_whatsapp: clienteData.whatsapp,
-        p_gostos: clienteData.gostos,
-        p_avatar_url: clienteData.avatar_url,
+        p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
+        p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: clienteData.avatar_url,
         p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
@@ -107,12 +127,14 @@ export default function ClientesPage() {
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      if (avatar_urls && avatar_urls.length > 0) {
-        const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: newClientId, image_urls: avatar_urls },
-        });
-        if (faceError) showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
-      }
+      const facesToInsert = embeddings.map(embedding => ({
+        cliente_id: newClientId,
+        user_id: user.id,
+        embedding: Array.from(embedding),
+        ai_provider: 'face-api.js',
+      }));
+      const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
+      if (faceError) throw new Error(`Cliente criado, mas falha ao salvar rosto: ${faceError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
@@ -140,11 +162,14 @@ export default function ClientesPage() {
       }
 
       if (avatar_urls && avatar_urls.length > 0) {
-        const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: id, image_urls: avatar_urls },
-        });
-        if (faceError) {
-          showError(`Cliente atualizado, mas falha ao registrar o rosto: ${faceError.message}`);
+        const embeddings = await generateEmbeddings(avatar_urls);
+        if (embeddings.length > 0) {
+          await supabase.from('customer_faces').delete().eq('cliente_id', id);
+          const facesToInsert = embeddings.map(embedding => ({
+            cliente_id: id, user_id: user.id, embedding: Array.from(embedding), ai_provider: 'face-api.js',
+          }));
+          const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
+          if (faceError) throw new Error(`Cliente atualizado, mas falha ao salvar rosto: ${faceError.message}`);
         }
       }
     },
