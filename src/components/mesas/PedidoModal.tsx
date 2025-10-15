@@ -192,11 +192,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
   const closeOrderMutation = useMutation({
     mutationFn: async () => {
-      if (!pedido || !mesa) throw new Error("Pedido ou mesa não encontrado.");
+      if (!pedido || !mesa || !ocupantes) throw new Error("Pedido, mesa ou ocupantes não encontrados.");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      await supabase.from("pedidos").update({ status: "pago", closed_at: new Date().toISOString() }).eq("id", pedido.id);
+      const acompanhantesData = ocupantes.map(o => ({ id: o.id, nome: o.nome }));
+
+      await supabase.from("pedidos").update({ 
+        status: "pago", 
+        closed_at: new Date().toISOString(),
+        acompanhantes: acompanhantesData,
+      }).eq("id", pedido.id);
+
       await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesa.id);
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa.id);
 
