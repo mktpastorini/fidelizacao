@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "docker:build": "docker build -t mgp150192/fidelize-app:latest .",
+    "docker:push": "docker push mgp150192/fidelize-app:latest"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
