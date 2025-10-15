@@ -15,40 +15,41 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Copy, RefreshCw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useSettings } from "@/contexts/SettingsContext";
 
 type UserData = {
   profile: Profile | null;
-  settings: UserSettings | null;
   templates: MessageTemplate[];
   produtos: Produto[];
 };
 
-async function fetchUserData(): Promise<UserData> {
+async function fetchPageData(): Promise<UserData> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { profile: null, settings: null, templates: [], produtos: [] };
+  if (!user) return { profile: null, templates: [], produtos: [] };
 
   const { data: profiles, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (profileError && profileError.code !== 'PGRST116') throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
   
-  const { data: settings, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", user.id).single();
-  if (settingsError && settingsError.code !== 'PGRST116') throw new Error(`Erro ao buscar configurações: ${settingsError.message}`);
-
   const { data: templates, error: templatesError } = await supabase.from("message_templates").select("*");
   if (templatesError) throw new Error(`Erro ao buscar templates: ${templatesError.message}`);
 
   const { data: produtos, error: produtosError } = await supabase.from("produtos").select("*").order("nome");
   if (produtosError) throw new Error(`Erro ao buscar produtos: ${produtosError.message}`);
 
-  return { profile: profiles, settings, templates: templates || [], produtos: produtos || [] };
+  return { profile: profiles, templates: templates || [], produtos: produtos || [] };
 }
 
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
+  const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["userData"],
-    queryFn: fetchUserData,
+  const { data, isLoading: isLoadingPage, isError } = useQuery({
+    queryKey: ["configPageData"],
+    queryFn: fetchPageData,
   });
+
+  const isLoading = isLoadingSettings || isLoadingPage;
 
   const updateProfileMutation = useMutation({
     mutationFn: async (updatedProfile: Partial<Profile>) => {
@@ -58,7 +59,7 @@ export default function ConfiguracoesPage() {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userData"] });
+      queryClient.invalidateQueries({ queryKey: ["configPageData"] });
       showSuccess("Perfil atualizado com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
@@ -75,7 +76,7 @@ export default function ConfiguracoesPage() {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userData"] });
+      refetchSettings();
       showSuccess("Configurações salvas com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
@@ -116,7 +117,7 @@ export default function ConfiguracoesPage() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["userData"] });
+      refetchSettings();
       showSuccess("Nova chave de API gerada com sucesso!");
     },
     onError: (error: Error) => {
@@ -175,8 +176,8 @@ export default function ConfiguracoesPage() {
                 {isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Input readOnly value={data?.settings?.api_key || "Nenhuma chave gerada"} />
-                      <Button variant="outline" size="icon" onClick={() => handleCopy(data?.settings?.api_key)}><Copy className="w-4 h-4" /></Button>
+                      <Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} />
+                      <Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button>
                     </div>
                     <Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}>
                       <RefreshCw className="w-4 h-4 mr-2" />
@@ -197,7 +198,7 @@ export default function ConfiguracoesPage() {
                   <WebhookForm
                     onSubmit={(values) => updateSettingsMutation.mutate(values)}
                     isSubmitting={updateSettingsMutation.isPending}
-                    defaultValues={data?.settings || undefined}
+                    defaultValues={settings || undefined}
                     onTest={() => testWebhookMutation.mutate()}
                     isTesting={testWebhookMutation.isPending}
                   />
@@ -216,7 +217,7 @@ export default function ConfiguracoesPage() {
                     <div className="space-y-2">
                       <Label htmlFor="ai-provider">Provedor de Reconhecimento Facial</Label>
                       <Select
-                        defaultValue={data?.settings?.ai_provider || 'simulacao'}
+                        defaultValue={settings?.ai_provider || 'simulacao'}
                         onValueChange={(value) => updateSettingsMutation.mutate({ ai_provider: value })}
                       >
                         <SelectTrigger id="ai-provider">
@@ -234,7 +235,7 @@ export default function ConfiguracoesPage() {
                     <Button
                       variant="outline"
                       onClick={() => testGoogleVisionMutation.mutate()}
-                      disabled={data?.settings?.ai_provider !== 'google_vision' || testGoogleVisionMutation.isPending}
+                      disabled={settings?.ai_provider !== 'google_vision' || testGoogleVisionMutation.isPending}
                     >
                       {testGoogleVisionMutation.isPending ? "Testando..." : "Testar Conexão Google Vision"}
                     </Button>
@@ -257,7 +258,7 @@ export default function ConfiguracoesPage() {
                   <TemplateSettingsForm
                     onSubmit={(values) => updateSettingsMutation.mutate(values)}
                     isSubmitting={updateSettingsMutation.isPending}
-                    defaultValues={data?.settings || undefined}
+                    defaultValues={settings || undefined}
                     templates={data?.templates || []}
                   />
                 )}
@@ -274,16 +275,16 @@ export default function ConfiguracoesPage() {
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="auto-add-item"
-                        checked={data?.settings?.auto_add_item_enabled}
+                        checked={settings?.auto_add_item_enabled}
                         onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_add_item_enabled: checked })}
                       />
                       <Label htmlFor="auto-add-item">Habilitar item de entrada automático</Label>
                     </div>
-                    {data?.settings?.auto_add_item_enabled && (
+                    {settings?.auto_add_item_enabled && (
                       <div className="space-y-2">
                         <Label htmlFor="default-product">Produto Padrão</Label>
                         <Select
-                          value={data?.settings?.default_produto_id || ""}
+                          value={settings?.default_produto_id || ""}
                           onValueChange={(value) => updateSettingsMutation.mutate({ default_produto_id: value })}
                         >
                           <SelectTrigger id="default-product">
@@ -314,25 +315,25 @@ export default function ConfiguracoesPage() {
                       <Input
                         id="report-phone"
                         placeholder="(99) 99999-9999"
-                        defaultValue={data?.settings?.daily_report_phone_number || ""}
+                        defaultValue={settings?.daily_report_phone_number || ""}
                         onBlur={(e) => updateSettingsMutation.mutate({ daily_report_phone_number: e.target.value })}
                       />
                     </div>
                     <div className="flex items-center space-x-2">
                       <Switch
                         id="auto-close"
-                        checked={data?.settings?.auto_close_enabled}
+                        checked={settings?.auto_close_enabled}
                         onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_close_enabled: checked })}
                       />
                       <Label htmlFor="auto-close">Habilitar fechamento automático</Label>
                     </div>
-                    {data?.settings?.auto_close_enabled && (
+                    {settings?.auto_close_enabled && (
                       <div>
                         <Label htmlFor="auto-close-time">Horário do Fechamento</Label>
                         <Input
                           id="auto-close-time"
                           type="time"
-                          defaultValue={data?.settings?.auto_close_time || "23:00"}
+                          defaultValue={settings?.auto_close_time || "23:00"}
                           onBlur={(e) => updateSettingsMutation.mutate({ auto_close_time: e.target.value })}
                         />
                       </div>
@@ -347,13 +348,28 @@ export default function ConfiguracoesPage() {
         <TabsContent value="aparencia" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Personalização da Aparência</CardTitle>
+              <CardTitle>Estilo do Menu</CardTitle>
               <CardDescription>
-                Ajuste as cores do sistema para combinar com a sua marca.
+                Escolha como você prefere navegar pelo sistema.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Em breve você poderá personalizar as cores aqui.</p>
+              {isLoading ? <Skeleton className="h-24 w-full" /> : (
+                <RadioGroup
+                  value={settings?.menu_style || 'sidebar'}
+                  onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="sidebar" id="sidebar" />
+                    <Label htmlFor="sidebar">Barra Lateral (Padrão)</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="dock" id="dock" />
+                    <Label htmlFor="dock">Dock Inferior</Label>
+                  </div>
+                </RadioGroup>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
