@@ -42,7 +42,8 @@ export function useFaceRecognition() {
       try {
         const { data: faces, error: dbError } = await supabase
           .from('customer_faces')
-          .select('cliente_id, embedding, cliente:clientes!inner(*)');
+          .select('cliente_id, embedding, cliente:clientes!inner(*)')
+          .eq('ai_provider', 'face-api.js'); // Filtra apenas por embeddings do face-api.js
 
         if (dbError) throw dbError;
 
