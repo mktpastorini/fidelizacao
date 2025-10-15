@@ -16,6 +16,7 @@ import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { generateEmbeddings } from "@/utils/faceApi";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -141,28 +142,38 @@ export default function SalaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
+      const { avatar_url, ...clienteData } = newCliente;
+      
+      const embeddings = await generateEmbeddings(avatar_url ? [avatar_url] : []);
+      if (embeddings.length === 0) {
+        throw new Error("Nenhum rosto detectado na imagem. O cadastro foi cancelado.");
+      }
+
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
-        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: newCliente.casado_com,
-        p_whatsapp: newCliente.whatsapp, p_gostos: newCliente.gostos, p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id,
+        p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
+        p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: avatar_url,
+        p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
 
-      if (newCliente.filhos && newCliente.filhos.length > 0) {
-        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+      if (clienteData.filhos && clienteData.filhos.length > 0) {
+        const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      if (newCliente.avatar_url) {
-        const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
-        });
-        if (faceError) showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
-      }
+      const facesToInsert = embeddings.map(embedding => ({
+        cliente_id: newClientId,
+        user_id: user.id,
+        embedding: Array.from(embedding),
+        ai_provider: 'face-api.js',
+      }));
+      const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
+      if (faceError) throw new Error(`Cliente criado, mas falha ao salvar rosto: ${faceError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Novo cliente cadastrado com sucesso!");
       setIsNewClientOpen(false);
     },
@@ -306,7 +317,7 @@ export default function SalaoPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
         {mesasComPedidos?.map(mesa => (
-          <MesaCard key={mesa.id} mesa={mesa} onClick={() => handleMesaClick(mesa)} />
+          <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
         ))}
       </div>
 

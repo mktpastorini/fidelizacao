@@ -26,7 +26,7 @@ import { ClienteDetalhesModal } from "@/components/clientes/ClienteDetalhesModal
 import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
-import * as faceapi from 'face-api.js';
+import { generateEmbeddings } from "@/utils/faceApi";
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
@@ -45,24 +45,6 @@ async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   }
 
   return clientes || [];
-}
-
-// Helper para gerar embeddings no navegador
-async function generateEmbeddings(imageUrls: string[]): Promise<Float32Array[]> {
-  const embeddings: Float32Array[] = [];
-  for (const url of imageUrls) {
-    try {
-      const img = await faceapi.fetchImage(url);
-      const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-      if (detection) {
-        embeddings.push(detection.descriptor);
-      }
-    } catch (error) {
-      console.error(`Falha ao processar a imagem: ${url}`, error);
-      showError(`Não foi possível processar uma das imagens. Tente uma foto mais nítida.`);
-    }
-  }
-  return embeddings;
 }
 
 export default function ClientesPage() {
