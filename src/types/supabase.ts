@@ -82,6 +82,8 @@ export type Produto = {
   nome: string;
   preco: number;
   descricao: string | null;
+  tipo: 'venda' | 'rodizio' | 'componente_rodizio';
+  requer_preparo: boolean;
   created_at: string;
 };
 

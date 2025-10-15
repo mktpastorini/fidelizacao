@@ -37,6 +37,7 @@ const itemSchema = z.object({
   quantidade: z.coerce.number().min(1, "A quantidade deve ser pelo menos 1."),
   preco: z.coerce.number(),
   consumido_por_cliente_id: z.string().uuid().nullable().optional(),
+  status: z.enum(['pendente', 'preparando', 'entregue']),
 });
 
 async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
@@ -77,7 +78,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
-    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null },
+    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente' },
   });
 
   const { data: pedido, isLoading } = useQuery({
@@ -139,7 +140,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       showSuccess("Item adicionado com sucesso!");
-      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null });
+      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente' });
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -222,7 +223,9 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   });
 
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
-    addItemMutation.mutate(values);
+    const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
+    const status = produtoSelecionado?.requer_preparo ? 'pendente' : 'entregue';
+    addItemMutation.mutate({ ...values, status });
   };
 
   return (
@@ -303,7 +306,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar produto..." /><CommandList><CommandEmpty>Nenhum produto encontrado.</CommandEmpty><CommandGroup>
-                          {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {form.setValue("nome_produto", produto.nome); form.setValue("preco", produto.preco); setPopoverOpen(false);}}>
+                          {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {
+                            const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
+                            form.setValue("nome_produto", produto.nome);
+                            form.setValue("preco", preco);
+                            setPopoverOpen(false);
+                          }}>
                             <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
                         </CommandGroup></CommandList></Command></PopoverContent>
                       </Popover>
