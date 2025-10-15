@@ -17,6 +17,7 @@ export type Cliente = {
   created_at: string;
   indicado_por_id: string | null;
   indicado_por?: { nome: string } | null;
+  visitas: number;
 };
 
 export type Mesa = {

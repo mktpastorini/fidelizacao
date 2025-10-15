@@ -13,7 +13,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Heart, Users, ThumbsUp, Star, User } from "lucide-react";
+import { Phone, Heart, Users, ThumbsUp, Star, User, DoorOpen, ReceiptText } from "lucide-react";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -47,8 +47,9 @@ const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: R
   </div>
 );
 
-const StatDisplay = ({ title, value, className }: { title: string, value: string | number, className?: string }) => (
-  <div className={`p-3 rounded-lg text-center ${className}`}>
+const StatDisplay = ({ title, value, className, icon: Icon }: { title: string, value: string | number, className?: string, icon: React.ElementType }) => (
+  <div className={`p-3 rounded-lg text-center flex flex-col items-center justify-center ${className}`}>
+    <Icon className="w-5 h-5 mb-1 text-primary-foreground/80" />
     <p className="text-xs text-primary-foreground/80">{title}</p>
     <p className="text-xl font-bold text-primary-foreground">{value}</p>
   </div>
@@ -69,12 +70,12 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
 
   const stats = useMemo(() => {
     if (!historico || historico.length === 0) {
-      return { totalVisits: 0, totalSpent: 0, averageTicket: 0 };
+      return { totalPedidosPagos: 0, totalSpent: 0, averageTicket: 0 };
     }
-    const totalVisits = historico.length;
+    const totalPedidosPagos = historico.length;
     const totalSpent = historico.reduce((acc, pedido) => acc + calculateTotal(pedido.itens_pedido), 0);
-    const averageTicket = totalSpent / totalVisits;
-    return { totalVisits, totalSpent, averageTicket };
+    const averageTicket = totalSpent / totalPedidosPagos;
+    return { totalPedidosPagos, totalSpent, averageTicket };
   }, [historico]);
 
   return (
@@ -97,9 +98,9 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
             
             <div className="p-6 shrink-0">
                 <div className="grid grid-cols-3 gap-2">
-                    <StatDisplay title="Total de Visitas" value={stats.totalVisits} className="bg-primary/80" />
-                    <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} className="bg-primary/80" />
-                    <StatDisplay title="Ticket Médio" value={formatCurrency(stats.averageTicket)} className="bg-primary/80" />
+                    <StatDisplay title="Total de Visitas" value={cliente.visitas || 0} icon={DoorOpen} className="bg-primary/80" />
+                    <StatDisplay title="Pedidos Pagos" value={stats.totalPedidosPagos} icon={ReceiptText} className="bg-primary/80" />
+                    <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} icon={Users} className="bg-primary/80" />
                 </div>
             </div>
 
