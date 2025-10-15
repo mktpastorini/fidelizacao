@@ -19,12 +19,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
 import { Badge } from "../ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -286,8 +287,23 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                   <p>R$ {precoOriginal.toFixed(2)}</p>
                                 )}
                               </div>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setItemParaDesconto(item)}><Tag className="h-4 w-4 text-blue-600" /></Button>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                    <Tag className="h-4 w-4 mr-2" />
+                                    <span>Aplicar Desconto</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-red-500" onClick={() => deleteItemMutation.mutate(item.id)}>
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <span>Remover Item</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </div>
                           </li>
                         );
