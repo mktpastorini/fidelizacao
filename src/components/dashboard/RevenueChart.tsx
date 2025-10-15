@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "../ui/skeleton";
@@ -28,7 +28,7 @@ export function RevenueChart() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
         <CardHeader>
           <CardTitle>Faturamento dos Últimos 7 Dias</CardTitle>
           <CardDescription>Analisando os dados...</CardDescription>
@@ -41,33 +41,44 @@ export function RevenueChart() {
   }
 
   return (
-    <Card>
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
         <CardTitle>Faturamento dos Últimos 7 Dias</CardTitle>
         <CardDescription>Visão geral do faturamento diário da última semana.</CardDescription>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={350}>
-          <BarChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
+          <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <defs>
+              <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis
               dataKey="day"
               tickFormatter={formatDate}
-              stroke="#888888"
+              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
             />
             <YAxis
-              stroke="#888888"
+              stroke="hsl(var(--muted-foreground))"
               fontSize={12}
               tickFormatter={(value) => `R$${value}`}
             />
             <Tooltip
               formatter={(value: number) => [formatCurrency(value), "Faturamento"]}
               labelFormatter={formatDate}
-              contentStyle={{ backgroundColor: '#fff', border: '1px solid #ccc', borderRadius: '0.5rem' }}
+              contentStyle={{ 
+                backgroundColor: 'hsl(var(--card))', 
+                border: '1px solid hsl(var(--border))', 
+                borderRadius: '0.5rem',
+                color: 'hsl(var(--card-foreground))'
+              }}
             />
-            <Bar dataKey="total_revenue" fill="#1d4ed8" radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Area type="monotone" dataKey="total_revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" />
+          </AreaChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>

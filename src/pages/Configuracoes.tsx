@@ -141,9 +141,10 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="perfil">Perfil & Integrações</TabsTrigger>
           <TabsTrigger value="automacao">Automação</TabsTrigger>
+          <TabsTrigger value="aparencia">Aparência</TabsTrigger>
           <TabsTrigger value="api">Documentação API</TabsTrigger>
         </TabsList>
 
@@ -341,6 +342,20 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="aparencia" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Personalização da Aparência</CardTitle>
+              <CardDescription>
+                Ajuste as cores do sistema para combinar com a sua marca.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground">Em breve você poderá personalizar as cores aqui.</p>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="api" className="mt-6">

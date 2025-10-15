@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { User, Clock } from "lucide-react";
@@ -20,22 +20,21 @@ async function fetchRecentArrivals(): Promise<RecentArrival[]> {
   return data || [];
 }
 
-export function RecentArrivalsCard() {
+export function RecentActivityCard() {
   const { data: recentArrivals, isLoading } = useQuery({
     queryKey: ["recentArrivals"],
     queryFn: fetchRecentArrivals,
   });
 
   return (
-    <Card>
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
-        <CardTitle>Chegadas Recentes</CardTitle>
-        <CardDescription>Últimos clientes que chegaram ao estabelecimento.</CardDescription>
+        <CardTitle>Atividade Recente</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="flex items-center gap-4">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="space-y-2 flex-1">
@@ -46,7 +45,7 @@ export function RecentArrivalsCard() {
             ))}
           </div>
         ) : recentArrivals && recentArrivals.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {recentArrivals.map((arrival) => (
               <div key={arrival.cliente_id + arrival.arrival_time} className="flex items-center gap-4">
                 <Avatar className="h-10 w-10">
@@ -58,8 +57,7 @@ export function RecentArrivalsCard() {
                 <div className="flex-1">
                   <p className="font-medium">{arrival.nome}</p>
                   <p className="text-sm text-muted-foreground flex items-center">
-                    <Clock className="w-3 h-3 mr-1.5" />
-                    {formatDistanceToNow(new Date(arrival.arrival_time), { locale: ptBR, addSuffix: true })}
+                    chegou {formatDistanceToNow(new Date(arrival.arrival_time), { locale: ptBR, addSuffix: true })}
                   </p>
                 </div>
               </div>

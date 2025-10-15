@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Crown, User } from "lucide-react";
@@ -13,7 +13,7 @@ type TopClient = {
 };
 
 async function fetchTopClients(): Promise<TopClient[]> {
-  const { data, error } = await supabase.rpc('get_top_clients', { limit_count: 5 });
+  const { data, error } = await supabase.rpc('get_top_clients', { limit_count: 3 });
   if (error) throw new Error(error.message);
   return data || [];
 }
@@ -27,15 +27,14 @@ export function TopClientsCard() {
   });
 
   return (
-    <Card>
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
-        <CardTitle>Top 5 Clientes</CardTitle>
-        <CardDescription>Clientes que mais gastaram no seu estabelecimento.</CardDescription>
+        <CardTitle>Top Clientes</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
+            {[...Array(3)].map((_, i) => (
               <div key={i} className="flex items-center gap-4">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="space-y-2 flex-1">
@@ -46,9 +45,10 @@ export function TopClientsCard() {
             ))}
           </div>
         ) : topClients && topClients.length > 0 ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {topClients.map((client, index) => (
               <div key={client.cliente_id} className="flex items-center gap-4">
+                {index === 0 && <Crown className="w-5 h-5 text-yellow-500" />}
                 <Avatar className="h-10 w-10">
                   <AvatarImage src={client.avatar_url || undefined} />
                   <AvatarFallback>
@@ -59,7 +59,6 @@ export function TopClientsCard() {
                   <p className="font-medium">{client.nome}</p>
                   <p className="text-sm text-muted-foreground">{formatCurrency(client.total_gasto)}</p>
                 </div>
-                {index === 0 && <Crown className="w-5 h-5 text-yellow-500" />}
               </div>
             ))}
           </div>

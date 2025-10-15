@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopClientsCard } from "@/components/dashboard/TopClientsCard";
-import { RecentArrivalsCard } from "@/components/dashboard/RecentArrivalsCard";
+import { RecentActivityCard } from "@/components/dashboard/RecentActivityCard";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DollarSign, Users, ChefHat, BarChart2, ReceiptText } from "lucide-react";
@@ -13,7 +13,6 @@ import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth } from "date-fns";
 
-// Tipos para os dados
 type DailyStats = {
   revenue_today: number;
   avg_ticket_today: number;
@@ -34,7 +33,6 @@ type DashboardData = {
   has_clients: boolean;
 };
 
-// Funções de busca de dados
 async function fetchDashboardData(): Promise<DashboardData> {
   const { data: financialData, error: financialError } = await supabase.rpc('get_financial_stats_today');
   if (financialError) throw new Error(financialError.message);
@@ -68,7 +66,6 @@ async function fetchRangeStats(dateRange: DateRange): Promise<RangeStats> {
   return data && data.length > 0 ? data[0] : { total_revenue: 0, total_orders: 0, avg_order_value: 0, new_clients: 0 };
 }
 
-// Componente principal
 export default function DashboardPage() {
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -99,31 +96,40 @@ export default function DashboardPage() {
     return <WelcomeCard />;
   }
 
+  const occupiedPercentage = dailyData.dailyStats.total_tables > 0 ? (dailyData.dailyStats.occupied_tables / dailyData.dailyStats.total_tables) * 100 : 0;
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Analise a performance do seu negócio.</p>
+        <p className="text-muted-foreground mt-1">Visão geral e análise de desempenho do seu negócio.</p>
       </div>
 
       <Tabs defaultValue="today">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
           <TabsTrigger value="today">Visão de Hoje</TabsTrigger>
           <TabsTrigger value="period">Análise por Período</TabsTrigger>
         </TabsList>
         
         <TabsContent value="today" className="mt-6 space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Faturamento do Dia" value={formatCurrency(dailyData.dailyStats.revenue_today)} icon={DollarSign} />
-            <StatCard title="Ticket Médio do Dia" value={formatCurrency(dailyData.dailyStats.avg_ticket_today)} icon={BarChart2} />
-            <StatCard title="Mesas Ocupadas" value={`${dailyData.dailyStats.occupied_tables} de ${dailyData.dailyStats.total_tables}`} icon={Users} />
+            <StatCard title="Ticket Médio" value={formatCurrency(dailyData.dailyStats.avg_ticket_today)} icon={BarChart2} />
+            <StatCard 
+              title="Mesas Ocupadas" 
+              value={`${dailyData.dailyStats.occupied_tables} / ${dailyData.dailyStats.total_tables}`} 
+              icon={Users}
+              progress={occupiedPercentage}
+            />
             <StatCard title="Pedidos na Cozinha" value={dailyData.dailyStats.kitchen_orders} icon={ChefHat} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2"><RevenueChart /></div>
-            <div><TopClientsCard /></div>
+            <div className="space-y-6">
+              <TopClientsCard />
+              <RecentActivityCard />
+            </div>
           </div>
-          <div><RecentArrivalsCard /></div>
         </TabsContent>
 
         <TabsContent value="period" className="mt-6 space-y-6">
