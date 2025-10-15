@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RevenueChart } from "@/components/dashboard/RevenueChart";
 import { TopClientsCard } from "@/components/dashboard/TopClientsCard";
+import { TopClientsByVisitsCard } from "@/components/dashboard/TopClientsByVisitsCard";
 import { RecentActivityCard } from "@/components/dashboard/RecentActivityCard";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -136,6 +137,7 @@ export default function DashboardPage() {
             <div className="lg:col-span-2"><RevenueChart /></div>
             <div className="space-y-6">
               <TopClientsCard />
+              <TopClientsByVisitsCard />
               <RecentActivityCard />
             </div>
           </div>
