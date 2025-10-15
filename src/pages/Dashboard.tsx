@@ -18,7 +18,8 @@ type DailyStats = {
   avg_ticket_today: number;
   occupied_tables: number;
   total_tables: number;
-  kitchen_orders: number;
+  pending_kitchen_orders: number;
+  preparing_kitchen_orders: number;
 };
 
 type RangeStats = {
@@ -39,7 +40,10 @@ async function fetchDashboardData(): Promise<DashboardData> {
 
   const { count: occupiedTables } = await supabase.from("mesas").select("*", { count: 'exact', head: true }).not("cliente_id", "is", null);
   const { count: totalTables } = await supabase.from("mesas").select("*", { count: 'exact', head: true });
-  const { count: kitchenOrders } = await supabase.from("itens_pedido").select("*", { count: 'exact', head: true }).in("status", ["pendente", "preparando"]);
+  
+  const { count: pendingOrders } = await supabase.from("itens_pedido").select("*", { count: 'exact', head: true }).eq("status", "pendente");
+  const { count: preparingOrders } = await supabase.from("itens_pedido").select("*", { count: 'exact', head: true }).eq("status", "preparando");
+
   const { count: clientCount } = await supabase.from("clientes").select("*", { count: 'exact', head: true });
 
   return {
@@ -48,7 +52,8 @@ async function fetchDashboardData(): Promise<DashboardData> {
       avg_ticket_today: financialData.avg_ticket_today || 0,
       occupied_tables: occupiedTables || 0,
       total_tables: totalTables || 0,
-      kitchen_orders: kitchenOrders || 0,
+      pending_kitchen_orders: pendingOrders || 0,
+      preparing_kitchen_orders: preparingOrders || 0,
     },
     has_clients: (clientCount || 0) > 0,
   };
@@ -121,7 +126,11 @@ export default function DashboardPage() {
               icon={Users}
               progress={occupiedPercentage}
             />
-            <StatCard title="Pedidos na Cozinha" value={dailyData.dailyStats.kitchen_orders} icon={ChefHat} />
+            <StatCard 
+              title="Pedidos na Cozinha" 
+              value={`${dailyData.dailyStats.pending_kitchen_orders} Pend. / ${dailyData.dailyStats.preparing_kitchen_orders} Prep.`} 
+              icon={ChefHat} 
+            />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2"><RevenueChart /></div>
