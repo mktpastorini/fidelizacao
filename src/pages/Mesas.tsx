@@ -14,7 +14,7 @@ import { MesaForm } from "@/components/mesas/MesaForm";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { MesaCard } from "@/components/mesas/MesaCard";
-import { PlusCircle, UserMinus, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, UserMinus, MoreVertical, Edit, Trash2, Users } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import {
   AlertDialog,
@@ -28,27 +28,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-type Ocupante = {
-  cliente: {
-    id: string;
-    nome: string;
-  } | null;
-};
-
-type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
+type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
 async function fetchMesas(): Promise<MesaComOcupantes[]> {
   const { data, error } = await supabase
     .from("mesas")
-    .select("*, cliente:clientes(id, nome), ocupantes:mesa_ocupantes(cliente:clientes(id, nome))")
+    .select("*, cliente:clientes(id, nome), ocupantes_count:mesa_ocupantes(count)")
     .order("numero", { ascending: true });
   if (error) throw new Error(error.message);
   
-  return data || [];
+  return (data || []).map(m => ({
+    ...m,
+    ocupantes_count: m.ocupantes_count[0]?.count || (m.cliente ? 1 : 0),
+  }));
 }
 
 async function fetchClientes(): Promise<Cliente[]> {
-  const { data, error } = await supabase.from("clientes").select("*").order("nome");
+  const { data, error } = await supabase.from("clientes").select("*, filhos(*)").order("nome");
   if (error) throw new Error(error.message);
   return data || [];
 }
@@ -73,6 +69,11 @@ export default function MesasPage() {
   const handleFormClose = () => {
     setEditingMesa(null);
     setIsFormOpen(false);
+  };
+
+  const handleOcuparMesaOpen = (mesa: Mesa) => {
+    setSelectedMesa(mesa);
+    setIsOcuparMesaOpen(true);
   };
 
   const addMesaMutation = useMutation({
@@ -121,22 +122,20 @@ export default function MesasPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const { error: mesaError } = await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
-      if (mesaError) throw new Error(`Erro ao ocupar mesa: ${mesaError.message}`);
-
+      await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
+      
       const todosOcupantes = [clientePrincipalId, ...acompanhanteIds];
       const ocupantesData = todosOcupantes.map(clienteId => ({
         mesa_id: selectedMesa.id,
         cliente_id: clienteId,
         user_id: user.id,
       }));
-      const { error: ocupantesError } = await supabase.from("mesa_ocupantes").insert(ocupantesData);
-      if (ocupantesError) throw new Error(`Erro ao adicionar ocupantes: ${ocupantesError.message}`);
+      await supabase.from("mesa_ocupantes").insert(ocupantesData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      showSuccess("Mesa ocupada com sucesso!");
+      showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
     },
     onError: (err: Error) => showError(err.message),
@@ -223,7 +222,7 @@ export default function MesasPage() {
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-red-500">Erro ao carregar mesas.</p> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {mesas?.map((mesa) => (
-            <MesaCard key={mesa.id} mesa={mesa} onClick={() => handleMesaClick(mesa)}>
+            <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes_count} onClick={() => handleMesaClick(mesa)}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -232,9 +231,14 @@ export default function MesasPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   {mesa.cliente_id && (
-                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMesaToFree(mesa); }}>
-                      <UserMinus className="w-4 h-4 mr-2" /> Liberar Mesa
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={() => handleOcuparMesaOpen(mesa)}>
+                        <Users className="w-4 h-4 mr-2" /> Editar Ocupantes
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMesaToFree(mesa); }}>
+                        <UserMinus className="w-4 h-4 mr-2" /> Liberar Mesa
+                      </DropdownMenuItem>
+                    </>
                   )}
                   <DropdownMenuItem onClick={() => handleFormOpen(mesa)}>
                     <Edit className="w-4 h-4 mr-2" /> Editar

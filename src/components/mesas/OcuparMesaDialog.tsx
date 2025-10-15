@@ -1,4 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -28,6 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Cliente, Mesa } from "@/types/supabase";
 import { Check, ChevronsUpDown, X, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ClienteForm } from "../clientes/ClienteForm";
+import { showError, showSuccess } from "@/utils/toast";
 
 type OcuparMesaDialogProps = {
   isOpen: boolean;
@@ -38,6 +42,15 @@ type OcuparMesaDialogProps = {
   isSubmitting: boolean;
 };
 
+async function fetchOcupantes(mesaId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("mesa_ocupantes")
+    .select("cliente_id")
+    .eq("mesa_id", mesaId);
+  if (error) throw error;
+  return data.map(o => o.cliente_id);
+}
+
 export function OcuparMesaDialog({
   isOpen,
   onOpenChange,
@@ -46,9 +59,49 @@ export function OcuparMesaDialog({
   onSubmit,
   isSubmitting,
 }: OcuparMesaDialogProps) {
+  const queryClient = useQueryClient();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [isNewCompanionOpen, setIsNewCompanionOpen] = useState(false);
   const [clientePrincipalId, setClientePrincipalId] = useState<string | null>(null);
   const [acompanhanteIds, setAcompanhanteIds] = useState<string[]>([]);
+
+  const { data: ocupantesAtuais, isLoading: isLoadingOcupantes } = useQuery({
+    queryKey: ["ocupantes", mesa?.id],
+    queryFn: () => fetchOcupantes(mesa!.id),
+    enabled: isOpen && !!mesa?.cliente_id,
+  });
+
+  useEffect(() => {
+    if (isOpen && mesa?.cliente_id && ocupantesAtuais) {
+      setClientePrincipalId(mesa.cliente_id);
+      setAcompanhanteIds(ocupantesAtuais.filter(id => id !== mesa.cliente_id));
+    }
+  }, [isOpen, mesa, ocupantesAtuais]);
+
+  const addCompanionMutation = useMutation({
+    mutationFn: async (newCliente: any) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
+        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: newCliente.casado_com,
+        p_whatsapp: newCliente.whatsapp, p_gostos: newCliente.gostos, p_avatar_url: newCliente.avatar_url,
+        p_indicado_por_id: newCliente.indicado_por_id,
+      });
+      if (rpcError) throw new Error(rpcError.message);
+      
+      const { data: newClient, error: selectError } = await supabase.from('clientes').select('*, filhos(*)').eq('id', newClientId).single();
+      if (selectError) throw new Error(selectError.message);
+      return newClient;
+    },
+    onSuccess: (newClient) => {
+      queryClient.invalidateQueries({ queryKey: ["clientes_list"] });
+      setAcompanhanteIds(prev => [...prev, newClient.id]);
+      showSuccess(`${newClient.nome} cadastrado e adicionado à mesa!`);
+      setIsNewCompanionOpen(false);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
 
   const ocupantesCount = (clientePrincipalId ? 1 : 0) + acompanhanteIds.length;
   const capacidadeExcedida = mesa ? ocupantesCount > mesa.capacidade : false;
@@ -70,88 +123,85 @@ export function OcuparMesaDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Ocupar Mesa {mesa?.numero}</DialogTitle>
-          <DialogDescription>
-            Selecione o cliente principal e adicione os acompanhantes.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="py-4 space-y-4">
-          <div>
-            <label className="text-sm font-medium">Cliente Principal (Responsável)</label>
-            <Select onValueChange={setClientePrincipalId} value={clientePrincipalId || ""}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Selecione o cliente principal" />
-              </SelectTrigger>
-              <SelectContent>
-                {clientes.map((cliente) => (
-                  <SelectItem key={cliente.id} value={cliente.id}>
-                    {cliente.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium">Acompanhantes</label>
-            <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between mt-1">
-                  {acompanhanteIds.length > 0 ? `${acompanhanteIds.length} acompanhante(s)` : "Adicionar acompanhantes"}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{mesa?.cliente_id ? `Editando Ocupantes da Mesa ${mesa?.numero}` : `Ocupar Mesa ${mesa?.numero}`}</DialogTitle>
+            <DialogDescription>Selecione o cliente principal e adicione os acompanhantes.</DialogDescription>
+          </DialogHeader>
+          {isLoadingOcupantes ? <p>Carregando ocupantes...</p> : (
+            <div className="py-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium">Cliente Principal (Responsável)</label>
+                <Select onValueChange={setClientePrincipalId} value={clientePrincipalId || ""}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione o cliente principal" /></SelectTrigger>
+                  <SelectContent>{clientes.map((cliente) => (<SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>))}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Acompanhantes</label>
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between mt-1">
+                      {acompanhanteIds.length > 0 ? `${acompanhanteIds.length} acompanhante(s)` : "Adicionar acompanhantes"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <Command>
+                      <CommandInput placeholder="Buscar cliente..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {clientesDisponiveis.map((cliente) => (
+                            <CommandItem value={cliente.nome} key={cliente.id} onSelect={() => setAcompanhanteIds(prev => [...prev, cliente.id])}>
+                              <UserPlus className="mr-2 h-4 w-4" />{cliente.nome}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {acompanhanteIds.map(id => {
+                    const cliente = clientes.find(c => c.id === id);
+                    return (<Badge key={id} variant="secondary">{cliente?.nome}<button onClick={() => setAcompanhanteIds(ids => ids.filter(i => i !== id))} className="ml-1"><X className="h-3 w-3" /></button></Badge>);
+                  })}
+                </div>
+                <Button variant="link" size="sm" className="p-0 h-auto mt-2" onClick={() => setIsNewCompanionOpen(true)}>
+                  <UserPlus className="w-4 h-4 mr-1" /> Cadastrar novo acompanhante
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                <Command>
-                  <CommandInput placeholder="Buscar cliente..." />
-                  <CommandList>
-                    <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
-                    <CommandGroup>
-                      {clientesDisponiveis.map((cliente) => (
-                        <CommandItem
-                          value={cliente.nome}
-                          key={cliente.id}
-                          onSelect={() => setAcompanhanteIds(prev => [...prev, cliente.id])}
-                        >
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          {cliente.nome}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {acompanhanteIds.map(id => {
-                const cliente = clientes.find(c => c.id === id);
-                return (
-                  <Badge key={id} variant="secondary">
-                    {cliente?.nome}
-                    <button onClick={() => setAcompanhanteIds(ids => ids.filter(i => i !== id))} className="ml-1">
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                );
-              })}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Capacidade: {mesa?.capacidade} | Ocupantes: {ocupantesCount}
+                {capacidadeExcedida && <span className="text-red-500 font-semibold ml-2">Capacidade excedida!</span>}
+              </div>
             </div>
-          </div>
-          
-          <div className="text-sm text-muted-foreground">
-            Capacidade: {mesa?.capacidade} | Ocupantes: {ocupantesCount}
-            {capacidadeExcedida && <span className="text-red-500 font-semibold ml-2">Capacidade excedida!</span>}
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={!clientePrincipalId || isSubmitting || capacidadeExcedida}>
-            {isSubmitting ? "Ocupando..." : "Confirmar Ocupação"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleClose}>Cancelar</Button>
+            <Button onClick={handleSubmit} disabled={!clientePrincipalId || isSubmitting || capacidadeExcedida}>
+              {isSubmitting ? "Salvando..." : "Confirmar Ocupação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isNewCompanionOpen} onOpenChange={setIsNewCompanionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cadastrar Novo Acompanhante</DialogTitle>
+            <DialogDescription>Preencha os dados do novo cliente. Ele será adicionado à mesa automaticamente.</DialogDescription>
+          </DialogHeader>
+          <ClienteForm
+            onSubmit={(values) => addCompanionMutation.mutate(values)}
+            isSubmitting={addCompanionMutation.isPending}
+            clientes={clientes}
+          />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

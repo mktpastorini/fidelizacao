@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { Mesa, Pedido, ItemPedido, Produto } from "@/types/supabase";
+import { Mesa, Pedido, ItemPedido, Produto, Cliente } from "@/types/supabase";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +47,18 @@ async function fetchProdutos(): Promise<Produto[]> {
   return data || [];
 }
 
+async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
+  const { data: ocupanteIds, error: idsError } = await supabase.from("mesa_ocupantes").select("cliente_id").eq("mesa_id", mesaId);
+  if (idsError) throw idsError;
+
+  const ids = ocupanteIds.map(o => o.cliente_id);
+  if (ids.length === 0) return [];
+  
+  const { data: clientes, error: clientesError } = await supabase.from("clientes").select("nome").in("id", ids);
+  if (clientesError) throw clientesError;
+  return clientes;
+}
+
 export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const queryClient = useQueryClient();
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -67,6 +79,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     enabled: isOpen,
   });
 
+  const { data: ocupantes } = useQuery({
+    queryKey: ["ocupantes", mesa?.id],
+    queryFn: () => fetchOcupantes(mesa!.id),
+    enabled: !!mesa && isOpen,
+  });
+
   const totalPedido = useMemo(() => {
     if (!pedido?.itens_pedido) return 0;
     return pedido.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
@@ -78,31 +96,15 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado.");
 
-      let { data: existingPedido } = await supabase
-        .from("pedidos")
-        .select("id")
-        .eq("mesa_id", mesa.id)
-        .eq("status", "aberto")
-        .maybeSingle();
-
-      let pedidoId = existingPedido?.id;
-
+      let pedidoId = pedido?.id;
       if (!pedidoId) {
-        const { data: novoPedido, error: createError } = await supabase
-          .from("pedidos")
-          .insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.id, status: "aberto" })
-          .select("id")
-          .single();
-        
-        if (createError) throw new Error(`Erro ao criar pedido: ${createError.message}`);
+        const { data: novoPedido, error: pedidoError } = await supabase.from("pedidos").insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.id, status: "aberto" }).select("id").single();
+        if (pedidoError) throw new Error(pedidoError.message);
         pedidoId = novoPedido.id;
       }
 
-      const { error: itemError } = await supabase
-        .from("itens_pedido")
-        .insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
-      
-      if (itemError) throw new Error(`Erro ao adicionar item: ${itemError.message}`);
+      const { error: itemError } = await supabase.from("itens_pedido").insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
+      if (itemError) throw new Error(itemError.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
@@ -132,6 +134,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
       await supabase.from("pedidos").update({ status: "pago", closed_at: new Date().toISOString() }).eq("id", pedido.id);
       await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesa.id);
+      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa.id);
 
       if (mesa.cliente_id) {
         const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { body: { clientId: mesa.cliente_id, userId: user.id } });
@@ -156,7 +159,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
-          <DialogDescription>Cliente: {mesa?.cliente?.nome || "N/A"}</DialogDescription>
+          <DialogDescription className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
+          </DialogDescription>
         </DialogHeader>
         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto">
           <div className="space-y-4">
