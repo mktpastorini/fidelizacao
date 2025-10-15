@@ -1,0 +1,15 @@
+# Ignore dependencies, build artifacts, and local environment files
+node_modules
+dist
+.env
+.env.*
+npm-debug.log
+README.md
+.git
+.gitignore
+
+# Ignore Docker-related files
+Dockerfile
+docker-compose.yml
+.dockerignore
+nginx.conf
