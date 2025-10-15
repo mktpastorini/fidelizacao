@@ -4,6 +4,8 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -68,6 +70,15 @@ export default function CozinhaPage() {
         <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
         <p className="text-gray-600 mt-2">Acompanhe o preparo dos pedidos em tempo real.</p>
       </div>
+
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Como funciona a coluna "Pronto/Entregue"</AlertTitle>
+        <AlertDescription>
+          Itens finalizados aparecerão aqui e ficarão visíveis por 30 minutos antes de serem removidos automaticamente. Isso ajuda a equipe a não perder nenhuma entrega.
+        </AlertDescription>
+      </Alert>
+
       {isLoading ? (
         <div className="flex gap-4">
           <Skeleton className="flex-1 h-[70vh]" />
