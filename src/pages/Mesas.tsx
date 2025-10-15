@@ -215,6 +215,11 @@ export default function MesasPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
+                  {mesa.cliente_id && (
+                    <DropdownMenuItem onClick={() => unassignClienteMutation.mutate(mesa.id)}>
+                      <UserMinus className="w-4 h-4 mr-2" /> Liberar Mesa
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => handleFormOpen(mesa)}>
                     <Edit className="w-4 h-4 mr-2" /> Editar
                   </DropdownMenuItem>
