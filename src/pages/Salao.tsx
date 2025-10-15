@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -45,7 +46,7 @@ async function fetchSalaoData(): Promise<SalaoData> {
   const { data: clientes, error: clientesError } = await supabase.from("clientes").select("*, filhos(*)");
   if (clientesError) throw new Error(clientesError.message);
 
-  const { data: settings, error: settingsError } = await supabase.from("user_settings").select("establishment_is_closed").eq("id", user!.id).single();
+  const { data: settings, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", user!.id).single();
   if (settingsError && settingsError.code !== 'PGRST116') throw new Error(settingsError.message);
 
   return {
@@ -73,6 +74,7 @@ export default function SalaoPage() {
   });
 
   const isClosed = data?.settings?.establishment_is_closed || false;
+  const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
 
   const closeDayMutation = useMutation({
     mutationFn: async () => {
@@ -154,25 +156,38 @@ export default function SalaoPage() {
               <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
             </Button>
           ) : (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={closeDayMutation.isPending}>
-                  <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div tabIndex={0}>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
+                          <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TooltipTrigger>
+                {!isCloseDayReady && (
+                  <TooltipContent>
+                    <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
           )}
           <Button variant="outline" onClick={() => setIsRecognitionOpen(true)} disabled={isClosed}><Camera className="w-4 h-4 mr-2" />Analisar Rosto</Button>
           <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
