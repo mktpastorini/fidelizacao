@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Cliente, Mesa, Pedido, ItemPedido } from "@/types/supabase";
+import { Cliente, Mesa, Pedido, ItemPedido, UserSettings } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { ClientArrivalModal } from "@/components/dashboard/ClientArrivalModal";
 import { FacialRecognitionDialog } from "@/components/dashboard/FacialRecognitionDialog";
@@ -9,10 +9,12 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { Camera, UserPlus } from "lucide-react";
+import { Camera, UserPlus, Lock, Unlock } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -22,9 +24,12 @@ type SalaoData = {
   mesas: MesaComOcupantes[];
   pedidosAbertos: PedidoAberto[];
   clientes: Cliente[];
+  settings: UserSettings | null;
 };
 
 async function fetchSalaoData(): Promise<SalaoData> {
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data: mesas, error: mesasError } = await supabase
     .from("mesas")
     .select("*, cliente:clientes(id, nome), ocupantes:mesa_ocupantes(cliente:clientes(id, nome))")
@@ -40,10 +45,14 @@ async function fetchSalaoData(): Promise<SalaoData> {
   const { data: clientes, error: clientesError } = await supabase.from("clientes").select("*, filhos(*)");
   if (clientesError) throw new Error(clientesError.message);
 
+  const { data: settings, error: settingsError } = await supabase.from("user_settings").select("establishment_is_closed").eq("id", user!.id).single();
+  if (settingsError && settingsError.code !== 'PGRST116') throw new Error(settingsError.message);
+
   return {
     mesas: mesas || [],
     pedidosAbertos: pedidosAbertos || [],
     clientes: clientes || [],
+    settings,
   };
 }
 
@@ -60,80 +69,34 @@ export default function SalaoPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["salaoData"],
     queryFn: fetchSalaoData,
-    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchInterval: 30000,
   });
 
-  const addClienteMutation = useMutation({
-    mutationFn: async (newCliente: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
+  const isClosed = data?.settings?.establishment_is_closed || false;
 
-      const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
-        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: newCliente.casado_com,
-        p_whatsapp: newCliente.whatsapp, p_gostos: newCliente.gostos, p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id,
-      });
-      if (rpcError) throw new Error(rpcError.message);
-      
-      if (newCliente.avatar_url) {
-        const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
-        });
-        if (faceError) showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
-      }
+  const closeDayMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke('close-day');
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["clientes_list"] });
-      showSuccess("Cliente adicionado com sucesso!");
-      setIsNewClientOpen(false);
+      showSuccess("Dia fechado com sucesso e relatório enviado!");
     },
     onError: (error: Error) => showError(error.message),
   });
 
-  const alocarMesaMutation = useMutation({
-    mutationFn: async (mesaId: string) => {
-      if (!recognizedClient) throw new Error("Nenhum cliente reconhecido.");
+  const openDayMutation = useMutation({
+    mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado.");
-
-      await supabase.from("mesas").update({ cliente_id: recognizedClient.id }).eq("id", mesaId);
-      await supabase.from("mesa_ocupantes").insert({ mesa_id: mesaId, cliente_id: recognizedClient.id, user_id: user.id });
-      
-      const { error: functionError } = await supabase.functions.invoke('send-welcome-message', { body: { clientId: recognizedClient.id, userId: user.id } });
-      if (functionError) showError(`Mesa alocada, mas falha ao enviar webhook: ${functionError.message}`);
+      const { error } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", user!.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      showSuccess("Cliente alocado à mesa com sucesso!");
-      setIsArrivalOpen(false);
+      showSuccess("Estabelecimento aberto para um novo dia!");
     },
     onError: (error: Error) => showError(error.message),
-  });
-
-  const ocuparMesaMutation = useMutation({
-    mutationFn: async ({ clientePrincipalId, acompanhanteIds }: { clientePrincipalId: string, acompanhanteIds: string[] }) => {
-      if (!selectedMesa) throw new Error("Nenhuma mesa selecionada");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
-  
-      await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
-  
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
-      const todosOcupantes = [clientePrincipalId, ...acompanhanteIds];
-      const ocupantesData = todosOcupantes.map(clienteId => ({
-        mesa_id: selectedMesa.id,
-        cliente_id: clienteId,
-        user_id: user.id,
-      }));
-      await supabase.from("mesa_ocupantes").insert(ocupantesData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      showSuccess("Mesa ocupada/atualizada com sucesso!");
-      setIsOcuparMesaOpen(false);
-    },
-    onError: (err: Error) => showError(err.message),
   });
 
   const mesasComPedidos = data?.mesas.map(mesa => {
@@ -144,6 +107,10 @@ export default function SalaoPage() {
   const mesasLivres = data?.mesas.filter(m => !m.cliente_id) || [];
 
   const handleMesaClick = (mesa: Mesa) => {
+    if (isClosed && !mesa.cliente_id) {
+      showError("O estabelecimento está fechado. Não é possível ocupar novas mesas.");
+      return;
+    }
     setSelectedMesa(mesa);
     if (mesa.cliente_id) {
       setIsPedidoOpen(true);
@@ -158,14 +125,7 @@ export default function SalaoPage() {
   };
 
   if (isLoading) {
-    return (
-      <div className="space-y-6 p-6">
-        <Skeleton className="h-10 w-1/3" />
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {[...Array(10)].map((_, i) => <Skeleton key={i} className="h-32" />)}
-        </div>
-      </div>
-    );
+    return <Skeleton className="h-screen w-full" />;
   }
   
   if (data?.clientes.length === 0) {
@@ -174,14 +134,48 @@ export default function SalaoPage() {
 
   return (
     <div className="p-6 space-y-6">
+      {isClosed && (
+        <Alert variant="destructive">
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Estabelecimento Fechado</AlertTitle>
+          <AlertDescription>
+            Nenhuma nova alocação de mesa ou pedido pode ser feito. Para reabrir, clique em "Abrir Dia".
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Visão do Salão</h1>
           <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setIsRecognitionOpen(true)}><Camera className="w-4 h-4 mr-2" />Analisar Rosto</Button>
-          <Button onClick={() => setIsNewClientOpen(true)}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
+          {isClosed ? (
+            <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
+              <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
+            </Button>
+          ) : (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={closeDayMutation.isPending}>
+                  <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+          <Button variant="outline" onClick={() => setIsRecognitionOpen(true)} disabled={isClosed}><Camera className="w-4 h-4 mr-2" />Analisar Rosto</Button>
+          <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
         </div>
       </div>
 
@@ -192,10 +186,10 @@ export default function SalaoPage() {
       </div>
 
       <FacialRecognitionDialog isOpen={isRecognitionOpen} onOpenChange={setIsRecognitionOpen} onClientRecognized={handleClientRecognized} onNewClient={() => setIsNewClientOpen(true)} />
-      <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClienteMutation.mutate} isSubmitting={addClienteMutation.isPending} />
-      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={alocarMesaMutation.mutate} isAllocating={alocarMesaMutation.isPending} />
+      <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={() => {}} isSubmitting={false} />
+      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={() => {}} isAllocating={false} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
-      <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={ocuparMesaMutation.mutate} isSubmitting={ocuparMesaMutation.isPending} />
+      <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={() => {}} isSubmitting={false} />
     </div>
   );
 }

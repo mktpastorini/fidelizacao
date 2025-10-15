@@ -300,6 +300,46 @@ export default function ConfiguracoesPage() {
                 )}
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Fechamento do Dia</CardTitle>
+                <CardDescription>Configure o relatório diário e o fechamento automático.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-40 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="report-phone">Nº de WhatsApp para Relatório</Label>
+                      <Input
+                        id="report-phone"
+                        placeholder="(99) 99999-9999"
+                        defaultValue={data?.settings?.daily_report_phone_number || ""}
+                        onBlur={(e) => updateSettingsMutation.mutate({ daily_report_phone_number: e.target.value })}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="auto-close"
+                        checked={data?.settings?.auto_close_enabled}
+                        onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_close_enabled: checked })}
+                      />
+                      <Label htmlFor="auto-close">Habilitar fechamento automático</Label>
+                    </div>
+                    {data?.settings?.auto_close_enabled && (
+                      <div>
+                        <Label htmlFor="auto-close-time">Horário do Fechamento</Label>
+                        <Input
+                          id="auto-close-time"
+                          type="time"
+                          defaultValue={data?.settings?.auto_close_time || "23:00"}
+                          onBlur={(e) => updateSettingsMutation.mutate({ auto_close_time: e.target.value })}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

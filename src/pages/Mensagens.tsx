@@ -140,6 +140,7 @@ export default function MensagensPage() {
       case 'chegada': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
       case 'pagamento': return 'bg-green-100 text-green-800 hover:bg-green-200';
       case 'manual': return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
+      case 'fechamento_dia': return 'bg-gray-800 text-white hover:bg-gray-900';
       default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
   };
@@ -218,12 +219,13 @@ export default function MensagensPage() {
           <div className="bg-white p-6 rounded-lg shadow-md">
             {isLoadingLogs ? <p>Carregando histórico...</p> : logs && logs.length > 0 ? (
               <Table>
-                <TableHeader><TableRow><TableHead>Cliente</TableHead><TableHead>Data</TableHead><TableHead>Status Webhook</TableHead><TableHead>Status Entrega</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Destinatário</TableHead><TableHead>Data</TableHead><TableHead>Gatilho</TableHead><TableHead>Status Webhook</TableHead><TableHead>Status Entrega</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {logs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell>{log.cliente?.nome || "N/A"}</TableCell>
+                      <TableCell>{log.cliente?.nome || "Relatório Diário"}</TableCell>
                       <TableCell>{format(new Date(log.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</TableCell>
+                      <TableCell><Badge variant="outline" className={cn("border-transparent", getBadgeClassName(log.trigger_event))}>{log.trigger_event.replace(/_/g, ' ')}</Badge></TableCell>
                       <TableCell>
                         <Badge variant={log.status === 'sucesso' ? 'default' : 'destructive'} className={cn(log.status === 'sucesso' && "bg-green-600 hover:bg-green-700")}>
                           {log.status}

@@ -51,6 +51,10 @@ export type UserSettings = {
   api_key: string | null;
   auto_add_item_enabled?: boolean;
   default_produto_id?: string | null;
+  establishment_is_closed?: boolean;
+  daily_report_phone_number?: string | null;
+  auto_close_enabled?: boolean;
+  auto_close_time?: string | null;
 };
 
 export type Pedido = {
@@ -93,7 +97,7 @@ export type MessageLog = {
   id: string;
   created_at: string;
   status: 'sucesso' | 'falha';
-  trigger_event: 'chegada' | 'pagamento';
+  trigger_event: 'chegada' | 'pagamento' | 'fechamento_dia' | 'manual';
   error_message: string | null;
   webhook_response: Record<string, any> | null;
   cliente: { nome: string } | null;
