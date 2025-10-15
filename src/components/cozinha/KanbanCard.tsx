@@ -2,8 +2,9 @@ import { ItemPedido } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, User, Utensils, CheckCircle } from "lucide-react";
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from "@/lib/utils";
 
 type KanbanCardProps = {
   item: ItemPedido & {
@@ -16,49 +17,49 @@ type KanbanCardProps = {
 };
 
 export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
-  const tempoDesdePedido = formatDistanceToNow(new Date(item.created_at), { locale: ptBR, addSuffix: true });
+  const now = new Date();
+  const createdAt = new Date(item.created_at);
+  const tempoDesdePedido = formatDistanceToNow(createdAt, { locale: ptBR });
+  const minutesSinceCreation = differenceInMinutes(now, createdAt);
+
+  const isOverdue = minutesSinceCreation > 5 && item.status === 'pendente';
 
   return (
-    <Card className="mb-4 shadow-md">
+    <Card className="mb-4 bg-background shadow-md">
       <CardContent className="p-4 space-y-3">
         <div>
-          <h3 className="text-lg font-bold">{item.nome_produto} (x{item.quantidade})</h3>
-          <p className="text-sm font-semibold text-blue-600">Mesa {item.pedido?.mesa?.numero || '?'}</p>
+          <p className="text-sm font-semibold text-muted-foreground">MESA {item.pedido?.mesa?.numero || '?'}</p>
+          <h3 className="text-lg font-bold text-foreground">{item.nome_produto} (x{item.quantidade})</h3>
         </div>
-        <div className="text-sm text-gray-600 space-y-1 border-t pt-2">
+        <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">
           <div className="flex items-center">
             <User className="w-4 h-4 mr-2" />
-            <span>Para: {item.cliente?.nome || "Mesa (Geral)"}</span>
+            <span>{item.cliente?.nome || "Mesa (Geral)"}</span>
           </div>
-          <div className="flex items-center">
+          <div className={cn("flex items-center", isOverdue ? "text-red-500 font-semibold" : "")}>
             <Clock className="w-4 h-4 mr-2" />
-            <span>Pedido {tempoDesdePedido}</span>
+            <span>Há {tempoDesdePedido}</span>
           </div>
         </div>
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="pt-2">
           {item.status === 'pendente' && (
             item.requer_preparo ? (
-              <Button size="sm" onClick={() => onStatusChange(item.id, 'preparando')}>
+              <Button size="sm" className="w-full" onClick={() => onStatusChange(item.id, 'preparando')}>
                 <Utensils className="w-4 h-4 mr-2" />
                 Preparar
               </Button>
             ) : (
-              <Button size="sm" variant="outline" onClick={() => onStatusChange(item.id, 'entregue')}>
+              <Button size="sm" variant="outline" className="w-full" onClick={() => onStatusChange(item.id, 'entregue')}>
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Entregar
               </Button>
             )
           )}
           {item.status === 'preparando' && (
-            <Button size="sm" variant="success" onClick={() => onStatusChange(item.id, 'entregue')}>
-              Finalizar
-            </Button>
-          )}
-          {item.status === 'entregue' && (
-            <div className="flex items-center text-green-600 font-semibold">
+            <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => onStatusChange(item.id, 'entregue')}>
               <CheckCircle className="w-4 h-4 mr-2" />
-              Entregue
-            </div>
+              Pronto
+            </Button>
           )}
         </div>
       </CardContent>

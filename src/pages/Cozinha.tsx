@@ -4,8 +4,6 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -65,33 +63,25 @@ export default function CozinhaPage() {
   const deliveredItems = items?.filter(item => item.status === 'entregue') || [];
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md">
+    <div className="h-full flex flex-col">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
-        <p className="text-gray-600 mt-2">Acompanhe o preparo dos pedidos em tempo real.</p>
+        <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
       </div>
 
-      <Alert className="mb-6">
-        <Info className="h-4 w-4" />
-        <AlertTitle>Como funciona a coluna "Pronto/Entregue"</AlertTitle>
-        <AlertDescription>
-          Itens finalizados aparecerão aqui e ficarão visíveis por 30 minutos antes de serem removidos automaticamente. Isso ajuda a equipe a não perder nenhuma entrega.
-        </AlertDescription>
-      </Alert>
-
       {isLoading ? (
-        <div className="flex gap-4">
-          <Skeleton className="flex-1 h-[70vh]" />
-          <Skeleton className="flex-1 h-[70vh]" />
-          <Skeleton className="flex-1 h-[70vh]" />
+        <div className="flex-1 flex gap-6">
+          <Skeleton className="flex-1" />
+          <Skeleton className="flex-1" />
+          <Skeleton className="flex-1" />
         </div>
       ) : isError ? (
         <p className="text-red-500">Erro ao carregar os pedidos.</p>
       ) : (
-        <div className="flex gap-4">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} className="bg-red-50" />
-          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} className="bg-yellow-50" />
-          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} className="bg-green-50" />
+        <div className="flex-1 flex gap-6">
+          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-red-500" />
+          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-blue-500" />
+          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-green-500" />
         </div>
       )}
     </div>
