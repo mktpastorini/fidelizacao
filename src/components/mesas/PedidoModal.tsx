@@ -38,7 +38,7 @@ async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedi
   if (!mesaId) return null;
   const { data, error } = await supabase.from("pedidos").select("*, itens_pedido(*)").eq("mesa_id", mesaId).eq("status", "aberto").order("created_at", { foreignTable: "itens_pedido", ascending: true }).maybeSingle();
   if (error) throw new Error(error.message);
-  return pedido;
+  return data;
 }
 
 async function fetchProdutos(): Promise<Produto[]> {
