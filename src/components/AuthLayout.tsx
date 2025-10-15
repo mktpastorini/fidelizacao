@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
+import { showError } from "@/utils/toast";
 
 export function AuthLayout() {
   const [session, setSession] = useState<Session | null>(null);
@@ -9,13 +10,34 @@ export function AuthLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setSession(data.session);
+    const setupSessionAndProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+
+      if (session?.user) {
+        // Verifica se o perfil existe e o cria se não existir
+        const { error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error && error.code === 'PGRST116') {
+          console.log('Perfil não encontrado para o usuário, criando um.');
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({ id: session.user.id });
+
+          if (insertError) {
+            console.error("Falha ao criar o perfil ausente:", insertError);
+            showError("Houve um problema ao configurar seu perfil. Tente recarregar a página.");
+          }
+        }
+      }
       setLoading(false);
     };
 
-    getSession();
+    setupSessionAndProfile();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
