@@ -13,6 +13,8 @@ type KitchenItem = ItemPedido & {
 };
 
 async function fetchKitchenItems(): Promise<KitchenItem[]> {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+
   const { data, error } = await supabase
     .from("itens_pedido")
     .select(`
@@ -21,7 +23,7 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
       cliente:clientes!consumido_por_cliente_id(nome)
     `)
     .eq("pedido.status", "aberto")
-    .in("status", ["pendente", "preparando"])
+    .or(`status.in.("pendente","preparando"),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -58,6 +60,7 @@ export default function CozinhaPage() {
 
   const pendingItems = items?.filter(item => item.status === 'pendente') || [];
   const preparingItems = items?.filter(item => item.status === 'preparando') || [];
+  const deliveredItems = items?.filter(item => item.status === 'entregue') || [];
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
@@ -77,12 +80,7 @@ export default function CozinhaPage() {
         <div className="flex gap-4">
           <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} className="bg-red-50" />
           <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} className="bg-yellow-50" />
-          <div className="flex-1 bg-green-50 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4 text-gray-700">Pronto / Entregue</h2>
-            <div className="h-[calc(100vh-12rem)] overflow-y-auto pr-2">
-              <p className="text-sm text-gray-500 text-center mt-8">Itens finalizados aparecerão no pedido da mesa.</p>
-            </div>
-          </div>
+          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} className="bg-green-50" />
         </div>
       )}
     </div>

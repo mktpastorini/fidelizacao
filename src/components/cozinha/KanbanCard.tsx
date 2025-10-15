@@ -54,6 +54,12 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
               Finalizar
             </Button>
           )}
+          {item.status === 'entregue' && (
+            <div className="flex items-center text-green-600 font-semibold">
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Entregue
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -76,6 +76,7 @@ export type ItemPedido = {
   status: 'pendente' | 'preparando' | 'entregue';
   requer_preparo: boolean;
   created_at: string;
+  updated_at: string;
 };
 
 export type Produto = {
