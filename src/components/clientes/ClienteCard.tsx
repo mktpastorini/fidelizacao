@@ -75,3 +75,4 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
       </CardContent>
     </Card>
   );
+}
