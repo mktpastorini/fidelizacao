@@ -3,7 +3,7 @@ import * as faceapi from 'face-api.js';
 import { supabase } from '@/integrations/supabase/client';
 import { Cliente } from '@/types/supabase';
 
-const MODELS_URL = 'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights';
+const MODELS_URL = '/models'; // Alterado para carregar modelos locais
 
 type CustomerFace = {
   cliente_id: string;
