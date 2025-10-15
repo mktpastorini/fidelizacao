@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  fidelize-app:
+    # Puxa a imagem pronta do Docker Hub. Não há 'build'.
+    image: mgp150192/fidelize-app:latest
+    restart: unless-stopped
+    networks:
+      - intrategica
+    deploy:
+      labels:
+        # Habilita o Traefik para este serviço
+        - "traefik.enable=true"
+        # Define a regra de roteamento baseada no domínio
+        - "traefik.http.routers.fidelize-app.rule=Host(`fidelize.intrategica.com.br`)"
+        # Usa a porta de entrada segura (HTTPS)
+        - "traefik.http.routers.fidelize-app.entrypoints=websecure"
+        # Habilita o resolvedor de certificados SSL do Let's Encrypt
+        - "traefik.http.routers.fidelize-app.tls.certresolver=letsencryptresolver"
+        # Informa ao Traefik que o serviço dentro do container está na porta 80
+        - "traefik.http.services.fidelize-app.loadbalancer.server.port=80"
+
+networks:
+  intrategica:
+    # Informa que a rede 'intrategica' já existe e não deve ser criada
+    external: true
