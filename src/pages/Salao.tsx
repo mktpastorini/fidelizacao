@@ -102,29 +102,26 @@ export default function SalaoPage() {
   });
 
   const allocateTableMutation = useMutation({
-    mutationFn: async ({ clienteId, mesaId }: { clienteId: string; mesaId: string }) => {
+    mutationFn: async ({ cliente, mesaId }: { cliente: Cliente; mesaId: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const cliente = data?.clientes.find(c => c.id === clienteId);
-      if (!cliente) throw new Error("Cliente não encontrado");
-
-      await supabase.from("mesas").update({ cliente_id: clienteId }).eq("id", mesaId);
+      await supabase.from("mesas").update({ cliente_id: cliente.id }).eq("id", mesaId);
       await supabase.from("pedidos").insert({
         mesa_id: mesaId,
-        cliente_id: clienteId,
+        cliente_id: cliente.id,
         user_id: user.id,
         status: "aberto",
         acompanhantes: [{ id: cliente.id, nome: cliente.nome }],
       });
       await supabase.from("mesa_ocupantes").insert({
         mesa_id: mesaId,
-        cliente_id: clienteId,
+        cliente_id: cliente.id,
         user_id: user.id,
       });
 
       const { error: functionError } = await supabase.functions.invoke('send-welcome-message', {
-        body: { clientId, userId: user.id },
+        body: { clientId: cliente.id, userId: user.id },
       });
       if (functionError) {
         showError(`Mesa alocada, mas falha ao enviar mensagem: ${functionError.message}`);
@@ -315,7 +312,7 @@ export default function SalaoPage() {
 
       <FacialRecognitionDialog isOpen={isRecognitionOpen} onOpenChange={setIsRecognitionOpen} onClientRecognized={handleClientRecognized} onNewClient={() => setIsNewClientOpen(true)} />
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
-      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ clienteId: recognizedClient.id, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
+      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
       <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={(clientePrincipalId, acompanhanteIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds })} isSubmitting={ocuparMesaMutation.isPending} />
     </div>
