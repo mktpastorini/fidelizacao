@@ -28,19 +28,23 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-type MesaComOcupantes = Mesa & { ocupantes_count: number };
+type Ocupante = {
+  cliente: {
+    id: string;
+    nome: string;
+  } | null;
+};
+
+type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
 
 async function fetchMesas(): Promise<MesaComOcupantes[]> {
   const { data, error } = await supabase
     .from("mesas")
-    .select("*, cliente:clientes(id, nome), ocupantes_count:mesa_ocupantes(count)")
+    .select("*, cliente:clientes(id, nome), ocupantes:mesa_ocupantes(cliente:clientes(id, nome))")
     .order("numero", { ascending: true });
   if (error) throw new Error(error.message);
   
-  return (data || []).map(m => ({
-    ...m,
-    ocupantes_count: m.ocupantes_count[0]?.count || (m.cliente ? 1 : 0),
-  }));
+  return data || [];
 }
 
 async function fetchClientes(): Promise<Cliente[]> {
@@ -219,7 +223,7 @@ export default function MesasPage() {
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-red-500">Erro ao carregar mesas.</p> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {mesas?.map((mesa) => (
-            <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes_count} onClick={() => handleMesaClick(mesa)}>
+            <MesaCard key={mesa.id} mesa={mesa} onClick={() => handleMesaClick(mesa)}>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
