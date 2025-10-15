@@ -140,6 +140,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Item adicionado com sucesso!");
       form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
     },
@@ -154,6 +156,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Desconto aplicado com sucesso!");
       setItemParaDesconto(null);
     },
@@ -167,6 +171,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Item removido com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
@@ -185,6 +191,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["ocupantes", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagando(null);
@@ -217,6 +224,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
