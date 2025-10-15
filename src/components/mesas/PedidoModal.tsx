@@ -19,9 +19,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
+import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -64,6 +65,7 @@ async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
 export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const queryClient = useQueryClient();
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [clientePagando, setClientePagando] = useState<Cliente | null>(null);
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
     defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null },
@@ -87,10 +89,27 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     enabled: !!mesa && isOpen,
   });
 
-  const totalPedido = useMemo(() => {
-    if (!pedido?.itens_pedido) return 0;
-    return pedido.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
-  }, [pedido]);
+  const { itensAgrupados, totalPedido } = useMemo(() => {
+    if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0 };
+    
+    const total = pedido.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
+    
+    const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: 'Mesa' }; itens: ItemPedido[]; subtotal: number }>();
+    
+    ocupantes.forEach(o => agrupados.set(o.id, { cliente: o, itens: [], subtotal: 0 }));
+    agrupados.set('mesa', { cliente: { id: 'mesa', nome: 'Mesa (Geral)' }, itens: [], subtotal: 0 });
+
+    pedido.itens_pedido.forEach(item => {
+      const key = item.consumido_por_cliente_id || 'mesa';
+      const grupo = agrupados.get(key);
+      if (grupo) {
+        grupo.itens.push(item);
+        grupo.subtotal += (item.preco || 0) * item.quantidade;
+      }
+    });
+
+    return { itensAgrupados: agrupados, totalPedido: total };
+  }, [pedido, ocupantes]);
 
   const addItemMutation = useMutation({
     mutationFn: async (novoItem: z.infer<typeof itemSchema>) => {
@@ -128,6 +147,26 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onError: (error: Error) => showError(error.message),
   });
 
+  const closePartialOrderMutation = useMutation({
+    mutationFn: async (clienteId: string) => {
+      if (!pedido) throw new Error("Pedido não encontrado.");
+      const { error } = await supabase.rpc('finalizar_pagamento_parcial', {
+        p_pedido_id: pedido.id,
+        p_cliente_id_pagando: clienteId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, clienteId) => {
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["ocupantes", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      const cliente = ocupantes?.find(o => o.id === clienteId);
+      showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
+      setClientePagando(null);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
   const closeOrderMutation = useMutation({
     mutationFn: async () => {
       if (!pedido || !mesa) throw new Error("Pedido ou mesa não encontrado.");
@@ -157,49 +196,52 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
-          <DialogDescription className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
-          </DialogDescription>
-        </DialogHeader>
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto">
-          <div className="space-y-4">
-            <h3 className="font-semibold">Itens do Pedido</h3>
-            {isLoading ? <p>Carregando...</p> : pedido?.itens_pedido && pedido.itens_pedido.length > 0 ? (
-              <ul className="space-y-2">
-                {pedido.itens_pedido.map((item) => {
-                  const consumidor = ocupantes?.find(o => o.id === item.consumido_por_cliente_id);
-                  return (
-                    <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                      <div>
-                        <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
-                        <p className="text-xs text-gray-500">
-                          {consumidor ? `Consumido por: ${consumidor.nome}` : 'Consumo da mesa'}
-                        </p>
-                      </div>
-                      <div className="flex items-center">
-                        {item.preco != null && <p className="text-sm text-gray-600 mr-4">R$ {(item.preco * item.quantidade).toFixed(2)}</p>}
-                        <Button variant="ghost" size="icon" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : <p className="text-sm text-gray-500">Nenhum item adicionado ainda.</p>}
-          </div>
+    <>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
+            <DialogDescription className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
+            <div className="space-y-4 overflow-y-auto pr-2">
+              <h3 className="font-semibold">Itens do Pedido</h3>
+              {isLoading ? <p>Carregando...</p> : Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => (
+                (itens.length > 0) && (
+                  <div key={cliente.id} className="p-3 border rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-semibold">{cliente.nome}</h4>
+                      {cliente.id !== 'mesa' && (
+                        <Button size="sm" variant="outline" onClick={() => setClientePagando(cliente as Cliente)}>
+                          <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
+                        </Button>
+                      )}
+                    </div>
+                    <ul className="space-y-2">
+                      {itens.map((item) => (
+                        <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                          <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                          <div className="flex items-center">
+                            {item.preco != null && <p className="text-gray-600 mr-4">R$ {(item.preco * item.quantidade).toFixed(2)}</p>}
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
+                  </div>
+                )
+              ))}
+            </div>
 
-          <div className="p-4 border rounded-lg">
-            <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="nome_produto"
-                  render={({ field }) => (
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField control={form.control} name="nome_produto" render={({ field }) => (
                     <FormItem className="flex flex-col">
                       <FormLabel>Produto</FormLabel>
                       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
@@ -211,89 +253,56 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                          <Command>
-                            <CommandInput placeholder="Buscar produto..." />
-                            <CommandList>
-                              <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
-                              <CommandGroup>
-                                {produtos?.map((produto) => (
-                                  <CommandItem
-                                    value={produto.nome}
-                                    key={produto.id}
-                                    onSelect={() => {
-                                      form.setValue("nome_produto", produto.nome);
-                                      form.setValue("preco", produto.preco);
-                                      setPopoverOpen(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />
-                                    {produto.nome}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar produto..." /><CommandList><CommandEmpty>Nenhum produto encontrado.</CommandEmpty><CommandGroup>
+                          {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {form.setValue("nome_produto", produto.nome); form.setValue("preco", produto.preco); setPopoverOpen(false);}}>
+                            <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
+                        </CommandGroup></CommandList></Command></PopoverContent>
                       </Popover>
                       <FormMessage />
                     </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="quantidade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantidade</FormLabel>
-                      <FormControl><Input type="number" {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="consumido_por_cliente_id"
-                  render={({ field }) => (
+                  )}/>
+                  <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Quantidade</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="consumido_por_cliente_id" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Consumido por</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger>
-                        </FormControl>
+                      <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} defaultValue={field.value || ""}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="null">Mesa (Geral)</SelectItem>
-                          {ocupantes?.map(ocupante => (
-                            <SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>
-                          ))}
+                          {ocupantes?.map(ocupante => (<SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
                     </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={addItemMutation.isPending}>
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  Adicionar ao Pedido
-                </Button>
-              </form>
-            </Form>
+                  )}/>
+                  <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
+                </form>
+              </Form>
+            </div>
           </div>
-        </div>
-        <div className="mt-6 pt-4 border-t">
-          <div className="flex justify-between items-center text-lg font-bold">
-            <span>Total do Pedido:</span>
-            <span>R$ {totalPedido.toFixed(2).replace('.', ',')}</span>
+          <div className="mt-6 pt-4 border-t">
+            <div className="flex justify-between items-center text-lg font-bold">
+              <span>Total Restante na Mesa:</span>
+              <span>R$ {totalPedido.toFixed(2).replace('.', ',')}</span>
+            </div>
           </div>
-        </div>
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => closeOrderMutation.mutate()} disabled={!pedido || pedido.itens_pedido.length === 0 || closeOrderMutation.isPending}>
-            <CreditCard className="w-4 h-4 mr-2" />
-            {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar e Pagar"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button onClick={() => closeOrderMutation.mutate()} disabled={!pedido || pedido.itens_pedido.length === 0 || closeOrderMutation.isPending}>
+              <CreditCard className="w-4 h-4 mr-2" />
+              {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar Conta Total"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <FinalizarContaParcialDialog
+        isOpen={!!clientePagando}
+        onOpenChange={() => setClientePagando(null)}
+        cliente={clientePagando}
+        itens={itensAgrupados.get(clientePagando?.id || '')?.itens || []}
+        onConfirm={() => clientePagando && closePartialOrderMutation.mutate(clientePagando.id)}
+        isSubmitting={closePartialOrderMutation.isPending}
+      />
+    </>
   );
 }
