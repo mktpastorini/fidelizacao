@@ -71,6 +71,8 @@ export type ItemPedido = {
   quantidade: number;
   preco: number | null;
   consumido_por_cliente_id?: string | null;
+  desconto_percentual?: number | null;
+  desconto_motivo?: string | null;
 };
 
 export type Produto = {

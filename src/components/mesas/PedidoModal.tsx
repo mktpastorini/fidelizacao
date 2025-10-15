@@ -19,10 +19,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
+import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
+import { Badge } from "../ui/badge";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -62,10 +64,17 @@ async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
   return clientes;
 }
 
+const calcularPrecoComDesconto = (item: ItemPedido) => {
+  const precoTotal = (item.preco || 0) * item.quantidade;
+  const desconto = precoTotal * ((item.desconto_percentual || 0) / 100);
+  return precoTotal - desconto;
+};
+
 export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const queryClient = useQueryClient();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [clientePagando, setClientePagando] = useState<Cliente | null>(null);
+  const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
     defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null },
@@ -92,7 +101,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const { itensAgrupados, totalPedido } = useMemo(() => {
     if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0 };
     
-    const total = pedido.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
+    const total = pedido.itens_pedido.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
     
     const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: 'Mesa' }; itens: ItemPedido[]; subtotal: number }>();
     
@@ -104,7 +113,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const grupo = agrupados.get(key);
       if (grupo) {
         grupo.itens.push(item);
-        grupo.subtotal += (item.preco || 0) * item.quantidade;
+        grupo.subtotal += calcularPrecoComDesconto(item);
       }
     });
 
@@ -131,6 +140,20 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       showSuccess("Item adicionado com sucesso!");
       form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null });
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const updateItemMutation = useMutation({
+    mutationFn: async (values: { itemId: string; desconto_percentual: number; desconto_motivo?: string }) => {
+      const { itemId, ...updateData } = values;
+      const { error } = await supabase.from("itens_pedido").update(updateData).eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      showSuccess("Desconto aplicado com sucesso!");
+      setItemParaDesconto(null);
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -221,15 +244,34 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                       )}
                     </div>
                     <ul className="space-y-2">
-                      {itens.map((item) => (
-                        <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
-                          <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
-                          <div className="flex items-center">
-                            {item.preco != null && <p className="text-gray-600 mr-4">R$ {(item.preco * item.quantidade).toFixed(2)}</p>}
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                          </div>
-                        </li>
-                      ))}
+                      {itens.map((item) => {
+                        const precoOriginal = (item.preco || 0) * item.quantidade;
+                        const precoFinal = calcularPrecoComDesconto(item);
+                        return (
+                          <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                            <div>
+                              <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                              {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="text-right">
+                                {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                  <>
+                                    <p className="text-gray-500 line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                    <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                  </>
+                                ) : (
+                                  <p>R$ {precoOriginal.toFixed(2)}</p>
+                                )}
+                              </div>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setItemParaDesconto(item)}><Tag className="h-4 w-4 text-blue-600" /></Button>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                     <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
                   </div>
@@ -302,6 +344,17 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         itens={itensAgrupados.get(clientePagando?.id || '')?.itens || []}
         onConfirm={() => clientePagando && closePartialOrderMutation.mutate(clientePagando.id)}
         isSubmitting={closePartialOrderMutation.isPending}
+      />
+      <AplicarDescontoDialog
+        isOpen={!!itemParaDesconto}
+        onOpenChange={() => setItemParaDesconto(null)}
+        item={itemParaDesconto}
+        isSubmitting={updateItemMutation.isPending}
+        onSubmit={(values) => {
+          if (itemParaDesconto) {
+            updateItemMutation.mutate({ itemId: itemParaDesconto.id, ...values });
+          }
+        }}
       />
     </>
   );
