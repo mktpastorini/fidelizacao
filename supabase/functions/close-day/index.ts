@@ -46,7 +46,8 @@ serve(async (req) => {
     const startOfDay = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
     const endOfDay = new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
 
-    const { data: stats, error: statsError } = await supabaseAdmin.rpc('get_stats_by_date_range', {
+    const { data: stats, error: statsError } = await supabaseAdmin.rpc('get_stats_by_date_range_for_user', {
+      p_user_id: user.id,
       start_date: startOfDay,
       end_date: endOfDay,
     }).single();
