@@ -27,7 +27,7 @@ export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardPr
           <CardTitle className="text-2xl font-bold">Mesa {mesa.numero}</CardTitle>
           <CardDescription className="flex items-center gap-1 text-xs text-gray-500 pt-1">
             <Users className="w-3 h-3" />
-            <span>Capacidade: {mesa.capacidade}</span>
+            <span>{ocupantesCount} / {mesa.capacidade} Ocupantes</span>
           </CardDescription>
         </div>
         <div onClick={(e) => e.stopPropagation()}>

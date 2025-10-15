@@ -67,6 +67,7 @@ export type ItemPedido = {
   nome_produto: string;
   quantidade: number;
   preco: number | null;
+  consumido_por_cliente_id?: string | null;
 };
 
 export type Produto = {

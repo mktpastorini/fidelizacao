@@ -17,6 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
 import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -32,6 +33,7 @@ const itemSchema = z.object({
   nome_produto: z.string().min(2, "O nome do produto é obrigatório."),
   quantidade: z.coerce.number().min(1, "A quantidade deve ser pelo menos 1."),
   preco: z.coerce.number(),
+  consumido_por_cliente_id: z.string().uuid().nullable().optional(),
 });
 
 async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
@@ -54,7 +56,7 @@ async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
   const ids = ocupanteIds.map(o => o.cliente_id);
   if (ids.length === 0) return [];
   
-  const { data: clientes, error: clientesError } = await supabase.from("clientes").select("nome").in("id", ids);
+  const { data: clientes, error: clientesError } = await supabase.from("clientes").select("id, nome").in("id", ids);
   if (clientesError) throw clientesError;
   return clientes;
 }
@@ -64,7 +66,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
-    defaultValues: { nome_produto: "", quantidade: 1, preco: 0 },
+    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null },
   });
 
   const { data: pedido, isLoading } = useQuery({
@@ -109,7 +111,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       showSuccess("Item adicionado com sucesso!");
-      form.reset({ nome_produto: "", quantidade: 1, preco: 0 });
+      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null });
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -169,15 +171,23 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             <h3 className="font-semibold">Itens do Pedido</h3>
             {isLoading ? <p>Carregando...</p> : pedido?.itens_pedido && pedido.itens_pedido.length > 0 ? (
               <ul className="space-y-2">
-                {pedido.itens_pedido.map((item) => (
-                  <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                    <div>
-                      <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
-                      {item.preco != null && <p className="text-sm text-gray-500">R$ {item.preco.toFixed(2)}</p>}
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                  </li>
-                ))}
+                {pedido.itens_pedido.map((item) => {
+                  const consumidor = ocupantes?.find(o => o.id === item.consumido_por_cliente_id);
+                  return (
+                    <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                      <div>
+                        <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                        <p className="text-xs text-gray-500">
+                          {consumidor ? `Consumido por: ${consumidor.nome}` : 'Consumo da mesa'}
+                        </p>
+                      </div>
+                      <div className="flex items-center">
+                        {item.preco != null && <p className="text-sm text-gray-600 mr-4">R$ {(item.preco * item.quantidade).toFixed(2)}</p>}
+                        <Button variant="ghost" size="icon" onClick={() => deleteItemMutation.mutate(item.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : <p className="text-sm text-gray-500">Nenhum item adicionado ainda.</p>}
           </div>
@@ -237,6 +247,27 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     <FormItem>
                       <FormLabel>Quantidade</FormLabel>
                       <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="consumido_por_cliente_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Consumido por</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="null">Mesa (Geral)</SelectItem>
+                          {ocupantes?.map(ocupante => (
+                            <SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
