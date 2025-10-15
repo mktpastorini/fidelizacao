@@ -12,7 +12,7 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ImageCapture } from "@/components/clientes/ImageCapture";
+import { MultiImageCapture } from "@/components/clientes/MultiImageCapture";
 import { Trash2, PlusCircle } from "lucide-react";
 import { Cliente, Filho } from "@/types/supabase";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
@@ -23,7 +23,7 @@ const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome é obrigatório." }),
   casado_com: z.string().optional(),
   whatsapp: z.string().optional(),
-  avatar_url: z.string().nullable().optional(),
+  avatar_urls: z.array(z.string()).min(1, { message: "É necessário pelo menos uma foto para o reconhecimento." }),
   indicado_por_id: z.string().uuid().optional().nullable().or(z.literal("none")).transform(val => val === "none" ? null : val),
   gostos: z.object({
     pizza_favorita: z.string().optional(),
@@ -39,7 +39,7 @@ const formSchema = z.object({
 });
 
 type ClienteFormProps = {
-  onSubmit: (values: z.infer<typeof formSchema>) => void;
+  onSubmit: (values: z.infer<typeof formSchema> & { avatar_url?: string | null }) => void;
   isSubmitting: boolean;
   defaultValues?: Partial<Cliente & { filhos: Filho[] }>;
   clientes: Cliente[];
@@ -53,7 +53,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
       nome: defaultValues?.nome || "",
       casado_com: defaultValues?.casado_com || "",
       whatsapp: defaultValues?.whatsapp || "",
-      avatar_url: defaultValues?.avatar_url || null,
+      avatar_urls: defaultValues?.avatar_url ? [defaultValues.avatar_url] : [],
       indicado_por_id: defaultValues?.indicado_por_id || "none",
       gostos: {
         pizza_favorita: defaultValues?.gostos?.pizza_favorita || "",
@@ -69,19 +69,28 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
     name: "filhos",
   });
 
+  const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
+    // A primeira imagem é a principal
+    const submissionData = {
+      ...values,
+      avatar_url: values.avatar_urls[0] || null,
+    };
+    onSubmit(submissionData);
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
         <FormField
           control={form.control}
-          name="avatar_url"
+          name="avatar_urls"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Foto do Cliente</FormLabel>
+              <FormLabel>Fotos do Cliente</FormLabel>
               <FormControl>
-                <ImageCapture
-                  url={field.value}
-                  onUpload={(url) => field.onChange(url)}
+                <MultiImageCapture
+                  urls={field.value || []}
+                  onUrlsChange={field.onChange}
                 />
               </FormControl>
               <FormMessage />

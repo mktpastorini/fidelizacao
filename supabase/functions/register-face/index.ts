@@ -18,13 +18,15 @@ await faceapi.nets.ssdMobilenetv1.loadFromUri(modelsUrl);
 await faceapi.nets.faceLandmark68Net.loadFromUri(modelsUrl);
 await faceapi.nets.faceRecognitionNet.loadFromUri(modelsUrl);
 
-async function getEmbedding(imageUrl: string): Promise<Float32Array> {
-  const img = await canvas.loadImage(imageUrl);
-  const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-  if (!detections) {
-    throw new Error("Nenhum rosto detectado na imagem.");
+async function getEmbedding(imageUrl: string): Promise<Float32Array | null> {
+  try {
+    const img = await canvas.loadImage(imageUrl);
+    const detections = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
+    return detections ? detections.descriptor : null;
+  } catch (error) {
+    console.error(`Erro ao processar imagem ${imageUrl}:`, error);
+    return null;
   }
-  return detections.descriptor;
 }
 
 serve(async (req) => {
@@ -33,9 +35,9 @@ serve(async (req) => {
   }
 
   try {
-    const { cliente_id, image_url } = await req.json();
-    if (!cliente_id || !image_url) {
-      throw new Error("Payload inválido: cliente_id e image_url são obrigatórios.");
+    const { cliente_id, image_urls } = await req.json();
+    if (!cliente_id || !Array.isArray(image_urls) || image_urls.length === 0) {
+      throw new Error("Payload inválido: cliente_id e um array de image_urls são obrigatórios.");
     }
 
     const supabaseAdmin = createClient(
@@ -49,20 +51,29 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw userError || new Error("Usuário não autenticado.");
 
-    const embedding = await getEmbedding(image_url);
+    // 1. Deletar embeddings antigos para este cliente
+    await supabaseAdmin.from('customer_faces').delete().eq('cliente_id', cliente_id);
 
-    const { error: upsertError } = await supabaseAdmin
-      .from('customer_faces')
-      .upsert({
-        cliente_id: cliente_id,
-        user_id: user.id,
-        embedding: Array.from(embedding), // Converte Float32Array para array normal
-        ai_provider: 'face-api.js',
-      }, { onConflict: 'cliente_id' });
+    // 2. Gerar novos embeddings
+    const embeddingPromises = image_urls.map(url => getEmbedding(url));
+    const embeddings = (await Promise.all(embeddingPromises)).filter(e => e !== null) as Float32Array[];
 
-    if (upsertError) throw upsertError;
+    if (embeddings.length === 0) {
+      throw new Error("Nenhum rosto foi detectado em nenhuma das imagens fornecidas.");
+    }
 
-    return new Response(JSON.stringify({ success: true, message: `Rosto cadastrado com sucesso.` }), {
+    // 3. Inserir novos embeddings
+    const rowsToInsert = embeddings.map(embedding => ({
+      cliente_id: cliente_id,
+      user_id: user.id,
+      embedding: Array.from(embedding),
+      ai_provider: 'face-api.js',
+    }));
+
+    const { error: insertError } = await supabaseAdmin.from('customer_faces').insert(rowsToInsert);
+    if (insertError) throw insertError;
+
+    return new Response(JSON.stringify({ success: true, message: `${embeddings.length} rosto(s) cadastrado(s) com sucesso.` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

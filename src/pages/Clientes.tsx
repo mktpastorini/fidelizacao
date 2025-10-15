@@ -88,30 +88,30 @@ export default function ClientesPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
+      const { avatar_urls, ...clienteData } = newCliente;
+
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id,
-        p_nome: newCliente.nome,
-        p_casado_com: newCliente.casado_com,
-        p_whatsapp: newCliente.whatsapp,
-        p_gostos: newCliente.gostos,
-        p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id,
+        p_nome: clienteData.nome,
+        p_casado_com: clienteData.casado_com,
+        p_whatsapp: clienteData.whatsapp,
+        p_gostos: clienteData.gostos,
+        p_avatar_url: clienteData.avatar_url,
+        p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
 
-      if (newCliente.filhos && newCliente.filhos.length > 0) {
-        const filhosData = newCliente.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+      if (clienteData.filhos && clienteData.filhos.length > 0) {
+        const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
         const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      if (newCliente.avatar_url) {
+      if (avatar_urls && avatar_urls.length > 0) {
         const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: newClientId, image_url: newCliente.avatar_url },
+          body: { cliente_id: newClientId, image_urls: avatar_urls },
         });
-        if (faceError) {
-          showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
-        }
+        if (faceError) showError(`Cliente criado, mas falha ao registrar o rosto: ${faceError.message}`);
       }
     },
     onSuccess: () => {
@@ -124,7 +124,7 @@ export default function ClientesPage() {
 
   const editClienteMutation = useMutation({
     mutationFn: async (updatedCliente: any) => {
-      const { id, filhos, ...clienteInfo } = updatedCliente;
+      const { id, filhos, avatar_urls, ...clienteInfo } = updatedCliente;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
@@ -139,9 +139,9 @@ export default function ClientesPage() {
         if (insertFilhosError) throw new Error(insertFilhosError.message);
       }
 
-      if (clienteInfo.avatar_url) {
+      if (avatar_urls && avatar_urls.length > 0) {
         const { error: faceError } = await supabase.functions.invoke('register-face', {
-          body: { cliente_id: id, image_url: clienteInfo.avatar_url },
+          body: { cliente_id: id, image_urls: avatar_urls },
         });
         if (faceError) {
           showError(`Cliente atualizado, mas falha ao registrar o rosto: ${faceError.message}`);
@@ -217,7 +217,7 @@ export default function ClientesPage() {
           <DialogHeader>
             <DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
             <DialogDescription>
-              Preencha as informações abaixo. A foto é usada para o reconhecimento facial.
+              Adicione várias fotos para melhorar a precisão do reconhecimento facial.
             </DialogDescription>
           </DialogHeader>
           <ClienteForm 

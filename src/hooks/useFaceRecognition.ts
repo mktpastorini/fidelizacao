@@ -47,7 +47,7 @@ export function useFaceRecognition() {
         if (dbError) throw dbError;
 
         const typedFaces = faces as CustomerFace[];
-        const validClients = typedFaces.map(f => f.cliente).filter(Boolean) as Cliente[];
+        const validClients = Array.from(new Map(typedFaces.map(f => f.cliente).filter(Boolean).map(c => [c!.id, c])).values()) as Cliente[];
         setClients(validClients);
 
         if (typedFaces.length === 0) {
@@ -55,12 +55,25 @@ export function useFaceRecognition() {
           return;
         }
 
-        const labeledDescriptors = typedFaces
-          .filter(face => face.embedding && face.cliente_id)
-          .map(face => new faceapi.LabeledFaceDescriptors(
-            face.cliente_id,
-            [new Float32Array(face.embedding)]
-          ));
+        // Agrupar embeddings por cliente
+        const embeddingsByClient = new Map<string, number[][]>();
+        for (const face of typedFaces) {
+          if (face.embedding && face.cliente_id) {
+            if (!embeddingsByClient.has(face.cliente_id)) {
+              embeddingsByClient.set(face.cliente_id, []);
+            }
+            embeddingsByClient.get(face.cliente_id)!.push(face.embedding);
+          }
+        }
+
+        // Calcular a média dos embeddings para cada cliente
+        const labeledDescriptors = [];
+        for (const [clienteId, embeddings] of embeddingsByClient.entries()) {
+          if (embeddings.length > 0) {
+            const averageEmbedding = faceapi.utils.average(embeddings.map(e => new Float32Array(e)));
+            labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(clienteId, [averageEmbedding]));
+          }
+        }
 
         if (labeledDescriptors.length > 0) {
           setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.5));
