@@ -75,17 +75,17 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const addItemMutation = useMutation({
     mutationFn: async (novoItem: z.infer<typeof itemSchema>) => {
       if (!mesa || !mesa.cliente_id) throw new Error("Mesa ou cliente não selecionado.");
-      const { data: user } = await supabase.auth.getUser();
-      if (!user?.user?.id) throw new Error("Usuário não autenticado.");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.id) throw new Error("Usuário não autenticado.");
 
       let pedidoId = pedido?.id;
       if (!pedidoId) {
-        const { data: novoPedido, error: pedidoError } = await supabase.from("pedidos").insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.user.id, status: "aberto" }).select().single();
+        const { data: novoPedido, error: pedidoError } = await supabase.from("pedidos").insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.id, status: "aberto" }).select("id").single();
         if (pedidoError) throw new Error(pedidoError.message);
         pedidoId = novoPedido.id;
       }
 
-      const { error: itemError } = await supabase.from("itens_pedido").insert({ pedido_id: pedidoId, user_id: user.user.id, ...novoItem });
+      const { error: itemError } = await supabase.from("itens_pedido").insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
       if (itemError) throw new Error(itemError.message);
     },
     onSuccess: () => {
