@@ -265,7 +265,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                   <FormField control={form.control} name="consumido_por_cliente_id" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Consumido por</FormLabel>
-                      <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} defaultValue={field.value || ""}>
+                      <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} value={field.value ?? 'null'}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger></FormControl>
                         <SelectContent>
                           <SelectItem value="null">Mesa (Geral)</SelectItem>
