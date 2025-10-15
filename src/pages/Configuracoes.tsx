@@ -96,20 +96,6 @@ export default function ConfiguracoesPage() {
     },
   });
 
-  const testGoogleVisionMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('test-google-vision');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: (data: any) => {
-      showSuccess(data.message || "Conexão com Google Vision bem-sucedida!");
-    },
-    onError: (error: Error) => {
-      showError(`Teste do Google Vision falhou: ${error.message}`);
-    },
-  });
-
   const regenerateApiKeyMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc('regenerate_api_key');
@@ -225,20 +211,13 @@ export default function ConfiguracoesPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="simulacao">Simulação (Padrão)</SelectItem>
-                          <SelectItem value="google_vision">Google Cloud Vision</SelectItem>
+                          <SelectItem value="face-api.js">Reconhecimento Facial (Beta)</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-muted-foreground">
-                        Lembre-se de configurar a chave de API correspondente para provedores externos.
+                        O modo de simulação é útil para testes. O modo de reconhecimento facial utiliza um modelo de IA para identificar clientes reais.
                       </p>
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => testGoogleVisionMutation.mutate()}
-                      disabled={settings?.ai_provider !== 'google_vision' || testGoogleVisionMutation.isPending}
-                    >
-                      {testGoogleVisionMutation.isPending ? "Testando..." : "Testar Conexão Google Vision"}
-                    </Button>
                   </div>
                 )}
               </CardContent>
