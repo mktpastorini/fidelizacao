@@ -1,7 +1,7 @@
 import { ItemPedido } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, User, Utensils } from "lucide-react";
+import { Clock, User, Utensils, CheckCircle } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -37,10 +37,17 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
         </div>
         <div className="flex justify-end gap-2 pt-2">
           {item.status === 'pendente' && (
-            <Button size="sm" onClick={() => onStatusChange(item.id, 'preparando')}>
-              <Utensils className="w-4 h-4 mr-2" />
-              Preparar
-            </Button>
+            item.requer_preparo ? (
+              <Button size="sm" onClick={() => onStatusChange(item.id, 'preparando')}>
+                <Utensils className="w-4 h-4 mr-2" />
+                Preparar
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => onStatusChange(item.id, 'entregue')}>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Entregar
+              </Button>
+            )
           )}
           {item.status === 'preparando' && (
             <Button size="sm" variant="success" onClick={() => onStatusChange(item.id, 'entregue')}>

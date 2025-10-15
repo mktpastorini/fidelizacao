@@ -74,6 +74,7 @@ export type ItemPedido = {
   desconto_percentual?: number | null;
   desconto_motivo?: string | null;
   status: 'pendente' | 'preparando' | 'entregue';
+  requer_preparo: boolean;
   created_at: string;
 };
 

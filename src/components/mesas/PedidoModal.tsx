@@ -38,6 +38,7 @@ const itemSchema = z.object({
   preco: z.coerce.number(),
   consumido_por_cliente_id: z.string().uuid().nullable().optional(),
   status: z.enum(['pendente', 'preparando', 'entregue']),
+  requer_preparo: z.boolean(),
 });
 
 async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
@@ -78,7 +79,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
-    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente' },
+    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
   });
 
   const { data: pedido, isLoading } = useQuery({
@@ -140,7 +141,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       showSuccess("Item adicionado com sucesso!");
-      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente' });
+      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -224,8 +225,9 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
     const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
-    const status = produtoSelecionado?.requer_preparo ? 'pendente' : 'entregue';
-    addItemMutation.mutate({ ...values, status });
+    const requerPreparo = produtoSelecionado?.requer_preparo ?? true;
+    const status = requerPreparo ? 'pendente' : 'entregue';
+    addItemMutation.mutate({ ...values, status, requer_preparo: requerPreparo });
   };
 
   return (
