@@ -17,14 +17,14 @@ type Ocupante = {
 };
 
 type MesaCardProps = {
-  mesa: Mesa & { ocupantes: Ocupante[] };
+  mesa: Mesa & { ocupantes?: Ocupante[] };
   onClick: () => void;
   children?: React.ReactNode;
 };
 
 export function MesaCard({ mesa, onClick, children }: MesaCardProps) {
   const isOcupada = !!mesa.cliente;
-  const acompanhantes = mesa.ocupantes
+  const acompanhantes = (mesa.ocupantes || [])
     .map(o => o.cliente?.nome)
     .filter(Boolean) as string[];
   
