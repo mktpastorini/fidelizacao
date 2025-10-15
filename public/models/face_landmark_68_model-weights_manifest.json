@@ -1,0 +1,26 @@
+[
+    {
+        "paths": [
+            "face_landmark_68_model-shard1.weights"
+        ],
+        "weights": [
+            {
+                "name": "conv1_1/filters",
+                "shape": [
+                    3,
+                    3,
+                    3,
+                    32
+                ],
+                "dtype": "float32"
+            },
+            {
+                "name": "conv1_1/biases",
+                "shape": [
+                    32
+                ],
+                "dtype": "float32"
+            }
+        ]
+    }
+]
