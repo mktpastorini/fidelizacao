@@ -94,16 +94,22 @@ serve(async (req) => {
 
     const personalizedMessage = personalizeMessage(template.conteudo, client);
 
+    const webhookPayload = {
+      recipients: [
+        {
+          log_id: logId,
+          phone: client.whatsapp,
+          message: personalizedMessage,
+          client_name: client.nome,
+          callback_endpoint: `${Deno.env.get('SUPABASE_URL')}/functions/v1/update-message-status`,
+        }
+      ]
+    };
+
     const webhookResponse = await fetch(settings.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        log_id: logId,
-        phone: client.whatsapp,
-        message: personalizedMessage,
-        client_name: client.nome,
-        callback_endpoint: `${Deno.env.get('SUPABASE_URL')}/functions/v1/update-message-status`,
-      }),
+      body: JSON.stringify(webhookPayload),
     })
 
     const responseBody = await webhookResponse.json().catch(() => webhookResponse.text());
