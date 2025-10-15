@@ -121,12 +121,26 @@ export default function MesasPage() {
       if (!selectedMesa) throw new Error("Nenhuma mesa selecionada");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
-
+  
+      const todosOcupantesIds = [clientePrincipalId, ...acompanhanteIds];
+      const todosOcupantes = clientes?.filter(c => todosOcupantesIds.includes(c.id)) || [];
+      const acompanhantesJson = todosOcupantes.map(c => ({ id: c.id, nome: c.nome }));
+  
+      // Atualiza a mesa com o cliente principal
       await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
+  
+      // Cria o pedido aberto, já salvando a lista completa de acompanhantes
+      await supabase.from("pedidos").insert({
+        mesa_id: selectedMesa.id,
+        cliente_id: clientePrincipalId,
+        user_id: user.id,
+        status: "aberto",
+        acompanhantes: acompanhantesJson,
+      });
+  
+      // Limpa ocupantes antigos e insere os novos
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
-      
-      const todosOcupantes = [clientePrincipalId, ...acompanhanteIds];
-      const ocupantesData = todosOcupantes.map(clienteId => ({
+      const ocupantesData = todosOcupantesIds.map(clienteId => ({
         mesa_id: selectedMesa.id,
         cliente_id: clienteId,
         user_id: user.id,
