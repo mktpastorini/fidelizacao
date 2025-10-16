@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Check, X, UserPlus, Loader2 } from 'lucide-react';
 import { showError } from '@/utils/toast';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSettings } from '@/contexts/SettingsContext';
 
 type FacialRecognitionDialogProps = {
   isOpen: boolean;
@@ -16,10 +18,13 @@ type FacialRecognitionDialogProps = {
 
 export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecognized, onNewClient }: FacialRecognitionDialogProps) {
   const webcamRef = useRef<Webcam>(null);
+  const { settings } = useSettings();
   const [isScanning, setIsScanning] = useState(false);
   const [match, setMatch] = useState<Cliente | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("Inicializando...");
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const { isReady, error: recognitionError, recognize, getClientById } = useFaceRecognition();
 
@@ -31,12 +36,32 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   }, []);
 
   useEffect(() => {
-    if (!isOpen) {
-      resetState();
-    } else {
+    if (isOpen) {
+      const getDevices = async () => {
+        try {
+          const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+          setDevices(videoDevices);
+
+          const savedCameraId = settings?.preferred_camera_device_id;
+          const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
+
+          if (savedCameraId && isSavedCameraAvailable) {
+            setSelectedDeviceId(savedCameraId);
+          } else if (videoDevices.length > 0) {
+            setSelectedDeviceId(videoDevices[0].deviceId);
+          }
+        } catch (err) {
+          showError("Não foi possível listar os dispositivos de câmera.");
+          console.error(err);
+        }
+      };
+      getDevices();
       setStatusMessage(isReady ? "Aponte a câmera para o rosto" : "Carregando modelos de IA...");
+    } else {
+      resetState();
     }
-  }, [isOpen, isReady, resetState]);
+  }, [isOpen, isReady, resetState, settings]);
 
   useEffect(() => {
     if (recognitionError) {
@@ -94,6 +119,12 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
     setSnapshot(null);
     setMatch(null);
     setStatusMessage("Aponte a câmera para o rosto");
+  };
+
+  const videoConstraints = {
+    width: 400,
+    height: 400,
+    deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
   };
 
   const renderContent = () => {
@@ -163,7 +194,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={{ width: 400, height: 400, facingMode: 'user' }}
+                videoConstraints={videoConstraints}
                 className="w-full h-full object-cover"
                 onUserMediaError={() => {
                   showError("Não foi possível acessar a câmera.");
@@ -172,6 +203,20 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
               />
             )}
           </div>
+          {!snapshot && devices.length > 1 && (
+            <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
+              <SelectTrigger className="w-full max-w-xs">
+                <SelectValue placeholder="Selecione uma câmera" />
+              </SelectTrigger>
+              <SelectContent>
+                {devices.map((device) => (
+                  <SelectItem key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Câmera ${devices.indexOf(device) + 1}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {renderContent()}
         </div>
       </DialogContent>

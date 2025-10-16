@@ -6,6 +6,7 @@ import { WebhookForm } from "@/components/configuracoes/WebhookForm";
 import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSettingsForm";
 import { ApiDocumentation } from "@/components/configuracoes/ApiDocumentation";
 import { RecognitionTester } from "@/components/configuracoes/RecognitionTester";
+import { CameraSettings } from "@/components/configuracoes/CameraSettings";
 import { showError, showSuccess } from "@/utils/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -325,17 +326,30 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="reconhecimento" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Teste de Reconhecimento</CardTitle>
-              <CardDescription>
-                Use esta ferramenta para verificar a precisão do reconhecimento facial em tempo real.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <RecognitionTester />
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Configuração da Câmera</CardTitle>
+                <CardDescription>
+                  Escolha a câmera que será usada como padrão em todo o sistema.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Teste de Reconhecimento</CardTitle>
+                <CardDescription>
+                  Use esta ferramenta para verificar a precisão do reconhecimento facial em tempo real.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RecognitionTester />
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="api" className="mt-6">

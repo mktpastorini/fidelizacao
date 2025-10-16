@@ -1,24 +1,52 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Camera, RefreshCw } from 'lucide-react';
 import { showError } from '@/utils/toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSettings } from '@/contexts/SettingsContext';
 
 type FaceRegistrationProps = {
   onFaceRegistered: (imageUrl: string) => void;
   isSubmitting: boolean;
 };
 
-const videoConstraints = {
-  width: 400,
-  height: 400,
-  facingMode: 'user',
-};
-
 export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistrationProps) {
   const webcamRef = useRef<Webcam>(null);
+  const { settings } = useSettings();
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+        setDevices(videoDevices);
+
+        const savedCameraId = settings?.preferred_camera_device_id;
+        const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
+
+        if (savedCameraId && isSavedCameraAvailable) {
+          setSelectedDeviceId(savedCameraId);
+        } else if (videoDevices.length > 0) {
+          setSelectedDeviceId(videoDevices[0].deviceId);
+        }
+      } catch (err) {
+        showError("Não foi possível listar os dispositivos de câmera.");
+        console.error(err);
+      }
+    };
+    getDevices();
+  }, [settings]);
+
+  const videoConstraints = {
+    width: 400,
+    height: 400,
+    deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+  };
 
   const capture = useCallback(() => {
     const imageSrc = webcamRef.current?.getScreenshot();
@@ -66,6 +94,7 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
       if (!data.publicUrl) throw new Error("Não foi possível obter a URL pública da imagem.");
 
       onFaceRegistered(data.publicUrl);
+      resetCapture(); // Reseta para permitir múltiplas capturas
     } catch (error: any) {
       showError(`Erro ao salvar a imagem: ${error.message}`);
     }
@@ -83,9 +112,24 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
             screenshotFormat="image/jpeg"
             videoConstraints={videoConstraints}
             className="w-full h-full object-cover"
+            onUserMediaError={() => showError("Não foi possível acessar a câmera. Verifique as permissões.")}
           />
         )}
       </div>
+      {!capturedImage && devices.length > 1 && (
+        <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
+          <SelectTrigger className="w-full max-w-xs">
+            <SelectValue placeholder="Selecione uma câmera" />
+          </SelectTrigger>
+          <SelectContent>
+            {devices.map((device) => (
+              <SelectItem key={device.deviceId} value={device.deviceId}>
+                {device.label || `Câmera ${devices.indexOf(device) + 1}`}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
       <div className="flex gap-2">
         {capturedImage ? (
           <>

@@ -7,9 +7,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, Camera, Search, User, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { useSettings } from '@/contexts/SettingsContext';
 
 export function RecognitionTester() {
   const webcamRef = useRef<Webcam>(null);
+  const { settings } = useSettings();
   const { isReady, isLoading, error, recognize, getClientById } = useFaceRecognition();
   
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
@@ -23,12 +25,18 @@ export function RecognitionTester() {
       const mediaDevices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
       setDevices(videoDevices);
-      if (videoDevices.length > 0) {
+
+      const savedCameraId = settings?.preferred_camera_device_id;
+      const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
+
+      if (savedCameraId && isSavedCameraAvailable) {
+        setSelectedDeviceId(savedCameraId);
+      } else if (videoDevices.length > 0) {
         setSelectedDeviceId(videoDevices[0].deviceId);
       }
     };
     getDevices();
-  }, []);
+  }, [settings]);
 
   const handleScan = useCallback(async () => {
     if (!webcamRef.current) return;

@@ -56,6 +56,8 @@ export type UserSettings = {
   daily_report_phone_number?: string | null;
   auto_close_enabled?: boolean;
   auto_close_time?: string | null;
+  menu_style?: string | null;
+  preferred_camera_device_id?: string | null;
 };
 
 export type Pedido = {
