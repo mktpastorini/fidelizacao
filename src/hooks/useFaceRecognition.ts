@@ -1,106 +1,119 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import * as faceapi from 'face-api.js';
 import { supabase } from '@/integrations/supabase/client';
 import { Cliente } from '@/types/supabase';
+import { useToast } from "@/components/ui/use-toast";
 
-// Usando um CDN confiável para os modelos
 const MODELS_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
 
-type CustomerFace = {
-  cliente_id: string;
-  embedding: number[];
-  cliente: Cliente | null;
-};
-
 export function useFaceRecognition() {
-  const [isLoadingModels, setIsLoadingModels] = useState(true);
-  const [isInitializingMatcher, setIsInitializingMatcher] = useState(false);
-  const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
+  const { toast } = useToast();
+  const [isModelsLoaded, setIsModelsLoaded] = useState(false);
+  const [isRecognizing, setIsRecognizing] = useState(false);
+  const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [clients, setClients] = useState<Cliente[]>([]);
+  const recognitionInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    const loadModels = async () => {
+    async function loadModels() {
       try {
-        setError(null);
-        setIsLoadingModels(true);
         await Promise.all([
-          faceapi.nets.ssdMobilenetv1.loadFromUri(MODELS_URL),
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL),
         ]);
+        setIsModelsLoaded(true);
       } catch (e) {
         console.error("Erro ao carregar modelos de IA:", e);
-        setError('Falha crítica ao carregar os modelos de IA. Verifique a conexão com a internet.');
-      } finally {
-        setIsLoadingModels(false);
+        setError("Falha ao carregar os modelos de IA. Verifique a conexão e recarregue a página.");
+      }
+    }
+    loadModels();
+
+    return () => {
+      if (recognitionInterval.current) {
+        clearInterval(recognitionInterval.current);
       }
     };
-    loadModels();
   }, []);
 
-  useEffect(() => {
-    if (isLoadingModels) return;
+  const startRecognition = useCallback((videoElement: HTMLVideoElement) => {
+    if (!isModelsLoaded || recognitionInterval.current) return;
 
-    const initFaceMatcher = async () => {
-      try {
-        setError(null);
-        setIsInitializingMatcher(true);
-        const { data: faces, error: dbError } = await supabase
-          .from('customer_faces')
-          .select('cliente_id, embedding, cliente:clientes!inner(*)');
+    recognitionInterval.current = setInterval(async () => {
+      if (videoElement.readyState < 3 || isRecognizing) return;
 
-        if (dbError) throw dbError;
+      const canvas = faceapi.createCanvasFromMedia(videoElement);
+      const displaySize = { width: videoElement.videoWidth, height: videoElement.videoHeight };
+      faceapi.matchDimensions(canvas, displaySize);
 
-        const typedFaces = faces as CustomerFace[];
-        const validClients = Array.from(new Map(typedFaces.map(f => f.cliente).filter(Boolean).map(c => [c!.id, c])).values()) as Cliente[];
-        setClients(validClients);
+      const detections = await faceapi.detectAllFaces(videoElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptors();
+      
+      if (detections.length > 0 && !isRecognizing) {
+        setIsRecognizing(true);
+        setRecognizedClient(null);
 
-        if (typedFaces.length === 0) {
-          return;
+        // Captura o frame como uma imagem base64
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = videoElement.videoWidth;
+        tempCanvas.height = videoElement.videoHeight;
+        const ctx = tempCanvas.getContext('2d');
+        ctx?.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
+        const imageUrl = tempCanvas.toDataURL('image/jpeg');
+
+        try {
+          const { data, error: functionError } = await supabase.functions.invoke('recognize-face', {
+            body: { image_url: imageUrl },
+          });
+
+          if (functionError) throw functionError;
+
+          if (data.match) {
+            setRecognizedClient(data.match);
+            toast({
+              title: "Cliente Reconhecido!",
+              description: `Bem-vindo(a) de volta, ${data.match.nome}!`,
+            });
+            stopRecognition();
+          } else {
+             // Se não encontrou, espera um pouco antes de tentar de novo para não sobrecarregar
+            setTimeout(() => setIsRecognizing(false), 2000);
+          }
+        } catch (err) {
+          console.error("Erro ao invocar a função de reconhecimento:", err);
+          toast({
+            title: "Erro no Reconhecimento",
+            description: "Não foi possível se comunicar com o serviço de reconhecimento.",
+            variant: "destructive",
+          });
+          // Libera para tentar novamente após um erro
+          setTimeout(() => setIsRecognizing(false), 5000);
         }
-
-        const labeledDescriptors = typedFaces
-          .filter(face => face.embedding && face.cliente_id)
-          .map(face => new faceapi.LabeledFaceDescriptors(face.cliente_id, [new Float32Array(face.embedding)]));
-
-        if (labeledDescriptors.length > 0) {
-          setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.5));
-        }
-      } catch (e: any) {
-        console.error("Erro ao inicializar o Face Matcher:", e);
-        setError('Falha ao carregar os rostos cadastrados no banco de dados.');
-      } finally {
-        setIsInitializingMatcher(false);
       }
-    };
+    }, 1500); // Tenta reconhecer a cada 1.5 segundos
+  }, [isModelsLoaded, isRecognizing, toast]);
 
-    initFaceMatcher();
-  }, [isLoadingModels]);
-
-  const recognize = useCallback(async (image: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement) => {
-    if (isLoadingModels || isInitializingMatcher || !faceMatcher) {
-      return null;
+  const stopRecognition = useCallback(() => {
+    if (recognitionInterval.current) {
+      clearInterval(recognitionInterval.current);
+      recognitionInterval.current = null;
     }
+    setIsRecognizing(false);
+  }, []);
 
-    const detection = await faceapi
-      .detectSingleFace(image)
-      .withFaceLandmarks()
-      .withFaceDescriptor();
+  const resetRecognition = useCallback(() => {
+    stopRecognition();
+    setRecognizedClient(null);
+    setError(null);
+  }, [stopRecognition]);
 
-    if (!detection) {
-      return null;
-    }
-
-    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-    return bestMatch;
-  }, [isLoadingModels, isInitializingMatcher, faceMatcher]);
-
-  const getClientById = (id: string) => {
-    return clients.find(c => c.id === id) || null;
-  }
-
-  const isReady = !isLoadingModels && !isInitializingMatcher;
-
-  return { isReady, isLoading: isLoadingModels || isInitializingMatcher, error, recognize, getClientById };
+  return {
+    isModelsLoaded,
+    isRecognizing,
+    recognizedClient,
+    error,
+    startRecognition,
+    stopRecognition,
+    resetRecognition,
+  };
 }
