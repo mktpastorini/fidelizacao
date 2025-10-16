@@ -53,6 +53,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
       nome: defaultValues?.nome || "",
       casado_com: defaultValues?.casado_com || "",
       whatsapp: defaultValues?.whatsapp || "",
+      // Ao editar, se houver avatar_url, ele deve ser o primeiro item do array de urls
       avatar_urls: defaultValues?.avatar_url ? [defaultValues.avatar_url] : [],
       indicado_por_id: defaultValues?.indicado_por_id || "none",
       gostos: {
@@ -70,7 +71,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
   });
 
   const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
-    // A primeira imagem é a principal
+    // A primeira imagem é a principal (avatar_url)
     const submissionData = {
       ...values,
       avatar_url: values.avatar_urls[0] || null,
