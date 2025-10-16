@@ -57,18 +57,15 @@ export function useFaceRecognition() {
         setClients(validClients);
 
         if (typedFaces.length === 0) {
-          setFaceMatcher(null);
           return;
         }
 
         const labeledDescriptors = typedFaces
-          .filter(face => face.embedding && face.cliente_id && face.embedding.length === 128) // Filtra apenas embeddings de 128 dimensões
+          .filter(face => face.embedding && face.cliente_id)
           .map(face => new faceapi.LabeledFaceDescriptors(face.cliente_id, [new Float32Array(face.embedding)]));
 
         if (labeledDescriptors.length > 0) {
           setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.5));
-        } else {
-          setFaceMatcher(null);
         }
       } catch (e: any) {
         console.error("Erro ao inicializar o Face Matcher:", e);
@@ -95,7 +92,6 @@ export function useFaceRecognition() {
       return null;
     }
 
-    // O descriptor gerado pelo face-api.js tem 128 elementos
     const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
     return bestMatch;
   }, [isLoadingModels, isInitializingMatcher, faceMatcher]);
