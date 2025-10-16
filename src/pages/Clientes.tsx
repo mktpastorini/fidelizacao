@@ -26,7 +26,6 @@ import { ClienteDetalhesModal } from "@/components/clientes/ClienteDetalhesModal
 import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
-import { generateEmbeddings } from "@/utils/faceApi";
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
@@ -91,10 +90,11 @@ export default function ClientesPage() {
 
       const { avatar_urls, ...clienteData } = newCliente;
       
-      const embeddings = await generateEmbeddings(avatar_urls);
-      if (embeddings.length === 0) {
-        throw new Error("Nenhum rosto detectado nas imagens. O cadastro foi cancelado.");
-      }
+      const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
+        body: { image_urls: avatar_urls }
+      });
+      if (embeddingError) throw new Error(`Falha na IA: ${embeddingError.message}`);
+      const embeddings = embeddingData.embeddings;
 
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
@@ -109,11 +109,11 @@ export default function ClientesPage() {
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      const facesToInsert = embeddings.map(embedding => ({
+      const facesToInsert = embeddings.map((embedding: number[]) => ({
         cliente_id: newClientId,
         user_id: user.id,
-        embedding: Array.from(embedding),
-        ai_provider: 'face-api.js',
+        embedding: embedding,
+        ai_provider: 'google-vision',
       }));
       const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
       if (faceError) throw new Error(`Cliente criado, mas falha ao salvar rosto: ${faceError.message}`);
@@ -144,11 +144,16 @@ export default function ClientesPage() {
       }
 
       if (avatar_urls && avatar_urls.length > 0) {
-        const embeddings = await generateEmbeddings(avatar_urls);
+        const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
+          body: { image_urls: avatar_urls }
+        });
+        if (embeddingError) throw new Error(`Falha na IA: ${embeddingError.message}`);
+        const embeddings = embeddingData.embeddings;
+
         if (embeddings.length > 0) {
           await supabase.from('customer_faces').delete().eq('cliente_id', id);
-          const facesToInsert = embeddings.map(embedding => ({
-            cliente_id: id, user_id: user.id, embedding: Array.from(embedding), ai_provider: 'face-api.js',
+          const facesToInsert = embeddings.map((embedding: number[]) => ({
+            cliente_id: id, user_id: user.id, embedding: embedding, ai_provider: 'google-vision',
           }));
           const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
           if (faceError) throw new Error(`Cliente atualizado, mas falha ao salvar rosto: ${faceError.message}`);
