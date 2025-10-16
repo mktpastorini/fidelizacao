@@ -3,7 +3,8 @@ import * as faceapi from 'face-api.js';
 import { supabase } from '@/integrations/supabase/client';
 import { Cliente } from '@/types/supabase';
 
-const MODELS_URL = '/models'; // Alterado para carregar modelos locais
+// Usando um CDN confiável para os modelos
+const MODELS_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
 
 type CustomerFace = {
   cliente_id: string;
@@ -12,34 +13,39 @@ type CustomerFace = {
 };
 
 export function useFaceRecognition() {
-  const [isModelsLoaded, setIsModelsLoaded] = useState(false);
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [isInitializingMatcher, setIsInitializingMatcher] = useState(false);
   const [faceMatcher, setFaceMatcher] = useState<faceapi.FaceMatcher | null>(null);
-  const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [clients, setClients] = useState<Cliente[]>([]);
 
   useEffect(() => {
     const loadModels = async () => {
       try {
+        setError(null);
+        setIsLoadingModels(true);
         await Promise.all([
           faceapi.nets.ssdMobilenetv1.loadFromUri(MODELS_URL),
           faceapi.nets.faceLandmark68Net.loadFromUri(MODELS_URL),
           faceapi.nets.faceRecognitionNet.loadFromUri(MODELS_URL),
         ]);
-        setIsModelsLoaded(true);
       } catch (e) {
-        setError('Falha ao carregar os modelos de IA.');
-        console.error(e);
+        console.error("Erro ao carregar modelos de IA:", e);
+        setError('Falha crítica ao carregar os modelos de IA. Verifique a conexão com a internet.');
+      } finally {
+        setIsLoadingModels(false);
       }
     };
     loadModels();
   }, []);
 
   useEffect(() => {
-    if (!isModelsLoaded) return;
+    if (isLoadingModels) return;
 
     const initFaceMatcher = async () => {
       try {
+        setError(null);
+        setIsInitializingMatcher(true);
         const { data: faces, error: dbError } = await supabase
           .from('customer_faces')
           .select('cliente_id, embedding, cliente:clientes!inner(*)');
@@ -51,45 +57,29 @@ export function useFaceRecognition() {
         setClients(validClients);
 
         if (typedFaces.length === 0) {
-          setIsReady(true);
           return;
         }
 
-        // Agrupar embeddings por cliente
-        const embeddingsByClient = new Map<string, number[][]>();
-        for (const face of typedFaces) {
-          if (face.embedding && face.cliente_id) {
-            if (!embeddingsByClient.has(face.cliente_id)) {
-              embeddingsByClient.set(face.cliente_id, []);
-            }
-            embeddingsByClient.get(face.cliente_id)!.push(face.embedding);
-          }
-        }
-
-        // Calcular a média dos embeddings para cada cliente
-        const labeledDescriptors = [];
-        for (const [clienteId, embeddings] of embeddingsByClient.entries()) {
-          if (embeddings.length > 0) {
-            const averageEmbedding = faceapi.utils.average(embeddings.map(e => new Float32Array(e)));
-            labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(clienteId, [averageEmbedding]));
-          }
-        }
+        const labeledDescriptors = typedFaces
+          .filter(face => face.embedding && face.cliente_id)
+          .map(face => new faceapi.LabeledFaceDescriptors(face.cliente_id, [new Float32Array(face.embedding)]));
 
         if (labeledDescriptors.length > 0) {
           setFaceMatcher(new faceapi.FaceMatcher(labeledDescriptors, 0.5));
         }
-        setIsReady(true);
       } catch (e: any) {
-        setError('Falha ao carregar os rostos cadastrados.');
-        console.error(e);
+        console.error("Erro ao inicializar o Face Matcher:", e);
+        setError('Falha ao carregar os rostos cadastrados no banco de dados.');
+      } finally {
+        setIsInitializingMatcher(false);
       }
     };
 
     initFaceMatcher();
-  }, [isModelsLoaded]);
+  }, [isLoadingModels]);
 
   const recognize = useCallback(async (image: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement) => {
-    if (!isReady || !faceMatcher) {
+    if (isLoadingModels || isInitializingMatcher || !faceMatcher) {
       return null;
     }
 
@@ -104,11 +94,13 @@ export function useFaceRecognition() {
 
     const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
     return bestMatch;
-  }, [isReady, faceMatcher]);
+  }, [isLoadingModels, isInitializingMatcher, faceMatcher]);
 
   const getClientById = (id: string) => {
     return clients.find(c => c.id === id) || null;
   }
 
-  return { isReady, error, recognize, getClientById };
+  const isReady = !isLoadingModels && !isInitializingMatcher;
+
+  return { isReady, isLoading: isLoadingModels || isInitializingMatcher, error, recognize, getClientById };
 }

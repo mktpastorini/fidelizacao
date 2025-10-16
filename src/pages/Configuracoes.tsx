@@ -5,6 +5,7 @@ import { ProfileForm } from "@/components/configuracoes/ProfileForm";
 import { WebhookForm } from "@/components/configuracoes/WebhookForm";
 import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSettingsForm";
 import { ApiDocumentation } from "@/components/configuracoes/ApiDocumentation";
+import { RecognitionTester } from "@/components/configuracoes/RecognitionTester";
 import { showError, showSuccess } from "@/utils/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -128,10 +129,11 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="perfil">Perfil & Integrações</TabsTrigger>
           <TabsTrigger value="automacao">Automação</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
+          <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>
           <TabsTrigger value="api">Documentação API</TabsTrigger>
         </TabsList>
 
@@ -188,37 +190,6 @@ export default function ConfiguracoesPage() {
                     onTest={() => testWebhookMutation.mutate()}
                     isTesting={testWebhookMutation.isPending}
                   />
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>Inteligência Artificial</CardTitle>
-                <CardDescription>Selecione o provedor para o reconhecimento facial.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ai-provider">Provedor de Reconhecimento Facial</Label>
-                      <Select
-                        defaultValue={settings?.ai_provider || 'simulacao'}
-                        onValueChange={(value) => updateSettingsMutation.mutate({ ai_provider: value })}
-                      >
-                        <SelectTrigger id="ai-provider">
-                          <SelectValue placeholder="Selecione um provedor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="simulacao">Simulação (Padrão)</SelectItem>
-                          <SelectItem value="face-api.js">Reconhecimento Facial (Beta)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">
-                        O modo de simulação é útil para testes. O modo de reconhecimento facial utiliza um modelo de IA para identificar clientes reais.
-                      </p>
-                    </div>
-                  </div>
                 )}
               </CardContent>
             </Card>
@@ -349,6 +320,20 @@ export default function ConfiguracoesPage() {
                   </div>
                 </RadioGroup>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="reconhecimento" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Teste de Reconhecimento</CardTitle>
+              <CardDescription>
+                Use esta ferramenta para verificar a precisão do reconhecimento facial em tempo real.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RecognitionTester />
             </CardContent>
           </Card>
         </TabsContent>
