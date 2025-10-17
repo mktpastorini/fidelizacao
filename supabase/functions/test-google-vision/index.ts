@@ -15,24 +15,7 @@ async function getGoogleAuthToken() {
     throw new Error("Os secrets GOOGLE_CLIENT_EMAIL e GOOGLE_PRIVATE_KEY devem estar configurados.");
   }
 
-  function formatPem(pem: string) {
-    const base64 = pem
-      .replace("-----BEGIN PRIVATE KEY-----", "")
-      .replace("-----END PRIVATE KEY-----", "")
-      .replace(/\\n/g, "")
-      .replace(/\s/g, "");
-    
-    const pemHeader = "-----BEGIN PRIVATE KEY-----";
-    const pemFooter = "-----END PRIVATE KEY-----";
-    
-    const chunks = base64.match(/.{1,64}/g) || [];
-    const formattedBase64 = chunks.join('\n');
-
-    return `${pemHeader}\n${formattedBase64}\n${pemFooter}`;
-  }
-
-  const formattedPrivateKey = formatPem(private_key_string);
-
+  const formattedPrivateKey = private_key_string.replace(/\\n/g, '\n');
   const scope = "https://www.googleapis.com/auth/cloud-vision";
   const aud = "https://oauth2.googleapis.com/token";
 
