@@ -58,6 +58,8 @@ export type UserSettings = {
   auto_close_time?: string | null;
   menu_style?: string | null;
   preferred_camera_device_id?: string | null;
+  compreface_url?: string | null;
+  compreface_api_key?: string | null;
 };
 
 export type Pedido = {

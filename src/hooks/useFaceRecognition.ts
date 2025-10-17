@@ -6,62 +6,31 @@ export function useFaceRecognition() {
   const [isReady, setIsReady] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [clients, setClients] = useState<Cliente[]>([]);
 
-  useEffect(() => {
-    const fetchClients = async () => {
-      setIsLoading(true);
-      // Busca a lista completa de clientes para que o frontend possa mapear IDs para nomes
-      const { data, error: clientError } = await supabase.from('clientes').select('*');
-      if (clientError) {
-        setError("Falha ao carregar lista de clientes para reconhecimento.");
-      } else {
-        setClients(data || []);
-      }
-      setIsLoading(false);
-    };
-    fetchClients();
-  }, []);
-
-  const recognize = useCallback(async (imageElement: HTMLImageElement) => {
+  const recognize = useCallback(async (imageSrc: string) => {
+    setIsLoading(true);
     setError(null);
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = imageElement.width;
-    canvas.height = imageElement.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      setError("Não foi possível obter o contexto do canvas.");
-      return null;
-    }
-    ctx.drawImage(imageElement, 0, 0);
-    const imageUrl = canvas.toDataURL('image/jpeg');
-
     try {
-      const { data, error: functionError } = await supabase.functions.invoke('recognize-face', {
-        body: { 
-          image_url: imageUrl, 
-          ai_provider: 'google-vision' // Adicionando o parâmetro obrigatório
-        },
+      const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
+        body: { image_url: imageSrc },
       });
 
       if (functionError) throw functionError;
 
+      setIsLoading(false);
       if (data.match) {
-        return { label: data.match.id, distance: data.distance };
+        return { client: data.match as Cliente, distance: data.distance };
       }
       return null;
 
     } catch (err: any) {
       console.error("Erro ao invocar a função de reconhecimento:", err);
-      setError(err.message || "Falha ao se comunicar com o serviço de reconhecimento.");
+      const errorMessage = err.context?.error_message || err.message || "Falha na comunicação com o serviço de reconhecimento.";
+      setError(errorMessage);
+      setIsLoading(false);
       return null;
     }
   }, []);
 
-  const getClientById = useCallback((id: string) => {
-    return clients.find(c => c.id === id) || null;
-  }, [clients]);
-
-  return { isReady, isLoading, error, recognize, getClientById };
+  return { isReady, isLoading, error, recognize };
 }
