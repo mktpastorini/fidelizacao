@@ -17,41 +17,86 @@ serve(async (req) => {
       throw new Error("`client_id` e um array de `image_urls` são obrigatórios.");
     }
 
-    const userClient = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_ANON_KEY') ?? '', { global: { headers: { Authorization: req.headers.get('Authorization')! } } });
+    const userClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
     const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) throw userError || new Error("Usuário não autenticado.");
-
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    const { data: settings, error: settingsError } = await supabaseAdmin.from('user_settings').select('compreface_url, compreface_api_key').eq('id', user.id).single();
-    if (settingsError || !settings?.compreface_url || !settings.compreface_api_key) {
-      throw new Error('URL ou Chave de API do CompreFace não configuradas.');
+    if (userError || !user) {
+        console.error("Erro de autenticação:", userError?.message || "Usuário não encontrado.");
+        throw new Error("Falha na autenticação do usuário.");
     }
 
-    for (const imageUrl of image_urls) {
-      const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': settings.compreface_api_key,
-        },
-        body: JSON.stringify({
-          file: imageUrl,
-          subject: client_id,
-        }),
-      });
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('user_settings')
+      .select('compreface_url, compreface_api_key')
+      .eq('id', user.id)
+      .single();
 
-      if (!response.ok) {
-        const errorBody = await response.json();
-        console.error(`Falha ao adicionar imagem para o cliente ${client_id}:`, errorBody);
+    if (settingsError) {
+      console.error("Erro ao buscar configurações do usuário:", settingsError.message);
+      throw new Error("Configurações do CompreFace não encontradas. Verifique a página de Configurações.");
+    }
+    if (!settings?.compreface_url || !settings?.compreface_api_key) {
+      throw new Error("URL ou Chave de API do CompreFace não configuradas. Verifique a página de Configurações.");
+    }
+
+    let successCount = 0;
+    let lastError = null;
+
+    for (const imageUrl of image_urls) {
+      try {
+        const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': settings.compreface_api_key,
+            'User-Agent': 'Fidelize-App/1.0'
+          },
+          body: JSON.stringify({
+            file: imageUrl,
+            subject: client_id,
+          }),
+        });
+
+        if (!response.ok) {
+          let errorMsg = `Falha ao enviar imagem para o CompreFace. Status: ${response.status}`;
+          try {
+            const errorBody = await response.json();
+            errorMsg += `. Detalhes: ${errorBody.message || JSON.stringify(errorBody)}`;
+          } catch (e) {
+            errorMsg += `. Detalhes: ${await response.text()}`;
+          }
+          console.warn(`Erro ao enviar imagem ${imageUrl}:`, errorMsg);
+          lastError = errorMsg; // Armazena o último erro, mas continua com as outras
+        } else {
+            successCount++;
+        }
+      } catch (fetchError) {
+        console.warn(`Erro de rede ao enviar imagem ${imageUrl}:`, fetchError.message);
+        lastError = `Erro de rede: ${fetchError.message}`;
       }
     }
 
-    return new Response(JSON.stringify({ success: true, message: `${image_urls.length} foto(s) enviada(s) para registro.` }), {
+    if (successCount === 0) {
+        throw new Error(lastError || "Nenhuma imagem foi enviada com sucesso para o CompreFace.");
+    }
+
+    const message = `Enviadas ${successCount} de ${image_urls.length} foto(s) para o CompreFace.` + (lastError ? ` Erros: ${lastError}` : '');
+    return new Response(JSON.stringify({ success: true, message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
+    console.error("--- ERRO NA FUNÇÃO add-face-examples ---");
+    console.error("Mensagem:", error.message);
+    console.error("Stack:", error.stack);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
