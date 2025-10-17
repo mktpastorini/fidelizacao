@@ -104,12 +104,9 @@ serve(async (req) => {
 
     let bestMatch = { cliente_id: null, distance: Infinity };
     for (const face of faces) {
-      if (face.embedding) {
-        const storedEmbedding = JSON.parse(face.embedding);
-        const distance = euclideanDistance(newEmbedding, storedEmbedding);
-        if (distance < bestMatch.distance) {
-          bestMatch = { cliente_id: face.cliente_id, distance };
-        }
+      const distance = euclideanDistance(newEmbedding, face.embedding);
+      if (distance < bestMatch.distance) {
+        bestMatch = { cliente_id: face.cliente_id, distance };
       }
     }
 
