@@ -63,6 +63,10 @@ export function RecognitionTester() {
       }
       setIsScanning(false);
     };
+    image.onerror = () => {
+      setMatchResult('not_found');
+      setIsScanning(false);
+    };
   }, [recognize, getClientById]);
 
   const reset = () => {
@@ -75,7 +79,7 @@ export function RecognitionTester() {
   }
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="w-8 h-8 animate-spin mr-2" /> Carregando modelos de IA...</div>;
+    return <div className="flex items-center justify-center p-8"><Loader2 className="w-8 h-8 animate-spin mr-2" /> Carregando dados de clientes...</div>;
   }
 
   return (

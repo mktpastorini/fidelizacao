@@ -11,6 +11,7 @@ export function useFaceRecognition() {
   useEffect(() => {
     const fetchClients = async () => {
       setIsLoading(true);
+      // Busca a lista completa de clientes para que o frontend possa mapear IDs para nomes
       const { data, error: clientError } = await supabase.from('clientes').select('*');
       if (clientError) {
         setError("Falha ao carregar lista de clientes para reconhecimento.");
@@ -38,7 +39,10 @@ export function useFaceRecognition() {
 
     try {
       const { data, error: functionError } = await supabase.functions.invoke('recognize-face', {
-        body: { image_url: imageUrl, ai_provider: 'google-vision' },
+        body: { 
+          image_url: imageUrl, 
+          ai_provider: 'google-vision' // Adicionando o parâmetro obrigatório
+        },
       });
 
       if (functionError) throw functionError;

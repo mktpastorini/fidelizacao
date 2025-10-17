@@ -32,8 +32,8 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
     setIsScanning(false);
     setMatch(null);
     setSnapshot(null);
-    setStatusMessage("Inicializando...");
-  }, []);
+    setStatusMessage(isReady ? "Aponte a câmera para o rosto" : "Carregando modelos de IA...");
+  }, [isReady]);
 
   useEffect(() => {
     if (isOpen) {
@@ -61,7 +61,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
     } else {
       resetState();
     }
-  }, [isOpen, isReady, resetState, settings]);
+  }, [isOpen, isReady, settings, resetState]);
 
   useEffect(() => {
     if (recognitionError) {
@@ -84,9 +84,15 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
       if (result && result.label !== 'unknown') {
         const client = getClientById(result.label);
         setMatch(client);
+        setStatusMessage(`Reconhecido: ${client?.nome}`);
       } else {
         setMatch(null);
+        setStatusMessage("Cliente não encontrado.");
       }
+      setIsScanning(false);
+    };
+    image.onerror = () => {
+      showError("Erro ao carregar a imagem para análise.");
       setIsScanning(false);
     };
   }, [isReady, recognize, getClientById]);
