@@ -16,7 +16,6 @@ import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { generateEmbeddings } from "@/utils/faceApi";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -143,11 +142,17 @@ export default function SalaoPage() {
       if (!user?.id) throw new Error("Usuário não autenticado");
 
       const { avatar_url, ...clienteData } = newCliente;
-      
-      const embeddings = await generateEmbeddings(avatar_url ? [avatar_url] : []);
-      if (embeddings.length === 0) {
-        throw new Error("Nenhum rosto detectado na imagem. O cadastro foi cancelado.");
+      const avatar_urls = avatar_url ? [avatar_url] : [];
+
+      if (avatar_urls.length === 0) {
+        throw new Error("Nenhuma foto fornecida para o cadastro.");
       }
+      
+      const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
+        body: { image_urls: avatar_urls }
+      });
+      if (embeddingError) throw new Error(`Falha na IA: ${embeddingError.message}`);
+      const embeddings = embeddingData.embeddings;
 
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
@@ -162,11 +167,11 @@ export default function SalaoPage() {
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      const facesToInsert = embeddings.map(embedding => ({
+      const facesToInsert = embeddings.map((embedding: number[]) => ({
         cliente_id: newClientId,
         user_id: user.id,
-        embedding: Array.from(embedding),
-        ai_provider: 'face-api.js',
+        embedding: embedding,
+        ai_provider: 'google-vision',
       }));
       const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
       if (faceError) throw new Error(`Cliente criado, mas falha ao salvar rosto: ${faceError.message}`);
