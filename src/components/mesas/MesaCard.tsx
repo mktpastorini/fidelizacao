@@ -1,6 +1,5 @@
 import { Mesa, Pedido, ItemPedido } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Users, User, Clock, DollarSign } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
@@ -14,7 +13,7 @@ type MesaCardProps = {
   mesa: MesaComPedido;
   ocupantesCount: number;
   onClick: () => void;
-  children: React.ReactNode;
+  children?: React.ReactNode;
 };
 
 // Função para obter data/hora no horário de Brasília
