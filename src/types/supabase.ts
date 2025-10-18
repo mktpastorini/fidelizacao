@@ -56,6 +56,8 @@ export type UserSettings = {
   preferred_camera_device_id?: string | null;
   compreface_url?: string | null;
   compreface_api_key?: string | null;
+  n8n_webhook_url?: string | null;
+  n8n_api_key?: string | null;
 };
 
 export type Pedido = {

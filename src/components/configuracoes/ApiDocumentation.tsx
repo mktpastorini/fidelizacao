@@ -23,6 +23,12 @@ const birthdayTriggerPayload = `{
   // Corpo vazio - apenas autenticação via header
 }`;
 
+const n8nNotificationPayload = `{
+  "event": "birthday_schedule_updated",
+  "new_time": "09:00",
+  "timestamp": "2023-06-15T10:30:00.000Z"
+}`;
+
 export function ApiDocumentation() {
   return (
     <div className="space-y-6">
@@ -115,6 +121,38 @@ export function ApiDocumentation() {
               <li>Usa o template de aniversário configurado nas "Automações"</li>
               <li>Envia as mensagens personalizadas através do webhook configurado</li>
             </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Integração com n8n</CardTitle>
+          <CardDescription>
+            Notificação automática para atualização de agendamento no n8n.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm">
+            Quando você configura uma URL de webhook do n8n nas configurações do Fidelize, 
+            o sistema enviará uma notificação sempre que o horário de envio de mensagens 
+            de aniversário for atualizado.
+          </p>
+          <h4 className="font-semibold">Exemplo de Payload de Notificação:</h4>
+          <CodeBlock code={n8nNotificationPayload} />
+          <h4 className="font-semibold mt-4">Campos do Payload:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li><code className="bg-gray-100 p-1 rounded">event</code>: O tipo de evento ocorrido (string).</li>
+            <li><code className="bg-gray-100 p-1 rounded">new_time</code>: O novo horário configurado para envio (string, formato HH:MM).</li>
+            <li><code className="bg-gray-100 p-1 rounded">timestamp</code>: Data e hora da atualização (string, formato ISO).</li>
+          </ul>
+          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+            <h4 className="font-semibold text-yellow-800">Configuração no n8n:</h4>
+            <p className="text-sm text-yellow-700 mt-2">
+              Para configurar a automação no n8n, crie um webhook que receba esta notificação 
+              e atualize o agendamento da sua automação de envio de aniversários. 
+              Você pode usar o campo "new_time" para definir o horário de execução.
+            </p>
           </div>
         </CardContent>
       </Card>

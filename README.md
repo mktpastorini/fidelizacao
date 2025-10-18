@@ -87,6 +87,24 @@ Para Windows, use o Task Scheduler:
 curl -X POST -H "Content-Type: application/json" -d "{}" http://localhost:54321/functions/v1/send-daily-birthday-wishes
 ```
 
+## Integração com n8n
+
+Para sincronizar automaticamente o horário de envio de mensagens de aniversário com uma automação no n8n:
+
+1. Configure a URL do webhook do n8n nas configurações do Fidelize (Configurações > Automação > Integração com n8n)
+2. Se necessário, adicione uma chave de API para autenticação
+3. Sempre que você atualizar o horário de envio nas configurações do Fidelize, uma notificação será enviada para o n8n
+4. No n8n, crie um webhook que receba esta notificação e atualize o agendamento da sua automação
+
+O payload enviado para o n8n terá o seguinte formato:
+```json
+{
+  "event": "birthday_schedule_updated",
+  "new_time": "09:00",
+  "timestamp": "2023-06-15T10:30:00.000Z"
+}
+```
+
 ## Como funciona
 
 A função `send-daily-birthday-wishes` verifica a cada minuto:

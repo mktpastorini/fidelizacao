@@ -17,6 +17,7 @@ import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
+import { N8nSettingsForm } from "@/components/configuracoes/N8nSettingsForm";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -119,6 +120,54 @@ export default function ConfiguracoesPage() {
 
       const { error } = await supabase.from("user_settings").upsert(settingsToUpsert);
       if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      refetchSettings();
+      showSuccess("Configurações salvas com sucesso!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const updateSettingsWithN8nNotificationMutation = useMutation({
+    mutationFn: async (updatedSettings: Partial<UserSettings>) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+      
+      // Atualiza as configurações no banco de dados
+      const settingsToUpsert = { id: user.id, ...updatedSettings };
+      const { error: updateError } = await supabase.from("user_settings").upsert(settingsToUpsert);
+      if (updateError) throw new Error(updateError.message);
+
+      // Se houver uma URL do webhook n8n configurada, notifica sobre a mudança
+      if (settings?.n8n_webhook_url && updatedSettings.aniversario_horario) {
+        try {
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          
+          // Adiciona chave de API se fornecida
+          if (settings.n8n_api_key) {
+            headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
+          }
+          
+          // Envia notificação para o n8n
+          const response = await fetch(settings.n8n_webhook_url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              event: 'birthday_schedule_updated',
+              new_time: updatedSettings.aniversario_horario,
+              timestamp: new Date().toISOString()
+            })
+          });
+          
+          if (!response.ok) {
+            console.error('Falha ao notificar n8n:', response.status, await response.text());
+          }
+        } catch (error) {
+          console.error('Erro ao notificar n8n:', error);
+        }
+      }
     },
     onSuccess: () => {
       refetchSettings();
@@ -239,7 +288,7 @@ export default function ConfiguracoesPage() {
                         id="birthday-time" 
                         type="time" 
                         defaultValue={settings?.aniversario_horario || "09:00"} 
-                        onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} 
+                        onBlur={(e) => updateSettingsWithN8nNotificationMutation.mutate({ aniversario_horario: e.target.value })} 
                       />
                     </div>
                     <Button 
@@ -253,6 +302,21 @@ export default function ConfiguracoesPage() {
                       Para envio automático, consulte a Documentação API para instruções sobre como configurar a automação externa.
                     </p>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Integração com n8n</CardTitle>
+                <CardDescription>Configure a conexão com sua automação no n8n.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-32 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
+                  <N8nSettingsForm 
+                    onSubmit={(values) => updateSettingsMutation.mutate(values)} 
+                    isSubmitting={updateSettingsMutation.isPending} 
+                    defaultValues={settings || undefined} 
+                  />
                 )}
               </CardContent>
             </Card>
