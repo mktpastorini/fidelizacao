@@ -9,19 +9,19 @@ const defaultTemplates = [
     tipo: "chegada",
   },
   {
-    nome: "Boas-vindas Personalizada",
-    conteudo: "Oi {nome}! Sua pizza favorita {pizza_favorita} está deliciosa hoje! Quer experimentar?",
-    tipo: "chegada",
+    nome: "Agradecimento Pós-Pagamento",
+    conteudo: "Obrigado pela sua visita, {nome}! Esperamos te ver novamente em breve. 😊",
+    tipo: "pagamento",
+  },
+  {
+    nome: "Feliz Aniversário!",
+    conteudo: "Olá {nome}! Desejamos a você um feliz aniversário, cheio de alegria e pizza! 🍕 Como presente, seu próximo pedido tem 10% de desconto!",
+    tipo: "aniversario",
   },
   {
     nome: "Promoção Especial",
     conteudo: "Olá {nome}! Temos uma promoção especial hoje: 20% de desconto na sua pizza {pizza_favorita}!",
     tipo: "geral",
-  },
-  {
-    nome: "Agradecimento Pós-Pagamento",
-    conteudo: "Obrigado pela sua visita, {nome}! Esperamos te ver novamente em breve. 😊",
-    tipo: "pagamento",
   },
 ];
 

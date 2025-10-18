@@ -23,6 +23,7 @@ const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome é obrigatório." }),
   casado_com: z.string().optional(),
   whatsapp: z.string().optional(),
+  data_nascimento: z.string().optional().nullable(),
   avatar_urls: z.array(z.string()).min(1, { message: "É necessário pelo menos uma foto para o reconhecimento." }),
   indicado_por_id: z.string().uuid().optional().nullable().or(z.literal("none")).transform(val => val === "none" ? null : val),
   gostos: z.object({
@@ -53,6 +54,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
       nome: defaultValues?.nome || "",
       casado_com: defaultValues?.casado_com || "",
       whatsapp: defaultValues?.whatsapp || "",
+      data_nascimento: defaultValues?.data_nascimento || undefined,
       avatar_urls: defaultValues?.avatar_url ? [defaultValues.avatar_url] : [],
       indicado_por_id: defaultValues?.indicado_por_id || "none",
       gostos: {
@@ -113,6 +115,34 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
+            name="whatsapp"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>WhatsApp</FormLabel>
+                <FormControl>
+                  <Input placeholder="(99) 99999-9999" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="data_nascimento"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Data de Nascimento</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} value={field.value || ''} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
             name="casado_com"
             render={({ field }) => (
               <FormItem>
@@ -126,45 +156,31 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
           />
           <FormField
             control={form.control}
-            name="whatsapp"
+            name="indicado_por_id"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>WhatsApp</FormLabel>
-                <FormControl>
-                  <Input placeholder="(99) 99999-9999" {...field} />
-                </FormControl>
+                <FormLabel>Indicado por</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value || "none"} disabled={isEditing}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione quem indicou este cliente" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Ninguém / Indicação própria</SelectItem>
+                    {clientes
+                      .filter(c => c.id !== defaultValues?.id)
+                      .map(cliente => (
+                        <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {isEditing && <FormDescription>A indicação não pode ser alterada após o cadastro.</FormDescription>}
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
-        
-        <FormField
-          control={form.control}
-          name="indicado_por_id"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Indicado por</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value || "none"} disabled={isEditing}>
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione quem indicou este cliente" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <SelectItem value="none">Ninguém / Indicação própria</SelectItem>
-                  {clientes
-                    .filter(c => c.id !== defaultValues?.id)
-                    .map(cliente => (
-                      <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isEditing && <FormDescription>A indicação não pode ser alterada após o cadastro.</FormDescription>}
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         <Accordion type="multiple" className="w-full space-y-2">
           <AccordionItem value="item-1" className="border rounded-md px-4">

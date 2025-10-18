@@ -29,7 +29,7 @@ import { useRef } from "react";
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome do template é obrigatório." }),
   conteudo: z.string().min(10, { message: "O conteúdo deve ter pelo menos 10 caracteres." }),
-  tipo: z.enum(["chegada", "pagamento", "geral"]),
+  tipo: z.enum(["chegada", "pagamento", "geral", "aniversario"]),
 });
 
 type MessageTemplateFormProps = {
@@ -108,6 +108,7 @@ export function MessageTemplateForm({ onSubmit, isSubmitting, defaultValues }: M
                     <SelectItem value="geral">Geral</SelectItem>
                     <SelectItem value="chegada">Chegada de Cliente</SelectItem>
                     <SelectItem value="pagamento">Pós-Pagamento</SelectItem>
+                    <SelectItem value="aniversario">Aniversário</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />

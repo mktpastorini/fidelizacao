@@ -139,6 +139,7 @@ export default function MensagensPage() {
     switch (type) {
       case 'chegada': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
       case 'pagamento': return 'bg-green-100 text-green-800 hover:bg-green-200';
+      case 'aniversario': return 'bg-pink-100 text-pink-800 hover:bg-pink-200';
       case 'manual': return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
       case 'fechamento_dia': return 'bg-gray-800 text-white hover:bg-gray-900';
       case 'abertura_dia': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';

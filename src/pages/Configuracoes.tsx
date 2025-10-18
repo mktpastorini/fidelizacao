@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -156,12 +156,24 @@ export default function ConfiguracoesPage() {
     },
   });
 
+  const sendBirthdayWishesMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('send-birthday-wishes');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: (data) => showSuccess(data.message),
+    onError: (error: Error) => showError(error.message),
+  });
+
   const handleCopy = (text: string | null | undefined) => {
     if (text) {
       navigator.clipboard.writeText(text);
       showSuccess("Chave de API copiada!");
     }
   };
+
+  const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
 
   return (
     <div>
@@ -199,6 +211,10 @@ export default function ConfiguracoesPage() {
             <Card>
               <CardHeader><CardTitle>Automação de Mensagens</CardTitle><CardDescription>Escolha os templates para cada evento automático.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar os templates.</p> : (<TemplateSettingsForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} templates={data?.templates || []} />)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Automação de Aniversários</CardTitle><CardDescription>Configure o envio automático de mensagens de aniversário.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : (<div className="space-y-4"><div><Label htmlFor="birthday-template">Template de Aniversário</Label><Select value={settings?.aniversario_template_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ aniversario_template_id: value })}><SelectTrigger id="birthday-template"><SelectValue placeholder="Selecione o template" /></SelectTrigger><SelectContent>{birthdayTemplates.map(template => (<SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>))}</SelectContent></Select></div><div><Label htmlFor="birthday-time">Horário de Envio</Label><Input id="birthday-time" type="time" defaultValue={settings?.aniversario_horario || "09:00"} onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} /></div><Button onClick={() => sendBirthdayWishesMutation.mutate()} disabled={sendBirthdayWishesMutation.isPending}><Send className="w-4 h-4 mr-2" />{sendBirthdayWishesMutation.isPending ? "Enviando..." : "Enviar para Aniversariantes de Hoje (Manual)"}</Button></div>)}</CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle>Automação de Pedidos</CardTitle><CardDescription>Configure um item para ser adicionado automaticamente quando um cliente senta à mesa.</CardDescription></CardHeader>

@@ -3,22 +3,18 @@ import { Sidebar } from "./Sidebar";
 import { Dock } from "./Dock";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Skeleton } from "./ui/skeleton";
-import { ThemeToggle } from "./ThemeToggle";
+import { Header } from "./Header";
 
 const MainContent = () => (
   <main className="flex-1 p-6 lg:p-8 overflow-y-auto relative">
-    <div className="absolute top-6 right-6 lg:top-8 lg:right-8 z-10">
-      <ThemeToggle />
-    </div>
+    <Header />
     <Outlet />
   </main>
 );
 
 const DockContent = () => (
   <main className="p-6 lg:p-8 pb-24 relative">
-    <div className="absolute top-6 right-6 lg:top-8 lg:right-8 z-10">
-      <ThemeToggle />
-    </div>
+    <Header />
     <Outlet />
   </main>
 );

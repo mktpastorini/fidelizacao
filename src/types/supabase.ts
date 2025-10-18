@@ -18,6 +18,7 @@ export type Cliente = {
   indicado_por_id: string | null;
   indicado_por?: { nome: string } | null;
   visitas: number;
+  data_nascimento?: string | null;
 };
 
 export type Mesa = {
@@ -33,7 +34,7 @@ export type MessageTemplate = {
   id: string;
   nome: string;
   conteudo: string;
-  tipo: 'chegada' | 'pagamento' | 'geral';
+  tipo: 'chegada' | 'pagamento' | 'geral' | 'aniversario';
   created_at: string;
 };
 
@@ -42,6 +43,8 @@ export type UserSettings = {
   webhook_url: string | null;
   chegada_template_id: string | null;
   pagamento_template_id: string | null;
+  aniversario_template_id?: string | null;
+  aniversario_horario?: string | null;
   api_key: string | null;
   auto_add_item_enabled?: boolean;
   default_produto_id?: string | null;
@@ -95,7 +98,7 @@ export type MessageLog = {
   id: string;
   created_at: string;
   status: 'sucesso' | 'falha';
-  trigger_event: 'chegada' | 'pagamento' | 'fechamento_dia' | 'manual' | 'abertura_dia';
+  trigger_event: 'chegada' | 'pagamento' | 'fechamento_dia' | 'manual' | 'abertura_dia' | 'aniversario';
   error_message: string | null;
   webhook_response: Record<string, any> | null;
   cliente: { nome: string } | null;
