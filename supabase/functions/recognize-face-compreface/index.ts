@@ -70,14 +70,18 @@ serve(async (req) => {
 
     console.log(`[recognize-face] 5/6: Resposta recebida do CompreFace com status: ${response.status}`);
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${errorBody}`);
+      const errorBody = await response.json().catch(() => response.text());
+      if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
+        console.log("[recognize-face] CompreFace não encontrou um rosto na imagem.");
+        return new Response(JSON.stringify({ match: null, distance: null, message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
+      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
     }
 
     const data = await response.json();
     const bestMatch = data.result?.[0]?.subjects?.[0];
 
-    if (bestMatch && bestMatch.similarity >= 0.90) {
+    if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/6: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
