@@ -67,8 +67,9 @@ serve(async (req) => {
         // Convert to base64
         const base64String = encode(imageArrayBuffer);
 
+        // Construct payload with subject explicitly included
         const payload = {
-          file: base64String, // Send base64 data
+          file: base64String,
           subject: subject,
         };
 
@@ -90,11 +91,13 @@ serve(async (req) => {
           } catch (e) {
             errorMsg += `. Detalhes: ${await response.text()}`;
           }
+          console.error(`Erro ao enviar imagem ${imageUrl}: ${errorMsg}`);
           errors.push(errorMsg);
         } else {
             successCount++;
         }
       } catch (fetchError) {
+        console.error(`Erro de rede ao enviar imagem ${imageUrl}: ${fetchError.message}`);
         errors.push(`Erro de rede ao enviar imagem: ${fetchError.message}`);
       }
     }
