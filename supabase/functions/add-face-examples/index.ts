@@ -83,12 +83,15 @@ serve(async (req) => {
         const base64String = encode(imageArrayBuffer);
         console.log(`${logPrefix} Imagem convertida para base64.`);
 
-        const payload = { file: base64String, subject: subject };
+        const payload = { file: base64String };
         
-        console.log(`${logPrefix} Payload a ser enviado: { file: [base64...], subject: "${payload.subject}" }`);
+        console.log(`${logPrefix} Payload a ser enviado: { file: [base64...] }`);
+        console.log(`${logPrefix} Subject a ser enviado na URL: ${subject}`);
 
         console.log(`${logPrefix} 5/7: Enviando para CompreFace...`);
-        const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
+        const requestUrl = `${settings.compreface_url}/api/v1/recognition/faces?subject=${encodeURIComponent(subject)}`;
+        
+        const response = await fetch(requestUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
