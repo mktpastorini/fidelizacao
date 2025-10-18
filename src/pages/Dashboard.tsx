@@ -35,6 +35,13 @@ type DashboardData = {
   has_clients: boolean;
 };
 
+// Função para obter data/hora no horário de Brasília
+function getBrazilTime() {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
+
 async function fetchDashboardData(): Promise<DashboardData> {
   const { data: financialData, error: financialError } = await supabase.rpc('get_financial_stats_today');
   if (financialError) throw new Error(financialError.message);
@@ -74,8 +81,8 @@ async function fetchRangeStats(dateRange: DateRange): Promise<RangeStats> {
 
 export default function DashboardPage() {
   const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
+    from: startOfMonth(getBrazilTime()),
+    to: endOfMonth(getBrazilTime()),
   });
 
   const { data: dailyData, isLoading: isLoadingDaily } = useQuery({

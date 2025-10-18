@@ -6,6 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Função para obter data/hora no horário de Brasília
+function getBrazilTime() {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -42,14 +49,16 @@ serve(async (req) => {
     }
     console.log("CLOSE-DAY: 4/8 - Configurações de webhook e telefone encontradas.");
 
-    const today = new Date();
-    const startOfDay = new Date(new Date().setHours(0, 0, 0, 0)).toISOString();
-    const endOfDay = new Date(new Date().setHours(23, 59, 59, 999)).toISOString();
+    const today = getBrazilTime();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
 
     const { data: stats, error: statsError } = await supabaseAdmin.rpc('get_stats_by_date_range_for_user', {
       p_user_id: user.id,
-      start_date: startOfDay,
-      end_date: endOfDay,
+      start_date: startOfDay.toISOString(),
+      end_date: endOfDay.toISOString(),
     }).single();
     if (statsError) throw statsError;
     console.log("CLOSE-DAY: 5/8 - Estatísticas do dia calculadas.");

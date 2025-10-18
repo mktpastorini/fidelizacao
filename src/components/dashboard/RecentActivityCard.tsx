@@ -14,6 +14,13 @@ type RecentArrival = {
   arrival_time: string;
 };
 
+// Função para obter data/hora no horário de Brasília
+function getBrazilTime() {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
+
 async function fetchRecentArrivals(): Promise<RecentArrival[]> {
   const { data, error } = await supabase.rpc('get_recent_arrivals', { limit_count: 5 });
   if (error) throw new Error(error.message);

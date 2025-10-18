@@ -16,8 +16,15 @@ type KanbanCardProps = {
   onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue') => void;
 };
 
-export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
+// Função para obter data/hora no horário de Brasília
+function getBrazilTime() {
   const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
+
+export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
+  const now = getBrazilTime();
   const createdAt = new Date(item.created_at);
   const tempoDesdePedido = formatDistanceToNow(createdAt, { locale: ptBR });
   const minutesSinceCreation = differenceInMinutes(now, createdAt);

@@ -25,6 +25,13 @@ type ClienteDetalhesModalProps = {
 
 type PedidoComItens = Pedido & { itens_pedido: ItemPedido[] };
 
+// Função para obter data/hora no horário de Brasília
+function getBrazilTime() {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
+
 async function fetchHistoricoCliente(clienteId: string): Promise<PedidoComItens[]> {
   const { data, error } = await supabase
     .from("pedidos")
