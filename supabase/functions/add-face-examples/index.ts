@@ -57,11 +57,21 @@ serve(async (req) => {
     const errors = [];
 
     for (const imageUrl of image_urls) {
+      if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim() === '') {
+        const errMsg = `URL inválida ou vazia detectada e ignorada: '${imageUrl}'`;
+        console.warn(errMsg);
+        errors.push(errMsg);
+        continue;
+      }
+
       try {
         // Fetch the image from the URL
         const imageResponse = await fetch(imageUrl);
         if (!imageResponse.ok) {
-          throw new Error(`Falha ao buscar imagem da URL: ${imageUrl}`);
+          const errMsg = `Falha ao buscar imagem da URL: ${imageUrl} (status ${imageResponse.status})`;
+          console.error(errMsg);
+          errors.push(errMsg);
+          continue;
         }
         const imageArrayBuffer = await imageResponse.arrayBuffer();
         // Convert to base64
@@ -94,16 +104,17 @@ serve(async (req) => {
           console.error(`Erro ao enviar imagem ${imageUrl}: ${errorMsg}`);
           errors.push(errorMsg);
         } else {
-            successCount++;
+          successCount++;
         }
       } catch (fetchError) {
-        console.error(`Erro de rede ao enviar imagem ${imageUrl}: ${fetchError.message}`);
-        errors.push(`Erro de rede ao enviar imagem: ${fetchError.message}`);
+        const errMsg = `Erro de rede ao enviar imagem ${imageUrl}: ${fetchError.message}`;
+        console.error(errMsg);
+        errors.push(errMsg);
       }
     }
 
     if (successCount === 0) {
-        throw new Error(`Nenhuma imagem foi enviada com sucesso. Último erro: ${errors[errors.length - 1] || 'Erro desconhecido'}`);
+      throw new Error(`Nenhuma imagem foi enviada com sucesso. Último erro: ${errors[errors.length - 1] || 'Erro desconhecido'}`);
     }
 
     const message = `Enviadas ${successCount} de ${image_urls.length} foto(s) para o CompreFace.` + (errors.length > 0 ? ` Alguns erros ocorreram: ${errors.join(', ')}` : '');
