@@ -15,6 +15,12 @@ serve(async (req) => {
     const { image_url } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
 
+    // New: Strip data URL prefix if present, as CompreFace expects raw base64
+    let imageData = image_url;
+    if (image_url.startsWith('data:image')) {
+      imageData = image_url.split(',')[1];
+    }
+
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -31,7 +37,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // Fixed: Properly fetch user settings with correct error handling
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('compreface_url, compreface_api_key')
@@ -43,7 +48,6 @@ serve(async (req) => {
       throw new Error("Configurações do CompreFace não encontradas. Verifique a página de Configurações.");
     }
     
-    // Fixed: Check for both URL and API key existence
     if (!settings?.compreface_url || !settings?.compreface_api_key) {
       throw new Error("URL ou Chave de API do CompreFace não configuradas. Verifique a página de Configurações.");
     }
@@ -55,7 +59,7 @@ serve(async (req) => {
         'x-api-key': settings.compreface_api_key,
         'User-Agent': 'Fidelize-App/1.0'
       },
-      body: JSON.stringify({ file: image_url }),
+      body: JSON.stringify({ file: imageData }), // Use stripped image data
     });
 
     if (!response.ok) {

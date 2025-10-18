@@ -12,7 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // 1. Parse request body
     const { subject, image_urls } = await req.json();
     if (!subject || typeof subject !== 'string' || subject.trim() === '') {
       throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente.`);
@@ -21,7 +20,6 @@ serve(async (req) => {
       throw new Error("`image_urls` deve ser um array com pelo menos uma URL.");
     }
 
-    // 2. Authenticate user
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -33,7 +31,6 @@ serve(async (req) => {
         throw new Error("Falha na autenticação do usuário.");
     }
 
-    // 3. Fetch user settings using admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -44,7 +41,6 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    // 4. Validate settings
     if (settingsError) {
       console.error(`Erro ao buscar configurações para o usuário ${user.id}:`, settingsError.message);
       if (settingsError.code === 'PGRST116') {
@@ -56,12 +52,17 @@ serve(async (req) => {
       throw new Error("URL ou Chave de API do CompreFace não configuradas. Verifique a página de Configurações.");
     }
 
-    // 5. Loop through images and send to CompreFace
     let successCount = 0;
     const errors = [];
 
     for (const imageUrl of image_urls) {
       try {
+        // Re-create payload inside loop to be safe
+        const payload = {
+          file: imageUrl,
+          subject: subject,
+        };
+
         const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
           method: 'POST',
           headers: {
@@ -69,10 +70,7 @@ serve(async (req) => {
             'x-api-key': settings.compreface_api_key,
             'User-Agent': 'Fidelize-App/1.0'
           },
-          body: JSON.stringify({
-            file: imageUrl,
-            subject: subject,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
@@ -92,7 +90,6 @@ serve(async (req) => {
       }
     }
 
-    // 6. Handle results
     if (successCount === 0) {
         throw new Error(`Nenhuma imagem foi enviada com sucesso. Último erro: ${errors[errors.length - 1] || 'Erro desconhecido'}`);
     }
