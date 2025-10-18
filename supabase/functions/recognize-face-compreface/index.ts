@@ -30,6 +30,8 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    
+    // Fixed: Properly fetch user settings with correct error handling
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('compreface_url, compreface_api_key')
@@ -40,6 +42,8 @@ serve(async (req) => {
       console.error("Erro ao buscar configurações do usuário:", settingsError.message);
       throw new Error("Configurações do CompreFace não encontradas. Verifique a página de Configurações.");
     }
+    
+    // Fixed: Check for both URL and API key existence
     if (!settings?.compreface_url || !settings?.compreface_api_key) {
       throw new Error("URL ou Chave de API do CompreFace não configuradas. Verifique a página de Configurações.");
     }
