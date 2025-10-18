@@ -77,20 +77,30 @@ serve(async (req) => {
         // Convert to base64
         const base64String = encode(imageArrayBuffer);
 
-        // Construct payload with subject explicitly included
-        const payload = {
-          file: base64String,
-          subject: subject,
-        };
+        // Prepare multipart/form-data body
+        const boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+        const bodyParts = [
+          `--${boundary}`,
+          `Content-Disposition: form-data; name="file"`,
+          ``,
+          base64String,
+          `--${boundary}`,
+          `Content-Disposition: form-data; name="subject"`,
+          ``,
+          subject,
+          `--${boundary}--`,
+          ``
+        ];
+        const body = bodyParts.join("\r\n");
 
         const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': `multipart/form-data; boundary=${boundary}`,
             'x-api-key': settings.compreface_api_key,
             'User-Agent': 'Fidelize-App/1.0'
           },
-          body: JSON.stringify(payload),
+          body,
         });
 
         if (!response.ok) {
