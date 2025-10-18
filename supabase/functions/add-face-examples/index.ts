@@ -8,12 +8,18 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log("--- [add-face-examples] INICIANDO EXECUÇÃO ---");
+  
   if (req.method === 'OPTIONS') {
+    console.log("[add-face-examples] Requisição OPTIONS recebida.");
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    console.log("[add-face-examples] 1/7: Parsing body da requisição...");
     const { subject, image_urls } = await req.json();
+    console.log(`[add-face-examples] 1/7: Body recebido - subject: ${subject}, image_urls.length: ${image_urls?.length}`);
+    
     if (!subject || typeof subject !== 'string' || subject.trim() === '') {
       throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente.`);
     }
@@ -21,6 +27,7 @@ serve(async (req) => {
       throw new Error("`image_urls` deve ser um array com pelo menos uma URL.");
     }
 
+    console.log("[add-face-examples] 2/7: Autenticando usuário...");
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -28,10 +35,11 @@ serve(async (req) => {
     );
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) {
-        console.error("Erro de autenticação:", userError?.message || "Usuário não encontrado.");
-        throw new Error("Falha na autenticação do usuário.");
+        throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
     }
+    console.log(`[add-face-examples] 2/7: Usuário autenticado: ${user.id}`);
 
+    console.log("[add-face-examples] 3/7: Buscando configurações do CompreFace...");
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -43,91 +51,85 @@ serve(async (req) => {
       .single();
 
     if (settingsError) {
-      console.error(`Erro ao buscar configurações para o usuário ${user.id}:`, settingsError.message);
-      if (settingsError.code === 'PGRST116') {
-        throw new Error("Nenhuma configuração encontrada para este usuário. O perfil pode estar incompleto.");
-      }
-      throw new Error("Não foi possível recuperar as configurações do CompreFace. Verifique a página de Configurações.");
+      throw new Error(`Não foi possível recuperar as configurações do CompreFace: ${settingsError.message}`);
     }
     if (!settings?.compreface_url || !settings?.compreface_api_key) {
-      throw new Error("URL ou Chave de API do CompreFace não configuradas. Verifique a página de Configurações.");
+      throw new Error("URL ou Chave de API do CompreFace não configuradas.");
     }
+    console.log(`[add-face-examples] 3/7: Configurações carregadas.`);
 
     let successCount = 0;
     const errors = [];
 
-    for (const imageUrl of image_urls) {
+    console.log(`[add-face-examples] 4/7: Iniciando loop para ${image_urls.length} imagens...`);
+    for (const [index, imageUrl] of image_urls.entries()) {
+      const logPrefix = `[add-face-examples] Imagem ${index + 1}/${image_urls.length}:`;
+      console.log(`${logPrefix} Processando URL: ${imageUrl}`);
+      
       if (!imageUrl || typeof imageUrl !== 'string' || imageUrl.trim() === '') {
-        const errMsg = `URL inválida ou vazia detectada e ignorada: '${imageUrl}'`;
-        console.warn(errMsg);
-        errors.push(errMsg);
+        errors.push(`${logPrefix} URL inválida ou vazia.`);
         continue;
       }
 
       try {
-        // 1. Fetch the image from the URL
+        console.log(`${logPrefix} Baixando imagem...`);
         const imageResponse = await fetch(imageUrl);
         if (!imageResponse.ok) {
-          const errMsg = `Falha ao buscar imagem da URL: ${imageUrl} (status ${imageResponse.status})`;
-          console.error(errMsg);
-          errors.push(errMsg);
+          errors.push(`${logPrefix} Falha ao baixar imagem (status ${imageResponse.status})`);
           continue;
         }
+        
         const imageArrayBuffer = await imageResponse.arrayBuffer();
-        // 2. Convert to base64
         const base64String = encode(imageArrayBuffer);
+        console.log(`${logPrefix} Imagem convertida para base64.`);
 
-        // 3. Prepare JSON payload
-        const payload = {
-          file: base64String,
-          subject: subject,
-        };
+        const payload = { file: base64String, subject: subject };
+        
+        console.log(`${logPrefix} Payload a ser enviado: { file: [base64...], subject: "${payload.subject}" }`);
 
-        // 4. Send JSON payload to CompreFace
+        console.log(`${logPrefix} 5/7: Enviando para CompreFace...`);
         const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json', // Crucial: Send as JSON
+            'Content-Type': 'application/json',
             'x-api-key': settings.compreface_api_key,
-            'User-Agent': 'Fidelize-App/1.0'
           },
           body: JSON.stringify(payload),
         });
 
+        console.log(`${logPrefix} 6/7: Resposta recebida do CompreFace com status: ${response.status}`);
         if (!response.ok) {
-          let errorMsg = `Falha ao enviar imagem. Status: ${response.status}`;
-          try {
-            const errorBody = await response.json();
-            errorMsg += `. Detalhes: ${errorBody.message || JSON.stringify(errorBody)}`;
-          } catch (e) {
-            errorMsg += `. Detalhes: ${await response.text()}`;
-          }
-          console.error(`Erro ao enviar imagem ${imageUrl}: ${errorMsg}`);
+          const errorBody = await response.text();
+          const errorMsg = `${logPrefix} Falha no envio. Status: ${response.status}. Detalhes: ${errorBody}`;
+          console.error(errorMsg);
           errors.push(errorMsg);
         } else {
+          console.log(`${logPrefix} Enviada com sucesso.`);
           successCount++;
         }
       } catch (fetchError) {
-        const errMsg = `Erro de rede ao enviar imagem ${imageUrl}: ${fetchError.message}`;
+        const errMsg = `${logPrefix} Erro de rede: ${fetchError.message}`;
         console.error(errMsg);
         errors.push(errMsg);
       }
     }
 
+    console.log(`[add-face-examples] 7/7: Loop concluído. Sucessos: ${successCount}, Erros: ${errors.length}`);
     if (successCount === 0) {
       throw new Error(`Nenhuma imagem foi enviada com sucesso. Último erro: ${errors[errors.length - 1] || 'Erro desconhecido'}`);
     }
 
-    const message = `Enviadas ${successCount} de ${image_urls.length} foto(s) para o CompreFace.` + (errors.length > 0 ? ` Alguns erros ocorreram: ${errors.join(', ')}` : '');
+    const message = `Enviadas ${successCount} de ${image_urls.length} foto(s).` + (errors.length > 0 ? ` Erros: ${errors.join('; ')}` : '');
     return new Response(JSON.stringify({ success: true, message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    console.error("--- ERRO NA FUNÇÃO add-face-examples ---");
+    console.error("--- [add-face-examples] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error("Stack:", error.stack);
+    return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
