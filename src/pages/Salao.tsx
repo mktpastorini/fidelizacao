@@ -153,17 +153,25 @@ export default function SalaoPage() {
         p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
+      if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      if (clienteData.filhos && clienteData.filhos.length > 0) {
-        const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
-        const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
-        if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
+      try {
+        if (clienteData.filhos && clienteData.filhos.length > 0) {
+          const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+          const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
+          if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
+        }
+        
+        const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
+          body: { subject: newClientId, image_urls: avatar_urls }
+        });
+        if (faceError) throw faceError;
+
+      } catch (error) {
+        console.error("Erro durante o processo de pós-criação do cliente. Revertendo...", error);
+        await supabase.from("clientes").delete().eq("id", newClientId);
+        throw new Error(`O cadastro do cliente falhou durante o registro facial. A operação foi desfeita. Erro original: ${error.message}`);
       }
-      
-      const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
-        body: { subject: newClientId, image_urls: avatar_urls }
-      });
-      if (faceError) throw new Error(`Cliente criado, mas falha ao registrar rosto: ${faceError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });

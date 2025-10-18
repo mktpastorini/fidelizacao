@@ -94,25 +94,31 @@ export default function ClientesPage() {
         throw new Error("É necessário pelo menos uma foto para o reconhecimento.");
       }
       
-      // Cria o cliente e obtém o novo ID
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
         p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: clienteData.avatar_url,
         p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
+      if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      if (clienteData.filhos && clienteData.filhos.length > 0) {
-        const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
-        const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
-        if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
+      try {
+        if (clienteData.filhos && clienteData.filhos.length > 0) {
+          const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+          const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
+          if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
+        }
+        
+        const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
+          body: { subject: newClientId, image_urls: avatar_urls }
+        });
+        if (faceError) throw faceError;
+
+      } catch (error) {
+        console.error("Erro durante o processo de pós-criação do cliente. Revertendo...", error);
+        await supabase.from("clientes").delete().eq("id", newClientId);
+        throw new Error(`O cadastro do cliente falhou durante o registro facial. A operação foi desfeita. Erro original: ${error.message}`);
       }
-      
-      // Envia as imagens para a função add-face-examples com o subject correto e as URLs das imagens
-      const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
-        body: { subject: newClientId, image_urls: avatar_urls }
-      });
-      if (faceError) throw new Error(`Cliente criado, mas falha ao registrar rosto: ${faceError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
