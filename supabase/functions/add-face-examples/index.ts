@@ -12,14 +12,16 @@ serve(async (req) => {
   }
 
   try {
+    // 1. Parse request body
     const { subject, image_urls } = await req.json();
     if (!subject || typeof subject !== 'string' || subject.trim() === '') {
-      throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente. Recebido: ${JSON.stringify(subject)}`);
+      throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente.`);
     }
-    if (!image_urls || !Array.isArray(image_urls)) {
-      throw new Error("`image_urls` deve ser um array.");
+    if (!image_urls || !Array.isArray(image_urls) || image_urls.length === 0) {
+      throw new Error("`image_urls` deve ser um array com pelo menos uma URL.");
     }
 
+    // 2. Authenticate user
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -31,6 +33,7 @@ serve(async (req) => {
         throw new Error("Falha na autenticação do usuário.");
     }
 
+    // 3. Fetch user settings using admin client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -41,16 +44,21 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
+    // 4. Validate settings
     if (settingsError) {
-      console.error("Erro ao buscar configurações do usuário:", settingsError.message);
-      throw new Error("Configurações do CompreFace não encontradas. Verifique a página de Configurações.");
+      console.error(`Erro ao buscar configurações para o usuário ${user.id}:`, settingsError.message);
+      if (settingsError.code === 'PGRST116') {
+        throw new Error("Nenhuma configuração encontrada para este usuário. O perfil pode estar incompleto.");
+      }
+      throw new Error("Não foi possível recuperar as configurações do CompreFace. Verifique a página de Configurações.");
     }
     if (!settings?.compreface_url || !settings?.compreface_api_key) {
       throw new Error("URL ou Chave de API do CompreFace não configuradas. Verifique a página de Configurações.");
     }
 
+    // 5. Loop through images and send to CompreFace
     let successCount = 0;
-    let lastError = null;
+    const errors = [];
 
     for (const imageUrl of image_urls) {
       try {
@@ -68,29 +76,28 @@ serve(async (req) => {
         });
 
         if (!response.ok) {
-          let errorMsg = `Falha ao enviar imagem para o CompreFace. Status: ${response.status}`;
+          let errorMsg = `Falha ao enviar imagem. Status: ${response.status}`;
           try {
             const errorBody = await response.json();
             errorMsg += `. Detalhes: ${errorBody.message || JSON.stringify(errorBody)}`;
           } catch (e) {
             errorMsg += `. Detalhes: ${await response.text()}`;
           }
-          console.warn(`Erro ao enviar imagem ${imageUrl}:`, errorMsg);
-          lastError = errorMsg; // Armazena o último erro, mas continua com as outras
+          errors.push(errorMsg);
         } else {
             successCount++;
         }
       } catch (fetchError) {
-        console.warn(`Erro de rede ao enviar imagem ${imageUrl}:`, fetchError.message);
-        lastError = `Erro de rede: ${fetchError.message}`;
+        errors.push(`Erro de rede ao enviar imagem: ${fetchError.message}`);
       }
     }
 
+    // 6. Handle results
     if (successCount === 0) {
-        throw new Error(lastError || "Nenhuma imagem foi enviada com sucesso para o CompreFace.");
+        throw new Error(`Nenhuma imagem foi enviada com sucesso. Último erro: ${errors[errors.length - 1] || 'Erro desconhecido'}`);
     }
 
-    const message = `Enviadas ${successCount} de ${image_urls.length} foto(s) para o CompreFace.` + (lastError ? ` Erros: ${lastError}` : '');
+    const message = `Enviadas ${successCount} de ${image_urls.length} foto(s) para o CompreFace.` + (errors.length > 0 ? ` Alguns erros ocorreram: ${errors.join(', ')}` : '');
     return new Response(JSON.stringify({ success: true, message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -99,7 +106,6 @@ serve(async (req) => {
   } catch (error) {
     console.error("--- ERRO NA FUNÇÃO add-face-examples ---");
     console.error("Mensagem:", error.message);
-    console.error("Stack:", error.stack);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
