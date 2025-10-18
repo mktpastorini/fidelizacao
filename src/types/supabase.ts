@@ -37,13 +37,6 @@ export type MessageTemplate = {
   created_at: string;
 };
 
-export type Profile = {
-  id: string;
-  first_name: string | null;
-  last_name: string | null;
-  updated_at: string;
-};
-
 export type UserSettings = {
   id: string;
   webhook_url: string | null;

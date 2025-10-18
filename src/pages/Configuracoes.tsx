@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Profile, UserSettings, MessageTemplate, Produto } from "@/types/supabase";
-import { ProfileForm } from "@/components/configuracoes/ProfileForm";
+import { UserSettings, MessageTemplate, Produto } from "@/types/supabase";
 import { WebhookForm } from "@/components/configuracoes/WebhookForm";
 import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSettingsForm";
 import { ApiDocumentation } from "@/components/configuracoes/ApiDocumentation";
@@ -20,25 +19,21 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
 
 type UserData = {
-  profile: Profile | null;
   templates: MessageTemplate[];
   produtos: Produto[];
 };
 
 async function fetchPageData(): Promise<UserData> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { profile: null, templates: [], produtos: [] };
+  if (!user) return { templates: [], produtos: [] };
 
-  const { data: profiles, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-  if (profileError && profileError.code !== 'PGRST116') throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
-  
   const { data: templates, error: templatesError } = await supabase.from("message_templates").select("*");
   if (templatesError) throw new Error(`Erro ao buscar templates: ${templatesError.message}`);
 
   const { data: produtos, error: produtosError } = await supabase.from("produtos").select("*").order("nome");
   if (produtosError) throw new Error(`Erro ao buscar produtos: ${produtosError.message}`);
 
-  return { profile: profiles, templates: templates || [], produtos: produtos || [] };
+  return { templates: templates || [], produtos: produtos || [] };
 }
 
 function CompreFaceSettingsForm() {
@@ -107,20 +102,6 @@ export default function ConfiguracoesPage() {
   });
 
   const isLoading = isLoadingSettings || isLoadingPage;
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (updatedProfile: Partial<Profile>) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-      const { error } = await supabase.from("profiles").update(updatedProfile).eq("id", user.id);
-      if (error) throw new Error(error.message);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["configPageData"] });
-      showSuccess("Perfil atualizado com sucesso!");
-    },
-    onError: (error: Error) => showError(error.message),
-  });
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Partial<UserSettings>) => {
@@ -194,16 +175,12 @@ export default function ConfiguracoesPage() {
         </TabsList>
 
         <TabsContent value="perfil" className="mt-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle>Perfil</CardTitle><CardDescription>Atualize seu nome e sobrenome.</CardDescription></CardHeader>
-              <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar o perfil.</p> : (<ProfileForm onSubmit={(values) => updateProfileMutation.mutate(values)} isSubmitting={updateProfileMutation.isPending} defaultValues={data?.profile || undefined} />)}</CardContent>
-            </Card>
+          <div className="space-y-6">
             <Card>
               <CardHeader><CardTitle>Chave de API</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
             </Card>
-            <Card className="lg:col-span-2">
+            <Card>
               <CardHeader><CardTitle>Integrações</CardTitle><CardDescription>Configure seu webhook para automações de WhatsApp.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar as configurações.</p> : (<WebhookForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} onTest={() => testWebhookMutation.mutate()} isTesting={testWebhookMutation.isPending} />)}</CardContent>
             </Card>
