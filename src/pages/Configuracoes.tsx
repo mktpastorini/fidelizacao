@@ -17,6 +17,8 @@ import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Info } from "lucide-react";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -213,8 +215,53 @@ export default function ConfiguracoesPage() {
               <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar os templates.</p> : (<TemplateSettingsForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} templates={data?.templates || []} />)}</CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle>Automação de Aniversários</CardTitle><CardDescription>Configure o envio automático de mensagens de aniversário.</CardDescription></CardHeader>
-              <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : (<div className="space-y-4"><div><Label htmlFor="birthday-template">Template de Aniversário</Label><Select value={settings?.aniversario_template_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ aniversario_template_id: value })}><SelectTrigger id="birthday-template"><SelectValue placeholder="Selecione o template" /></SelectTrigger><SelectContent>{birthdayTemplates.map(template => (<SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>))}</SelectContent></Select></div><div><Label htmlFor="birthday-time">Horário de Envio</Label><Input id="birthday-time" type="time" defaultValue={settings?.aniversario_horario || "09:00"} onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} /></div><Button onClick={() => sendBirthdayWishesMutation.mutate()} disabled={sendBirthdayWishesMutation.isPending}><Send className="w-4 h-4 mr-2" />{sendBirthdayWishesMutation.isPending ? "Enviando..." : "Enviar para Aniversariantes de Hoje (Manual)"}</Button></div>)}</CardContent>
+              <CardHeader>
+                <CardTitle>Automação de Aniversários</CardTitle>
+                <CardDescription>Configure o envio automático de mensagens de aniversário.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Alert className="mb-4">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>Importante</AlertTitle>
+                  <AlertDescription>
+                    Para que o envio automático funcione, é necessário configurar um agendador (cron job) que execute a função de envio a cada minuto. 
+                    Consulte o arquivo README.md para instruções detalhadas.
+                  </AlertDescription>
+                </Alert>
+                {isLoading ? <Skeleton className="h-40 w-full" /> : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="birthday-template">Template de Aniversário</Label>
+                      <Select value={settings?.aniversario_template_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ aniversario_template_id: value })}>
+                        <SelectTrigger id="birthday-template">
+                          <SelectValue placeholder="Selecione o template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {birthdayTemplates.map(template => (
+                            <SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="birthday-time">Horário de Envio</Label>
+                      <Input 
+                        id="birthday-time" 
+                        type="time" 
+                        defaultValue={settings?.aniversario_horario || "09:00"} 
+                        onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} 
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => sendBirthdayWishesMutation.mutate()} 
+                      disabled={sendBirthdayWishesMutation.isPending}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {sendBirthdayWishesMutation.isPending ? "Enviando..." : "Enviar para Aniversariantes de Hoje (Manual)"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle>Automação de Pedidos</CardTitle><CardDescription>Configure um item para ser adicionado automaticamente quando um cliente senta à mesa.</CardDescription></CardHeader>
