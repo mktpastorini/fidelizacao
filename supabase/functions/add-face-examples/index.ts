@@ -65,7 +65,7 @@ serve(async (req) => {
       }
 
       try {
-        // Fetch the image from the URL
+        // 1. Fetch the image from the URL
         const imageResponse = await fetch(imageUrl);
         if (!imageResponse.ok) {
           const errMsg = `Falha ao buscar imagem da URL: ${imageUrl} (status ${imageResponse.status})`;
@@ -74,33 +74,24 @@ serve(async (req) => {
           continue;
         }
         const imageArrayBuffer = await imageResponse.arrayBuffer();
-        // Convert to base64
+        // 2. Convert to base64
         const base64String = encode(imageArrayBuffer);
 
-        // Prepare multipart/form-data body
-        const boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
-        const bodyParts = [
-          `--${boundary}`,
-          `Content-Disposition: form-data; name="file"`,
-          ``,
-          base64String,
-          `--${boundary}`,
-          `Content-Disposition: form-data; name="subject"`,
-          ``,
-          subject,
-          `--${boundary}--`,
-          ``
-        ];
-        const body = bodyParts.join("\r\n");
+        // 3. Prepare JSON payload
+        const payload = {
+          file: base64String,
+          subject: subject,
+        };
 
+        // 4. Send JSON payload to CompreFace
         const response = await fetch(`${settings.compreface_url}/api/v1/recognition/faces`, {
           method: 'POST',
           headers: {
-            'Content-Type': `multipart/form-data; boundary=${boundary}`,
+            'Content-Type': 'application/json', // Crucial: Send as JSON
             'x-api-key': settings.compreface_api_key,
             'User-Agent': 'Fidelize-App/1.0'
           },
-          body,
+          body: JSON.stringify(payload),
         });
 
         if (!response.ok) {

@@ -55,7 +55,7 @@ serve(async (req) => {
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json', // Crucial: Send as JSON
         'x-api-key': settings.compreface_api_key,
         'User-Agent': 'Fidelize-App/1.0'
       },
