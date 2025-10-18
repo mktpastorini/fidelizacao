@@ -141,6 +141,7 @@ export default function MensagensPage() {
       case 'pagamento': return 'bg-green-100 text-green-800 hover:bg-green-200';
       case 'manual': return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
       case 'fechamento_dia': return 'bg-gray-800 text-white hover:bg-gray-900';
+      case 'abertura_dia': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
       default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
     }
   };

@@ -91,8 +91,15 @@ export default function SalaoPage() {
   const openDayMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", user!.id);
-      if (error) throw error;
+      if (!user) throw new Error("Usuário não autenticado");
+
+      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", user.id);
+      if (updateError) throw updateError;
+
+      const { error: functionError } = await supabase.functions.invoke('open-day');
+      if (functionError) {
+        showError(`Dia aberto, mas falha ao enviar notificação: ${functionError.message}`);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });

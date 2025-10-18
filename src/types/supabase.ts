@@ -95,7 +95,7 @@ export type MessageLog = {
   id: string;
   created_at: string;
   status: 'sucesso' | 'falha';
-  trigger_event: 'chegada' | 'pagamento' | 'fechamento_dia' | 'manual';
+  trigger_event: 'chegada' | 'pagamento' | 'fechamento_dia' | 'manual' | 'abertura_dia';
   error_message: string | null;
   webhook_response: Record<string, any> | null;
   cliente: { nome: string } | null;
