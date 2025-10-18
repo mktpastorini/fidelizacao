@@ -24,6 +24,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   const [statusMessage, setStatusMessage] = useState("Inicializando...");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const { isReady, isLoading: isScanning, error: recognitionError, recognize } = useFaceRecognition();
 
@@ -31,6 +32,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
     setMatch(null);
     setSnapshot(null);
     setStatusMessage(isReady ? "Aponte a câmera para o rosto" : "Carregando...");
+    setCameraError(null);
   }, [isReady]);
 
   useEffect(() => {
@@ -48,10 +50,12 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
             setSelectedDeviceId(savedCameraId);
           } else if (videoDevices.length > 0) {
             setSelectedDeviceId(videoDevices[0].deviceId);
+          } else {
+            setCameraError("Nenhuma câmera encontrada. Verifique se uma câmera está conectada.");
           }
         } catch (err) {
-          showError("Não foi possível listar os dispositivos de câmera.");
-          console.error(err);
+          console.error("Erro ao listar dispositivos de câmera:", err);
+          setCameraError("Permissão para acessar a câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.");
         }
       };
       getDevices();
@@ -90,7 +94,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
         setSnapshot(imageSrc);
         performRecognition(imageSrc);
       } else {
-        showError("Não foi possível capturar a imagem.");
+        showError("Não foi possível capturar a imagem. Tente novamente.");
       }
     }
   }, [performRecognition]);
@@ -111,6 +115,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
     setSnapshot(null);
     setMatch(null);
     setStatusMessage("Aponte a câmera para o rosto");
+    setCameraError(null);
   };
 
   const videoConstraints = {
@@ -120,6 +125,15 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   };
 
   const renderContent = () => {
+    if (cameraError) {
+      return (
+        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
+          <p className="text-lg font-bold text-red-600">{cameraError}</p>
+          <Button onClick={handleRetry}>Tentar Novamente</Button>
+        </div>
+      );
+    }
+
     if (!isReady) {
       return <div className="text-center h-24 flex flex-col justify-center items-center"><Loader2 className="w-8 h-8 animate-spin mb-2" /><p className="text-lg">{statusMessage}</p></div>;
     }
@@ -136,14 +150,33 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      onOpenChange(open);
+      if (!open) {
+        resetState();
+      }
+    }}>
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>Reconhecimento Facial</DialogTitle><DialogDescription>{statusMessage}</DialogDescription></DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
           <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
-            {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : <Webcam audio={false} ref={webcamRef} screenshotFormat="image/jpeg" videoConstraints={videoConstraints} className="w-full h-full object-cover" onUserMediaError={() => { showError("Não foi possível acessar a câmera."); onOpenChange(false); }} />}
+            {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : 
+             cameraError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500">Erro</div> :
+             <Webcam 
+               audio={false} 
+               ref={webcamRef} 
+               screenshotFormat="image/jpeg" 
+               videoConstraints={videoConstraints} 
+               className="w-full h-full object-cover" 
+               onUserMediaError={(e) => {
+                 console.error("Erro ao acessar a câmera:", e);
+                 setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
+                 onOpenChange(false);
+               }} 
+             />
+            }
           </div>
-          {!snapshot && devices.length > 1 && (
+          {!snapshot && !cameraError && devices.length > 1 && (
             <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
               <SelectTrigger className="w-full max-w-xs"><SelectValue placeholder="Selecione uma câmera" /></SelectTrigger>
               <SelectContent>{devices.map((device) => (<SelectItem key={device.deviceId} value={device.deviceId}>{device.label || `Câmera ${devices.indexOf(device) + 1}`}</SelectItem>))}</SelectContent>
