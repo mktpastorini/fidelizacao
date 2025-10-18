@@ -160,7 +160,7 @@ export default function ConfiguracoesPage() {
 
   const sendBirthdayWishesMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke('send-birthday-wishes');
+      const { data, error } = await supabase.functions.invoke('trigger-birthday-wishes');
       if (error) throw new Error(error.message);
       return data;
     },
@@ -224,8 +224,13 @@ export default function ConfiguracoesPage() {
                   <Info className="h-4 w-4" />
                   <AlertTitle>Importante</AlertTitle>
                   <AlertDescription>
-                    Para que o envio automático funcione, é necessário configurar um agendador (cron job) que execute a função de envio a cada minuto. 
-                    Consulte o arquivo README.md para instruções detalhadas.
+                    Para enviar mensagens de aniversário automaticamente, configure uma automação externa para chamar o endpoint:
+                    <br />
+                    <code className="bg-gray-100 p-1 rounded mt-1 block">
+                      POST /functions/v1/trigger-birthday-wishes
+                    </code>
+                    <br />
+                    Com o header: <code className="bg-gray-100 p-1 rounded">Authorization: Bearer {"{SUA_CHAVE_DE_API}"}</code>
                   </AlertDescription>
                 </Alert>
                 {isLoading ? <Skeleton className="h-40 w-full" /> : (

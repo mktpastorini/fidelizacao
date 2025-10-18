@@ -2,9 +2,29 @@
 
 ## Configuração de Envio Automático de Mensagens de Aniversário
 
+Para que o sistema envie automaticamente mensagens de aniversário, você tem duas opções:
+
+### Opção 1: Usando o endpoint de trigger (Recomendado)
+
+Você pode configurar uma automação externa para chamar o endpoint:
+
+`POST https://YOUR_PROJECT_ID.supabase.co/functions/v1/trigger-birthday-wishes`
+
+Com os seguintes headers:
+```
+Authorization: Bearer SUA_CHAVE_DE_API
+Content-Type: application/json
+```
+
+E um corpo vazio `{}`.
+
+Este endpoint verificará os aniversariantes do dia e enviará as mensagens através do webhook configurado.
+
+### Opção 2: Usando agendador com função edge
+
 Para que o sistema envie automaticamente mensagens de aniversário no horário configurado, é necessário configurar um agendador (cron job) que execute a função edge `send-daily-birthday-wishes` a cada minuto.
 
-### Usando Supabase CRON (Recomendado para produção)
+#### Usando Supabase CRON (Recomendado para produção)
 
 Se você estiver usando o Supabase em produção, siga estas etapas:
 
@@ -24,7 +44,7 @@ SELECT cron.schedule(
 
 Substitua `YOUR_PROJECT_ID` pelo ID do seu projeto Supabase.
 
-### Usando um serviço de agendamento externo
+#### Usando um serviço de agendamento externo
 
 Se você não puder usar o Supabase CRON, pode usar um serviço externo como:
 
@@ -46,7 +66,7 @@ E os seguintes headers:
 Content-Type: application/json
 ```
 
-### Para desenvolvimento local
+#### Para desenvolvimento local
 
 Se você estiver desenvolvendo localmente, pode usar o `cron` no Linux/macOS:
 
