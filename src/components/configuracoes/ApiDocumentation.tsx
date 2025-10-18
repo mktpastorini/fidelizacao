@@ -19,6 +19,10 @@ const updateStatusPayload = `{
   "status": "delivered"
 }`;
 
+const birthdayTriggerPayload = `{
+  // Corpo vazio - apenas autenticação via header
+}`;
+
 export function ApiDocumentation() {
   return (
     <div className="space-y-6">
@@ -82,6 +86,36 @@ export function ApiDocumentation() {
             <li><code className="bg-gray-100 p-1 rounded">log_id</code>: O ID que você recebeu no webhook (string, UUID).</li>
             <li><code className="bg-gray-100 p-1 rounded">status</code>: O status final da entrega. Valores possíveis: `"delivered"` ou `"failed"` (string).</li>
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>API: Envio de Mensagens de Aniversário</CardTitle>
+          <CardDescription>
+            Endpoint para acionar o envio automático de mensagens de aniversário.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm">
+            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-birthday-wishes`
+          </div>
+          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
+            <li>`Content-Type`: `application/json`</li>
+          </ul>
+          <h4 className="font-semibold">Corpo (Body):</h4>
+          <CodeBlock code={birthdayTriggerPayload} />
+          <div className="text-sm text-muted-foreground">
+            <p>Este endpoint não requer um corpo específico. Apenas a autenticação via header é necessária.</p>
+            <p className="mt-2">Quando chamado, o sistema:</p>
+            <ul className="list-disc list-inside mt-1">
+              <li>Verifica os clientes que fazem aniversário hoje</li>
+              <li>Usa o template de aniversário configurado nas "Automações"</li>
+              <li>Envia as mensagens personalizadas através do webhook configurado</li>
+            </ul>
+          </div>
         </CardContent>
       </Card>
     </div>

@@ -17,8 +17,6 @@ import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Info } from "lucide-react";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -220,19 +218,6 @@ export default function ConfiguracoesPage() {
                 <CardDescription>Configure o envio automático de mensagens de aniversário.</CardDescription>
               </CardHeader>
               <CardContent>
-                <Alert className="mb-4">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>Importante</AlertTitle>
-                  <AlertDescription>
-                    Para enviar mensagens de aniversário automaticamente, configure uma automação externa para chamar o endpoint:
-                    <br />
-                    <code className="bg-gray-100 p-1 rounded mt-1 block">
-                      POST /functions/v1/trigger-birthday-wishes
-                    </code>
-                    <br />
-                    Com o header: <code className="bg-gray-100 p-1 rounded">Authorization: Bearer {"{SUA_CHAVE_DE_API}"}</code>
-                  </AlertDescription>
-                </Alert>
                 {isLoading ? <Skeleton className="h-40 w-full" /> : (
                   <div className="space-y-4">
                     <div>
@@ -264,6 +249,9 @@ export default function ConfiguracoesPage() {
                       <Send className="w-4 h-4 mr-2" />
                       {sendBirthdayWishesMutation.isPending ? "Enviando..." : "Enviar para Aniversariantes de Hoje (Manual)"}
                     </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Para envio automático, consulte a Documentação API para instruções sobre como configurar a automação externa.
+                    </p>
                   </div>
                 )}
               </CardContent>
