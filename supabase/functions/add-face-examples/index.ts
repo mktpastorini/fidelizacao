@@ -12,9 +12,12 @@ serve(async (req) => {
   }
 
   try {
-    const { client_id, image_urls } = await req.json();
-    if (!client_id || !image_urls || !Array.isArray(image_urls)) {
-      throw new Error("`client_id` e um array de `image_urls` são obrigatórios.");
+    const { subject, image_urls } = await req.json();
+    if (!subject || typeof subject !== 'string' || subject.trim() === '') {
+      throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente. Recebido: ${JSON.stringify(subject)}`);
+    }
+    if (!image_urls || !Array.isArray(image_urls)) {
+      throw new Error("`image_urls` deve ser um array.");
     }
 
     const userClient = createClient(
@@ -60,7 +63,7 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             file: imageUrl,
-            subject: client_id,
+            subject: subject,
           }),
         });
 

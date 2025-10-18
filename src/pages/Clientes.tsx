@@ -104,7 +104,7 @@ export default function ClientesPage() {
       }
       
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
-        body: { client_id: newClientId, image_urls: avatar_urls }
+        body: { subject: newClientId, image_urls: avatar_urls }
       });
       if (faceError) throw new Error(`Cliente criado, mas falha ao registrar rosto: ${faceError.message}`);
     },
@@ -135,7 +135,7 @@ export default function ClientesPage() {
 
       if (avatar_urls && avatar_urls.length > 0) {
         const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
-          body: { client_id: id, image_urls: avatar_urls }
+          body: { subject: id, image_urls: avatar_urls }
         });
         if (faceError) throw new Error(`Cliente atualizado, mas falha ao registrar novos rostos: ${faceError.message}`);
       }

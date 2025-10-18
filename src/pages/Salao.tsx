@@ -141,22 +141,15 @@ export default function SalaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const { avatar_url, ...clienteData } = newCliente;
-      const avatar_urls = avatar_url ? [avatar_url] : [];
-
-      if (avatar_urls.length === 0) {
-        throw new Error("Nenhuma foto fornecida para o cadastro.");
+      const { avatar_urls, ...clienteData } = newCliente;
+      
+      if (!avatar_urls || avatar_urls.length === 0) {
+        throw new Error("É necessário pelo menos uma foto para o reconhecimento.");
       }
       
-      const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('generate-embeddings', {
-        body: { image_urls: avatar_urls }
-      });
-      if (embeddingError) throw new Error(`Falha na IA: ${embeddingError.message}`);
-      const embeddings = embeddingData.embeddings;
-
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
-        p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: avatar_url,
+        p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: clienteData.avatar_url,
         p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
@@ -167,14 +160,10 @@ export default function SalaoPage() {
         if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
       }
       
-      const facesToInsert = embeddings.map((embedding: number[]) => ({
-        cliente_id: newClientId,
-        user_id: user.id,
-        embedding: embedding,
-        ai_provider: 'google-vision',
-      }));
-      const { error: faceError } = await supabase.from('customer_faces').insert(facesToInsert);
-      if (faceError) throw new Error(`Cliente criado, mas falha ao salvar rosto: ${faceError.message}`);
+      const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
+        body: { subject: newClientId, image_urls: avatar_urls }
+      });
+      if (faceError) throw new Error(`Cliente criado, mas falha ao registrar rosto: ${faceError.message}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
