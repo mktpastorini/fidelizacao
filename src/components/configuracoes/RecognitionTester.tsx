@@ -12,7 +12,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 export function RecognitionTester() {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
-  const { isReady, isLoading, error, recognize, getClientById } = useFaceRecognition();
+  const { isReady, isLoading: isHookLoading, error, recognize } = useFaceRecognition();
   
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
@@ -47,27 +47,19 @@ export function RecognitionTester() {
     setIsScanning(true);
     setMatchResult(null);
 
-    const image = new Image();
-    image.src = imageSrc;
-    image.onload = async () => {
-      const result = await recognize(image);
-      if (result && result.label !== 'unknown') {
-        const client = getClientById(result.label);
-        setMatchResult({
-          name: client?.nome || 'Desconhecido',
-          distance: result.distance,
-          avatar: client?.avatar_url || null,
-        });
-      } else {
-        setMatchResult('not_found');
-      }
-      setIsScanning(false);
-    };
-    image.onerror = () => {
+    const result = await recognize(imageSrc);
+    
+    if (result && result.client) {
+      setMatchResult({
+        name: result.client.nome,
+        distance: result.distance,
+        avatar: result.client.avatar_url || null,
+      });
+    } else {
       setMatchResult('not_found');
-      setIsScanning(false);
-    };
-  }, [recognize, getClientById]);
+    }
+    setIsScanning(false);
+  }, [recognize]);
 
   const reset = () => {
     setSnapshot(null);
@@ -78,8 +70,8 @@ export function RecognitionTester() {
     return <Alert variant="destructive"><AlertTitle>Erro Crítico</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
   }
 
-  if (isLoading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="w-8 h-8 animate-spin mr-2" /> Carregando dados de clientes...</div>;
+  if (isHookLoading) {
+    return <div className="flex items-center justify-center p-8"><Loader2 className="w-8 h-8 animate-spin mr-2" /> Carregando modelos de reconhecimento...</div>;
   }
 
   return (
@@ -105,7 +97,7 @@ export function RecognitionTester() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={handleScan} disabled={isScanning} className="w-full">
+              <Button onClick={handleScan} disabled={isScanning || !isReady} className="w-full">
                 {isScanning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Search className="w-4 h-4 mr-2" />}
                 Analisar Rosto
               </Button>
