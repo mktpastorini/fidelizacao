@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -57,9 +58,17 @@ serve(async (req) => {
 
     for (const imageUrl of image_urls) {
       try {
-        // Re-create payload inside loop to be safe
+        // Fetch the image from the URL
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Falha ao buscar imagem da URL: ${imageUrl}`);
+        }
+        const imageArrayBuffer = await imageResponse.arrayBuffer();
+        // Convert to base64
+        const base64String = encode(imageArrayBuffer);
+
         const payload = {
-          file: imageUrl,
+          file: base64String, // Send base64 data
           subject: subject,
         };
 
