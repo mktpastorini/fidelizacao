@@ -34,6 +34,8 @@ serve(async (req) => {
   }
 
   try {
+    console.log("=== INICIANDO FUNÇÃO send-birthday-wishes ===");
+    
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -42,6 +44,7 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw userError || new Error("Usuário não autenticado.");
+    console.log("Usuário autenticado:", user.id);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -54,18 +57,31 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
     if (settingsError || !settings?.webhook_url || !settings?.aniversario_template_id) {
+      console.error("Configurações incompletas:", { settings, settingsError });
       throw new Error('Webhook ou template de aniversário não configurado.');
     }
+    console.log("Configurações encontradas:", settings);
 
     const { data: template, error: templateError } = await supabaseAdmin
       .from('message_templates')
       .select('conteudo')
       .eq('id', settings.aniversario_template_id)
       .single();
-    if (templateError || !template) throw templateError || new Error("Template não encontrado.");
+    if (templateError || !template) {
+      console.error("Erro ao buscar template:", templateError);
+      throw templateError || new Error("Template não encontrado.");
+    }
+    console.log("Template encontrado:", template);
 
+    // Usar a nova função RPC que filtra por usuário
     const { data: birthdayClients, error: clientsError } = await supabaseAdmin.rpc('get_todays_birthdays_by_user', { p_user_id: user.id });
-    if (clientsError) throw clientsError;
+    if (clientsError) {
+      console.error("Erro ao buscar aniversariantes:", clientsError);
+      throw clientsError;
+    }
+    
+    console.log("Aniversariantes encontrados:", birthdayClients);
+    
     if (!birthdayClients || birthdayClients.length === 0) {
       return new Response(JSON.stringify({ success: true, message: "Nenhum aniversariante hoje para notificar." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
@@ -84,7 +100,11 @@ serve(async (req) => {
       .from('message_logs')
       .insert(logsToInsert)
       .select('id, cliente_id');
-    if (logError || !insertedLogs) throw logError || new Error("Falha ao criar logs de mensagem.");
+    if (logError || !insertedLogs) {
+      console.error("Erro ao criar logs:", logError);
+      throw logError || new Error("Falha ao criar logs de mensagem.");
+    }
+    console.log("Logs criados:", insertedLogs);
 
     const recipients = birthdayClients.map(client => {
       const log = insertedLogs.find(l => l.cliente_id === client.id);
@@ -97,11 +117,15 @@ serve(async (req) => {
       };
     });
 
+    console.log("Payload para webhook:", { recipients });
+
     const webhookResponse = await fetch(settings.webhook_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipients }),
     });
+
+    console.log("Resposta do webhook:", webhookResponse.status);
 
     const responseBody = await webhookResponse.json().catch(() => webhookResponse.text());
     const logIdsToUpdate = insertedLogs.map(l => l.id);
@@ -119,6 +143,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error("Erro na função send-birthday-wishes:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
