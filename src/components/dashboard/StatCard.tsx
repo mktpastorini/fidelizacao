@@ -12,22 +12,27 @@ type StatCardProps = {
 };
 
 export function StatCard({ title, value, icon: Icon, variant, description }: StatCardProps) {
-  const variantClasses = {
-    blue: "bg-gradient-to-br from-blue-600 to-blue-800 text-blue-50",
-    green: "bg-gradient-to-br from-green-600 to-green-800 text-green-50",
-    orange: "bg-gradient-to-br from-orange-500 to-orange-700 text-orange-50",
-    purple: "bg-gradient-to-br from-purple-600 to-purple-800 text-purple-50",
+  const colorClasses = {
+    blue: "text-blue-500 dark:text-blue-400",
+    green: "text-green-600 dark:text-green-400",
+    orange: "text-orange-500 dark:text-orange-400",
+    purple: "text-purple-600 dark:text-purple-400",
   };
+  
+  const iconColor = colorClasses[variant];
+
+  // Para o valor, usamos a cor de destaque, exceto para o kitchenValue que já tem cores internas
+  const valueColor = variant === 'purple' ? 'text-foreground' : iconColor;
 
   return (
-    <Card className={cn("border-none text-white shadow-lg", variantClasses[variant])}>
+    <Card className="border shadow-md transition-all hover:shadow-lg">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-5 w-5 text-current/80" />
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className={cn("h-5 w-5", iconColor)} />
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        {description && <p className="text-xs text-current/80 pt-1">{description}</p>}
+        <div className={cn("text-3xl font-bold", valueColor)}>{value}</div>
+        {description && <p className="text-xs text-muted-foreground pt-1">{description}</p>}
       </CardContent>
     </Card>
   );

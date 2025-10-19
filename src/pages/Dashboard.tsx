@@ -109,12 +109,13 @@ export default function DashboardPage() {
     return <WelcomeCard />;
   }
 
+  // Mantendo os destaques de cor para pedidos pendentes (laranja) e em preparo (verde)
   const kitchenValue = (
     <div className="flex items-baseline gap-2">
-      <span className="text-orange-300">{dailyData.dailyStats.pending_kitchen_orders}</span>
-      <span className="text-sm text-white/80">Pend.</span>
-      <span className="text-green-300">{dailyData.dailyStats.preparing_kitchen_orders}</span>
-      <span className="text-sm text-white/80">Prep.</span>
+      <span className="text-orange-500 dark:text-orange-400">{dailyData.dailyStats.pending_kitchen_orders}</span>
+      <span className="text-sm text-muted-foreground">Pend.</span>
+      <span className="text-green-600 dark:text-green-400">{dailyData.dailyStats.preparing_kitchen_orders}</span>
+      <span className="text-sm text-muted-foreground">Prep.</span>
     </div>
   );
 
