@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
 import QRCode from "react-qr-code";
+import { ExternalLink } from "lucide-react";
 
 type QRCodeModalProps = {
   isOpen: boolean;
@@ -28,6 +29,10 @@ export function QRCodeModal({ isOpen, onOpenChange, mesaNumero, qrCodeUrl }: QRC
     URL.revokeObjectURL(url);
   };
 
+  const handleAccessMenu = () => {
+    window.open(qrCodeUrl, '_blank');
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm text-center">
@@ -45,8 +50,12 @@ export function QRCodeModal({ isOpen, onOpenChange, mesaNumero, qrCodeUrl }: QRC
             includeMargin={true}
           />
         </div>
-        <DialogFooter>
-          <Button onClick={handleDownload}>Baixar QR Code (SVG)</Button>
+        <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">
+          <Button variant="outline" onClick={handleDownload} className="w-full sm:w-auto">Baixar QR Code (SVG)</Button>
+          <Button onClick={handleAccessMenu} className="w-full sm:w-auto">
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Acessar Menu
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
