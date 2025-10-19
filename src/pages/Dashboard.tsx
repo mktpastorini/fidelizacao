@@ -88,7 +88,6 @@ export default function DashboardPage() {
   const { data: dailyData, isLoading: isLoadingDaily } = useQuery({
     queryKey: ["dashboardData"],
     queryFn: fetchDashboardData,
-    refetchInterval: 30000,
   });
 
   const { data: rangeData, isLoading: isLoadingRange } = useQuery({

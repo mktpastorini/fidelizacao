@@ -34,7 +34,7 @@ export function RecentActivityCard() {
   });
 
   return (
-    <Card className="bg-card shadow-lg border-border/50">
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
       <CardHeader>
         <CardTitle>Atividade Recente</CardTitle>
       </CardHeader>
