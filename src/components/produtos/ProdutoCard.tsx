@@ -36,7 +36,7 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
   return (
     <Card 
       className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-56 cursor-pointer"
-      onClick={onEdit} // Adiciona o clique para edição no card
+      onClick={onEdit} // Ação principal: Editar
     >
       {/* Imagem de Fundo (Expansível no Hover) */}
       <div 
@@ -53,8 +53,6 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
         {/* Overlay para escurecer a imagem e centralizar o botão */}
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
           <Button 
-            // O botão de edição aqui é redundante, mas mantemos para clareza visual no hover
-            // O clique principal é no Card, mas este botão reforça a ação
             onClick={(e) => { e.stopPropagation(); onEdit(); }} 
             className="text-white bg-primary hover:bg-primary/90 transition-all scale-0 group-hover:scale-100"
           >
@@ -65,8 +63,7 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
 
       {/* Conteúdo Principal (Visível por padrão, some no Hover) */}
       <CardContent 
-        // Impedimos a propagação do clique aqui para que o dropdown funcione
-        onClick={(e) => e.stopPropagation()}
+        // Removendo o e.stopPropagation() para permitir que o clique suba para o Card pai (onEdit)
         className={cn(
           "absolute inset-0 p-4 flex flex-col justify-between transition-opacity duration-300 bg-card",
           "group-hover:opacity-0 opacity-100"
@@ -94,8 +91,8 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive"><Trash2 className="w-4 h-4 mr-2" />Excluir</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onEdit}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onDelete} className="text-destructive focus:text-destructive"><Trash2 className="w-4 h-4 mr-2" />Excluir</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
