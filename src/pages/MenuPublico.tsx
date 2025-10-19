@@ -4,9 +4,10 @@ import { Produto, Mesa } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Utensils, Lock } from "lucide-react";
+import { ArrowLeft, Utensils, Lock, ReceiptText } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PublicMenuProductCard } from "@/components/menu-publico/PublicMenuProductCard";
+import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary"; // Importando o novo componente
 
 type MesaData = Mesa & { user_id: string };
 
@@ -35,6 +36,7 @@ export default function MenuPublicoPage() {
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [mesaData, setMesaData] = useState<MesaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false); // Novo estado para o resumo
   const navigate = useNavigate();
   const { mesaId } = useParams<{ mesaId: string }>();
 
@@ -149,15 +151,32 @@ export default function MenuPublicoPage() {
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-gray-900 min-h-screen">
-      <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6 text-white">
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Voltar
-      </Button>
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="text-white">
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Voltar
+        </Button>
+        {isMesaOcupada && mesaId && (
+          <Button variant="secondary" onClick={() => setIsSummaryOpen(true)}>
+            <ReceiptText className="w-4 h-4 mr-2" />
+            Ver Comanda
+          </Button>
+        )}
+      </div>
+      
       <h1 className="text-3xl font-bold mb-6 text-white text-center flex items-center justify-center gap-2">
         <Utensils className="w-6 h-6" />
         Cardápio da Mesa {mesaData?.numero || mesaId}
       </h1>
       {renderContent()}
+
+      {mesaId && (
+        <PublicOrderSummary
+          isOpen={isSummaryOpen}
+          onOpenChange={setIsSummaryOpen}
+          mesaId={mesaId}
+        />
+      )}
     </div>
   );
 }
