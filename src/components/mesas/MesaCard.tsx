@@ -1,7 +1,7 @@
 import { Mesa, Pedido, ItemPedido } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Users, User, Clock, DollarSign, MoreVertical, QrCode } from "lucide-react";
+import { Users, User, Clock, DollarSign, MoreVertical, QrCode, UserMinus, Edit, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useState } from "react";
@@ -28,10 +28,13 @@ type MesaCardProps = {
   mesa: MesaComPedido;
   ocupantesCount: number;
   onClick: () => void;
+  onEditMesa: () => void;
+  onFreeMesa: () => void;
+  onEditOcupantes: () => void;
   children?: React.ReactNode;
 };
 
-export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardProps) {
+export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa, onEditOcupantes, children }: MesaCardProps) {
   const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
 
   const isOcupada = !!mesa.cliente;
@@ -82,12 +85,26 @@ export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardPr
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 {mesa.cliente_id && (
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onClick(); }}>
-                    <Users className="w-4 h-4 mr-2" /> Ver Detalhes
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onClick(); }}>
+                      <Users className="w-4 h-4 mr-2" /> Ver Detalhes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onEditOcupantes(); }}>
+                      <Users className="w-4 h-4 mr-2" /> Editar Ocupantes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onFreeMesa(); }}>
+                      <UserMinus className="w-4 h-4 mr-2" /> Liberar Mesa
+                    </DropdownMenuItem>
+                  </>
                 )}
                 <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setIsQRCodeOpen(true); }}>
                   <QrCode className="w-4 h-4 mr-2" /> Visualizar QR Code
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onEditMesa(); }}>
+                  <Edit className="w-4 h-4 mr-2" /> Editar Mesa
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); onFreeMesa(); }}>
+                  <Trash2 className="w-4 h-4 mr-2" /> Excluir Mesa
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

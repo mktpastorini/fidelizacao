@@ -5,18 +5,6 @@ import { Mesa, Cliente } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { MesaForm } from "@/components/mesas/MesaForm";
-import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { PedidoModal } from "@/components/mesas/PedidoModal";
-import { MesaCard } from "@/components/mesas/MesaCard";
-import { PlusCircle, UserMinus, MoreVertical, Edit, Trash2, Users } from "lucide-react";
-import { showError, showSuccess } from "@/utils/toast";
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -27,6 +15,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { MesaForm } from "@/components/mesas/MesaForm";
+import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
+import { PedidoModal } from "@/components/mesas/PedidoModal";
+import { MesaCard } from "@/components/mesas/MesaCard";
+import { PlusCircle } from "lucide-react";
+import { showError, showSuccess } from "@/utils/toast";
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -207,28 +201,6 @@ export default function MesasPage() {
           <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
         </div>
         <div className="flex items-center gap-2">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" disabled={!mesas?.some(m => !!m.cliente_id)}>
-                <UserMinus className="w-4 h-4 mr-2" />
-                Liberar Todas as Mesas
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Esta ação irá liberar todas as mesas ocupadas e cancelar quaisquer pedidos abertos associados a elas. Deseja continuar?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={() => mesas?.forEach(m => m.cliente_id && unassignClienteMutation.mutate(m.id))}>
-                  Confirmar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
           <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
         </div>
       </div>
@@ -236,51 +208,15 @@ export default function MesasPage() {
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-destructive">Erro ao carregar mesas.</p> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {mesas?.map((mesa) => (
-            <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes_count} onClick={() => handleMesaClick(mesa)}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  {mesa.cliente_id && (
-                    <>
-                      <DropdownMenuItem onClick={() => handleOcuparMesaOpen(mesa)}>
-                        <Users className="w-4 h-4 mr-2" /> Editar Ocupantes
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMesaToFree(mesa); }}>
-                        <UserMinus className="w-4 h-4 mr-2" /> Liberar Mesa
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuItem onClick={() => handleFormOpen(mesa)}>
-                    <Edit className="w-4 h-4 mr-2" /> Editar
-                  </DropdownMenuItem>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
-                        <Trash2 className="w-4 h-4 mr-2" /> Excluir
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tem certeza que deseja excluir a Mesa {mesa.numero}? Esta ação não pode ser desfeita.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => deleteMesaMutation.mutate(mesa.id)}>
-                          Confirmar
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </MesaCard>
+            <MesaCard
+              key={mesa.id}
+              mesa={mesa}
+              ocupantesCount={mesa.ocupantes_count}
+              onClick={() => handleMesaClick(mesa)}
+              onEditMesa={() => handleFormOpen(mesa)}
+              onFreeMesa={() => setMesaToFree(mesa)}
+              onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
+            />
           ))}
         </div>
       )}
@@ -304,11 +240,7 @@ export default function MesasPage() {
         onSubmit={(clientePrincipalId, acompanhanteIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds })}
         isSubmitting={ocuparMesaMutation.isPending}
       />
-      <PedidoModal
-        isOpen={isPedidoOpen}
-        onOpenChange={setIsPedidoOpen}
-        mesa={selectedMesa}
-      />
+      <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
 
       <AlertDialog open={!!mesaToFree} onOpenChange={() => setMesaToFree(null)}>
         <AlertDialogContent>
