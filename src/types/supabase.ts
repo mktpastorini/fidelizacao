@@ -102,6 +102,10 @@ export type Produto = {
   categoria_id: string | null;
   imagem_url: string | null;
   categoria?: Categoria | null;
+  // Inventory fields
+  estoque_atual: number;
+  alerta_estoque_baixo: number;
+  valor_compra: number | null;
 };
 
 export type MessageLog = {

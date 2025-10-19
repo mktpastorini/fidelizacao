@@ -1,0 +1,4 @@
+ALTER TABLE public.produtos
+ADD COLUMN estoque_atual INTEGER DEFAULT 0 NOT NULL,
+ADD COLUMN alerta_estoque_baixo INTEGER DEFAULT 0 NOT NULL,
+ADD COLUMN valor_compra NUMERIC;

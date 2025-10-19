@@ -23,6 +23,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Produto, Categoria } from "@/types/supabase";
 import { ImageUpload } from "@/components/ui/ImageUpload";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome do produto é obrigatório." }),
@@ -32,6 +33,10 @@ const formSchema = z.object({
   requer_preparo: z.boolean().default(true),
   imagem_url: z.string().nullable().optional(),
   categoria_id: z.string().uuid().nullable().optional().or(z.literal("none")).transform(val => val === "none" ? null : val),
+  // Inventory fields
+  estoque_atual: z.coerce.number().int().min(0, "O estoque atual não pode ser negativo.").default(0),
+  alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
+  valor_compra: z.coerce.number().min(0, "O valor de compra não pode ser negativo.").nullable().optional().transform(val => val === 0 ? null : val),
 });
 
 type ProdutoFormProps = {
@@ -51,7 +56,11 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       tipo: defaultValues?.tipo || "venda",
       requer_preparo: defaultValues?.requer_preparo ?? true,
       imagem_url: defaultValues?.imagem_url || null,
-      categoria_id: defaultValues?.categoria_id || "none", // Use "none" for null/undefined
+      categoria_id: defaultValues?.categoria_id || "none",
+      // Inventory defaults
+      estoque_atual: defaultValues?.estoque_atual || 0,
+      alerta_estoque_baixo: defaultValues?.alerta_estoque_baixo || 0,
+      valor_compra: defaultValues?.valor_compra || undefined,
     },
   });
 
@@ -96,7 +105,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
               <FormLabel>Categoria</FormLabel>
               <Select 
                 onValueChange={field.onChange} 
-                value={field.value || "none"} // Ensure value is never null/undefined for Select
+                value={field.value || "none"}
               >
                 <FormControl>
                   <SelectTrigger>
@@ -141,7 +150,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
           name="preco"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Preço (R$)</FormLabel>
+              <FormLabel>Preço de Venda (R$)</FormLabel>
               <FormControl>
                 <Input type="number" step="0.01" placeholder="29.90" {...field} />
               </FormControl>
@@ -150,6 +159,62 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
             </FormItem>
           )}
         />
+        
+        <Accordion type="single" collapsible className="w-full">
+          <AccordionItem value="estoque" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">Gerenciamento de Estoque e Custo</AccordionTrigger>
+            <AccordionContent className="pt-4 space-y-4">
+              <FormField
+                control={form.control}
+                name="valor_compra"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Valor de Compra / Custo (R$)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        placeholder="15.00" 
+                        {...field} 
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="estoque_atual"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estoque Atual</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="alerta_estoque_baixo"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alerta de Estoque Baixo (Quantidade)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormDescription>Receba um alerta visual quando o estoque atingir ou cair abaixo desta quantidade.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+
         <FormField
           control={form.control}
           name="requer_preparo"

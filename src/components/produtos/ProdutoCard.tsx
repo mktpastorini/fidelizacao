@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MoreVertical, Edit, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
 type ProdutoCardProps = {
   produto: Produto;
@@ -13,6 +14,9 @@ type ProdutoCardProps = {
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
+  const isLowStock = produto.estoque_atual <= produto.alerta_estoque_baixo && produto.estoque_atual > 0;
+  const isOutOfStock = produto.estoque_atual === 0;
+
   return (
     <Card className="group overflow-hidden shadow-sm transition-all hover:shadow-xl">
       <div className="relative h-40 overflow-hidden">
@@ -42,6 +46,18 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
         </div>
         <div className="mt-4">
           <p className="text-2xl font-bold text-primary">{formatCurrency(produto.preco)}</p>
+          {produto.valor_compra !== null && produto.valor_compra !== undefined && (
+            <p className="text-xs text-muted-foreground">Custo: {formatCurrency(produto.valor_compra)}</p>
+          )}
+        </div>
+        <div className="mt-3 flex items-center gap-2">
+          {isOutOfStock ? (
+            <Badge variant="destructive">Esgotado</Badge>
+          ) : isLowStock ? (
+            <Badge variant="warning">Estoque Baixo ({produto.estoque_atual})</Badge>
+          ) : (
+            <Badge variant="secondary">Em Estoque ({produto.estoque_atual})</Badge>
+          )}
         </div>
       </CardContent>
     </Card>
