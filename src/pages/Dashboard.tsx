@@ -8,11 +8,12 @@ import { TopClientsByVisitsCard } from "@/components/dashboard/TopClientsByVisit
 import { RecentActivityCard } from "@/components/dashboard/RecentActivityCard";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DollarSign, Users, ChefHat, BarChart2, ReceiptText } from "lucide-react";
+import { DollarSign, Users, ChefHat, BarChart2, ReceiptText, ArrowUp, ArrowDown } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth } from "date-fns";
+import { generateMockData } from "@/lib/utils";
 
 type DailyStats = {
   revenue_today: number;
@@ -109,7 +110,16 @@ export default function DashboardPage() {
     return <WelcomeCard />;
   }
 
-  const occupiedPercentage = dailyData.dailyStats.total_tables > 0 ? (dailyData.dailyStats.occupied_tables / dailyData.dailyStats.total_tables) * 100 : 0;
+  const dailyStats = dailyData.dailyStats;
+  
+  // Mock data for sub-charts (as requested by the image)
+  const mockRevenueData = generateMockData(10, 100);
+  const mockTicketData = generateMockData(10, 50);
+  const mockTablesData = generateMockData(10, dailyStats.total_tables);
+  const mockKitchenData = generateMockData(10, 20);
+
+  const kitchenOrdersValue = `${dailyStats.pending_kitchen_orders} Pend. / ${dailyStats.preparing_kitchen_orders} Prep.`;
+  const kitchenOrdersSubValue = `Total: ${dailyStats.pending_kitchen_orders + dailyStats.preparing_kitchen_orders}`;
 
   return (
     <div className="space-y-6">
@@ -126,18 +136,37 @@ export default function DashboardPage() {
         
         <TabsContent value="today" className="mt-6 space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Faturamento do Dia" value={formatCurrency(dailyData.dailyStats.revenue_today)} icon={DollarSign} />
-            <StatCard title="Ticket Médio" value={formatCurrency(dailyData.dailyStats.avg_ticket_today)} icon={BarChart2} />
+            <StatCard 
+              title="Faturamento do Dia" 
+              value={formatCurrency(dailyStats.revenue_today)} 
+              icon={ArrowUp} 
+              colorClass="text-success"
+              subData={mockRevenueData}
+              subValue="Comparado a ontem"
+            />
+            <StatCard 
+              title="Ticket Médio" 
+              value={formatCurrency(dailyStats.avg_ticket_today)} 
+              icon={BarChart2} 
+              colorClass="text-primary"
+              subData={mockTicketData}
+              subValue="Média de pedidos fechados"
+            />
             <StatCard 
               title="Mesas Ocupadas" 
-              value={`${dailyData.dailyStats.occupied_tables} / ${dailyData.dailyStats.total_tables}`} 
+              value={`${dailyStats.occupied_tables} / ${dailyStats.total_tables}`} 
               icon={Users}
-              progress={occupiedPercentage}
+              colorClass="text-primary"
+              subData={mockTablesData}
+              subValue="Capacidade total"
             />
             <StatCard 
               title="Pedidos na Cozinha" 
-              value={`${dailyData.dailyStats.pending_kitchen_orders} Pend. / ${dailyData.dailyStats.preparing_kitchen_orders} Prep.`} 
+              value={kitchenOrdersValue} 
               icon={ChefHat} 
+              colorClass={dailyStats.pending_kitchen_orders > 0 ? "text-warning" : "text-success"}
+              subData={mockKitchenData}
+              subValue={kitchenOrdersSubValue}
             />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -160,10 +189,10 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Faturamento Total" value={formatCurrency(rangeData?.total_revenue)} icon={DollarSign} />
-              <StatCard title="Total de Pedidos" value={rangeData?.total_orders || 0} icon={ReceiptText} />
-              <StatCard title="Ticket Médio" value={formatCurrency(rangeData?.avg_order_value)} icon={BarChart2} />
-              <StatCard title="Novos Clientes" value={rangeData?.new_clients || 0} icon={Users} />
+              <StatCard title="Faturamento Total" value={formatCurrency(rangeData?.total_revenue)} icon={DollarSign} colorClass="text-success" />
+              <StatCard title="Total de Pedidos" value={rangeData?.total_orders || 0} icon={ReceiptText} colorClass="text-primary" />
+              <StatCard title="Ticket Médio" value={formatCurrency(rangeData?.avg_order_value)} icon={BarChart2} colorClass="text-primary" />
+              <StatCard title="Novos Clientes" value={rangeData?.new_clients || 0} icon={Users} colorClass="text-success" />
             </div>
           )}
         </TabsContent>

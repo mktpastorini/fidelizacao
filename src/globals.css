@@ -31,6 +31,9 @@
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
     --ring: 240 10% 3.9%;
+    
+    --success: 147 46% 51%; /* Verde */
+    --warning: 30 90% 50%; /* Laranja */
 
     --radius: 0.5rem;
   }
@@ -52,10 +55,10 @@
     --accent-foreground: 210 29% 97%;
     --destructive: 0 79% 57%;
     --destructive-foreground: 0 0% 98%;
-    --success: 147 46% 51%;
-    --success-foreground: 0 0% 98%;
-    --warning: 27 84% 57%;
-    --warning-foreground: 0 0% 98%;
+    
+    --success: 147 46% 51%; /* Verde */
+    --warning: 30 90% 50%; /* Laranja */
+
     --border: 220 18% 35%;
     --input: 220 18% 35%;
     --ring: 208 73% 57%;
