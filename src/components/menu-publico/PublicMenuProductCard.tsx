@@ -5,13 +5,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { showSuccess, showError } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Utensils } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type PublicMenuProductCardProps = {
   produto: Produto;
   onOrder: (produto: Produto, quantidade: number) => Promise<void>;
 };
 
-export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardCardProps) {
+const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
@@ -42,30 +46,48 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
   return (
     <>
       <div
-        className="relative rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer overflow-hidden transition"
+        className={cn(
+          "relative rounded-lg border border-gray-700 bg-gray-800 shadow-lg cursor-pointer overflow-hidden transition-all duration-300",
+          isHovered ? "scale-[1.02] shadow-xl" : "scale-100"
+        )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onClick={handleOrderClick}
       >
-        {/* Conteúdo do card */}
-        <div className="p-4 min-h-[140px] flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 truncate">{produto.nome}</h3>
-            {produto.descricao && <p className="text-sm text-gray-500 truncate">{produto.descricao}</p>}
+        {/* Conteúdo Padrão (Imagem Pequena + Info) */}
+        <div className="p-3 flex items-center gap-3">
+          <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden bg-gray-700 flex items-center justify-center">
+            {produto.imagem_url ? (
+              <img
+                src={produto.imagem_url}
+                alt={produto.nome}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Utensils className="w-6 h-6 text-gray-500" />
+            )}
           </div>
-          <div className="mt-4 text-xl font-bold text-gray-900">R$ {produto.preco.toFixed(2).replace('.', ',')}</div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-semibold text-white truncate">{produto.nome}</h3>
+            <p className="text-sm font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
+          </div>
         </div>
 
-        {/* Imagem que preenche o card ao hover */}
-        {isHovered && produto.imagem_url && (
-          <div className="absolute inset-0 z-10 bg-black bg-opacity-70 flex flex-col items-center justify-center p-4 text-white transition-opacity">
-            <img
-              src={produto.imagem_url}
-              alt={produto.nome}
-              className="absolute inset-0 w-full h-full object-cover rounded-lg opacity-80"
-              aria-hidden="true"
-            />
-            <div className="relative z-20">
-              <Button onClick={handleOrderClick} disabled={isOrdering} size="lg" variant="secondary">
+        {/* Overlay de Hover (Imagem Cheia + Botão) */}
+        {isHovered && (
+          <div className="absolute inset-0 z-10 bg-black/80 flex flex-col items-center justify-center p-4 text-white transition-opacity duration-300">
+            {produto.imagem_url && (
+              <img
+                src={produto.imagem_url}
+                alt={produto.nome}
+                className="absolute inset-0 w-full h-full object-cover opacity-30"
+                aria-hidden="true"
+              />
+            )}
+            <div className="relative z-20 text-center space-y-3">
+              <h3 className="text-xl font-bold">{produto.nome}</h3>
+              <p className="text-lg font-bold text-primary">{formatCurrency(produto.preco)}</p>
+              <Button onClick={handleOrderClick} disabled={isOrdering} size="lg" variant="secondary" className="mt-2">
                 Pedir
               </Button>
             </div>
@@ -75,7 +97,7 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
 
       {/* Modal de confirmação */}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent>
+        <DialogContent className="bg-white text-gray-900">
           <DialogHeader>
             <DialogTitle>Adicionar ao Pedido</DialogTitle>
           </DialogHeader>
@@ -92,7 +114,7 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
                 className="w-full"
               />
             </div>
-            <p className="text-xl font-bold text-right">Total: R$ {(produto.preco * quantidade).toFixed(2).replace('.', ',')}</p>
+            <p className="text-xl font-bold text-right">Total: {formatCurrency(produto.preco * quantidade)}</p>
           </div>
           <DialogFooter className="flex justify-end gap-4">
             <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isOrdering}>Cancelar</Button>

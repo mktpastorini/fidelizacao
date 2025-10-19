@@ -1,24 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Produto, Mesa } from "@/types/supabase";
+import { Produto, Mesa, Categoria } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Utensils, Lock, ReceiptText } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PublicMenuProductCard } from "@/components/menu-publico/PublicMenuProductCard";
-import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary"; // Importando o novo componente
+import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 type MesaData = Mesa & { user_id: string };
 
-async function fetchProdutosVisiveis(): Promise<Produto[]> {
-  const { data, error } = await supabase
+type MenuData = {
+  produtos: Produto[];
+  categorias: Categoria[];
+};
+
+async function fetchMenuData(): Promise<MenuData> {
+  const { data: produtos, error: produtosError } = await supabase
     .from("produtos")
-    .select("*")
+    .select("*, categoria:categorias(nome)")
     .eq("mostrar_no_menu", true)
     .order("nome");
-  if (error) throw new Error(error.message);
-  return data || [];
+  if (produtosError) throw new Error(produtosError.message);
+
+  const { data: categorias, error: categoriasError } = await supabase
+    .from("categorias")
+    .select("*")
+    .order("nome");
+  if (categoriasError) throw new Error(categoriasError.message);
+
+  return { produtos: produtos || [], categorias: categorias || [] };
 }
 
 async function fetchMesaData(mesaId: string): Promise<MesaData | null> {
@@ -33,10 +47,11 @@ async function fetchMesaData(mesaId: string): Promise<MesaData | null> {
 }
 
 export default function MenuPublicoPage() {
-  const [produtos, setProdutos] = useState<Produto[]>([]);
+  const [menuData, setMenuData] = useState<MenuData>({ produtos: [], categorias: [] });
   const [mesaData, setMesaData] = useState<MesaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false); // Novo estado para o resumo
+  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const navigate = useNavigate();
   const { mesaId } = useParams<{ mesaId: string }>();
 
@@ -47,11 +62,11 @@ export default function MenuPublicoPage() {
     }
 
     Promise.all([
-      fetchProdutosVisiveis(),
+      fetchMenuData(),
       fetchMesaData(mesaId),
     ])
-      .then(([produtosData, mesaData]) => {
-        setProdutos(produtosData);
+      .then(([menuData, mesaData]) => {
+        setMenuData(menuData);
         setMesaData(mesaData);
       })
       .catch(console.error)
@@ -59,6 +74,11 @@ export default function MenuPublicoPage() {
   }, [mesaId]);
 
   const isMesaOcupada = !!mesaData?.cliente_id;
+
+  const filteredProdutos = useMemo(() => {
+    if (selectedCategory === "all") return menuData.produtos;
+    return menuData.produtos.filter(p => p.categoria_id === selectedCategory);
+  }, [menuData.produtos, selectedCategory]);
 
   const handleOrder = async (produto: Produto, quantidade: number) => {
     if (!mesaId || !mesaData || !mesaData.user_id) {
@@ -68,7 +88,7 @@ export default function MenuPublicoPage() {
       throw new Error("A mesa não está ocupada. Não é possível adicionar pedidos.");
     }
 
-    const userId = mesaData.user_id; // O user_id do dono do estabelecimento
+    const userId = mesaData.user_id;
 
     // 1. Verifica se já existe pedido aberto para a mesa
     let pedidoId: string | null = null;
@@ -91,7 +111,7 @@ export default function MenuPublicoPage() {
           mesa_id: mesaId, 
           status: "aberto", 
           user_id: userId,
-          cliente_id: mesaData.cliente_id, // Usando o cliente principal
+          cliente_id: mesaData.cliente_id,
         })
         .select("id")
         .single();
@@ -103,12 +123,12 @@ export default function MenuPublicoPage() {
     const { error: itemError } = await supabase.from("itens_pedido").insert({
       pedido_id: pedidoId,
       nome_produto: produto.nome,
-      quantidade: quantidade, // Usando a quantidade selecionada
+      quantidade: quantidade,
       preco: produto.preco,
       status: "pendente",
       requer_preparo: produto.requer_preparo,
-      user_id: userId, // Usando o user_id do dono do estabelecimento
-      consumido_por_cliente_id: null, // Ocupante será definido pelo garçom, se necessário
+      user_id: userId,
+      consumido_por_cliente_id: null,
     });
     if (itemError) throw itemError;
   };
@@ -136,15 +156,46 @@ export default function MenuPublicoPage() {
       );
     }
 
-    if (produtos.length === 0) {
+    if (menuData.produtos.length === 0) {
       return <p className="text-center text-gray-300">Nenhum produto disponível no momento.</p>;
     }
 
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {produtos.map((produto) => (
-          <PublicMenuProductCard key={produto.id} produto={produto} onOrder={handleOrder} />
-        ))}
+      <div className="space-y-6">
+        {/* Filtro de Categorias */}
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border bg-gray-800">
+          <div className="flex w-max space-x-2 p-2">
+            <Button 
+              variant={selectedCategory === "all" ? "default" : "ghost"} 
+              onClick={() => setSelectedCategory("all")}
+              className={cn(selectedCategory === "all" ? "bg-primary text-primary-foreground" : "text-white hover:bg-gray-700")}
+            >
+              Todos
+            </Button>
+            {menuData.categorias.map((cat) => (
+              <Button
+                key={cat.id}
+                variant={selectedCategory === cat.id ? "default" : "ghost"}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={cn(selectedCategory === cat.id ? "bg-primary text-primary-foreground" : "text-white hover:bg-gray-700")}
+              >
+                {cat.nome}
+              </Button>
+            ))}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+
+        {/* Lista de Produtos */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {filteredProdutos.length > 0 ? (
+            filteredProdutos.map((produto) => (
+              <PublicMenuProductCard key={produto.id} produto={produto} onOrder={handleOrder} />
+            ))
+          ) : (
+            <p className="col-span-full text-center text-gray-400 py-10">Nenhum produto nesta categoria.</p>
+          )}
+        </div>
       </div>
     );
   };
