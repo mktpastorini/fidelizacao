@@ -204,7 +204,7 @@ export default function MesasPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Painel de Mesas</h1>
-          <p className="text-gray-600 mt-2">Visualize a ocupação e gerencie os pedidos.</p>
+          <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
         </div>
         <div className="flex items-center gap-2">
           <AlertDialog>
@@ -233,7 +233,7 @@ export default function MesasPage() {
         </div>
       </div>
 
-      {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-red-500">Erro ao carregar mesas.</p> : (
+      {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-destructive">Erro ao carregar mesas.</p> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {mesas?.map((mesa) => (
             <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes_count} onClick={() => handleMesaClick(mesa)}>
@@ -259,7 +259,7 @@ export default function MesasPage() {
                   </DropdownMenuItem>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-500">
+                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive">
                         <Trash2 className="w-4 h-4 mr-2" /> Excluir
                       </DropdownMenuItem>
                     </AlertDialogTrigger>

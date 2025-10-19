@@ -41,7 +41,7 @@ export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardPr
   return (
     <Card
       className={cn(
-        "shadow-md transition-all hover:shadow-lg cursor-pointer flex flex-col justify-between",
+        "border transition-all hover:border-primary/50 cursor-pointer flex flex-col justify-between",
         isOcupada ? "bg-card" : "bg-secondary/50",
         hasPendingItems && "border-accent ring-2 ring-accent/50"
       )}
@@ -73,7 +73,7 @@ export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardPr
             </div>
           </div>
         ) : (
-          <p className="text-sm font-semibold text-green-600">Livre</p>
+          <p className="text-sm font-semibold text-green-500">Livre</p>
         )}
       </CardContent>
     </Card>

@@ -43,7 +43,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
             <User className="w-4 h-4 mr-2" />
             <span>{item.cliente?.nome || "Mesa (Geral)"}</span>
           </div>
-          <div className={cn("flex items-center", isOverdue ? "text-red-500 font-semibold" : "")}>
+          <div className={cn("flex items-center", isOverdue ? "text-destructive font-semibold" : "")}>
             <Clock className="w-4 h-4 mr-2" />
             <span>Há {tempoDesdePedido}</span>
           </div>
@@ -63,7 +63,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
             )
           )}
           {item.status === 'preparando' && (
-            <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => onStatusChange(item.id, 'entregue')}>
+            <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" onClick={() => onStatusChange(item.id, 'entregue')}>
               <CheckCircle className="w-4 h-4 mr-2" />
               Pronto
             </Button>

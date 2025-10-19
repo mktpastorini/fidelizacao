@@ -137,20 +137,20 @@ export default function MensagensPage() {
 
   const getBadgeClassName = (type: string) => {
     switch (type) {
-      case 'chegada': return 'bg-blue-100 text-blue-800 hover:bg-blue-200';
-      case 'pagamento': return 'bg-green-100 text-green-800 hover:bg-green-200';
-      case 'aniversario': return 'bg-pink-100 text-pink-800 hover:bg-pink-200';
-      case 'manual': return 'bg-purple-100 text-purple-800 hover:bg-purple-200';
-      case 'fechamento_dia': return 'bg-gray-800 text-white hover:bg-gray-900';
-      case 'abertura_dia': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200';
-      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200';
+      case 'chegada': return 'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/50 dark:text-blue-200';
+      case 'pagamento': return 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-200';
+      case 'aniversario': return 'bg-pink-100 text-pink-800 hover:bg-pink-200 dark:bg-pink-900/50 dark:text-pink-200';
+      case 'manual': return 'bg-purple-100 text-purple-800 hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200';
+      case 'fechamento_dia': return 'bg-gray-800 text-white hover:bg-gray-900 dark:bg-gray-700 dark:text-gray-100';
+      case 'abertura_dia': return 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-200';
+      default: return 'bg-gray-100 text-gray-800 hover:bg-gray-200 dark:bg-secondary dark:text-secondary-foreground';
     }
   };
 
   const getDeliveryStatusBadge = (status: MessageLog['delivery_status']) => {
     switch (status) {
       case 'delivered':
-        return <Badge className="bg-green-600 hover:bg-green-700">Entregue</Badge>;
+        return <Badge className="bg-green-500 hover:bg-green-600 text-primary-foreground">Entregue</Badge>;
       case 'failed':
         return <Badge variant="destructive">Falhou</Badge>;
       case 'pending':
@@ -164,7 +164,7 @@ export default function MensagensPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Mensagens</h1>
-          <p className="text-gray-600 mt-2">Crie templates e acompanhe o histórico de envios.</p>
+          <p className="text-muted-foreground mt-2">Crie templates e acompanhe o histórico de envios.</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingTemplates || isLoadingClientes}>
@@ -192,7 +192,7 @@ export default function MensagensPage() {
           {!isLoadingTemplates && templates && (
             <DefaultTemplates onAdd={(template) => addTemplateMutation.mutate(template)} existingTemplateNames={templates.map(t => t.nome)} />
           )}
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="bg-card p-6 rounded-lg border">
             {isLoadingTemplates ? <p>Carregando templates...</p> : templates && templates.length > 0 ? (
               <Table>
                 <TableHeader><TableRow><TableHead>Nome</TableHead><TableHead>Tipo</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
@@ -206,7 +206,7 @@ export default function MensagensPage() {
                           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => { setEditingTemplate(template); setIsTemplateDialogOpen(true); }}><Edit className="w-4 h-4 mr-2" />Editar</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-500" onClick={() => deleteTemplateMutation.mutate(template.id)} disabled={deleteTemplateMutation.isPending}><Trash2 className="w-4 h-4 mr-2" />Excluir</DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => deleteTemplateMutation.mutate(template.id)} disabled={deleteTemplateMutation.isPending}><Trash2 className="w-4 h-4 mr-2" />Excluir</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -214,11 +214,11 @@ export default function MensagensPage() {
                   ))}
                 </TableBody>
               </Table>
-            ) : <div className="text-center py-12"><p className="text-gray-500">Nenhum template de mensagem cadastrado.</p></div>}
+            ) : <div className="text-center py-12"><p className="text-muted-foreground">Nenhum template de mensagem cadastrado.</p></div>}
           </div>
         </TabsContent>
         <TabsContent value="historico" className="mt-6">
-          <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="bg-card p-6 rounded-lg border">
             {isLoadingLogs ? <p>Carregando histórico...</p> : logs && logs.length > 0 ? (
               <Table>
                 <TableHeader><TableRow><TableHead>Destinatário</TableHead><TableHead>Data</TableHead><TableHead>Gatilho</TableHead><TableHead>Status Webhook</TableHead><TableHead>Status Entrega</TableHead><TableHead className="text-right">Ações</TableHead></TableRow></TableHeader>
@@ -229,7 +229,7 @@ export default function MensagensPage() {
                       <TableCell>{format(new Date(log.created_at), "dd/MM/yy HH:mm", { locale: ptBR })}</TableCell>
                       <TableCell><Badge variant="outline" className={cn("border-transparent", getBadgeClassName(log.trigger_event))}>{log.trigger_event.replace(/_/g, ' ')}</Badge></TableCell>
                       <TableCell>
-                        <Badge variant={log.status === 'sucesso' ? 'default' : 'destructive'} className={cn(log.status === 'sucesso' && "bg-green-600 hover:bg-green-700")}>
+                        <Badge variant={log.status === 'sucesso' ? 'default' : 'destructive'} className={cn(log.status === 'sucesso' && "bg-green-500 hover:bg-green-600 text-primary-foreground")}>
                           {log.status}
                         </Badge>
                       </TableCell>
@@ -241,7 +241,7 @@ export default function MensagensPage() {
                   ))}
                 </TableBody>
               </Table>
-            ) : <div className="text-center py-12"><p className="text-gray-500">Nenhum registro de envio encontrado.</p></div>}
+            ) : <div className="text-center py-12"><p className="text-muted-foreground">Nenhum registro de envio encontrado.</p></div>}
           </div>
         </TabsContent>
       </Tabs>

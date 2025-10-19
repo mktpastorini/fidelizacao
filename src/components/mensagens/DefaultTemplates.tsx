@@ -48,7 +48,7 @@ export function DefaultTemplates({ onAdd, existingTemplateNames }: DefaultTempla
               <CardDescription>Tipo: {template.tipo}</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm bg-gray-50 p-3 rounded-md border italic">"{template.conteudo}"</p>
+              <p className="text-sm bg-secondary p-3 rounded-md border italic">"{template.conteudo}"</p>
               <Button size="sm" className="mt-4" onClick={() => onAdd(template)}>
                 <MessageSquarePlus className="w-4 h-4 mr-2" />
                 Adicionar este template

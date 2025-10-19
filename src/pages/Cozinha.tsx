@@ -76,11 +76,11 @@ export default function CozinhaPage() {
           <Skeleton className="flex-1" />
         </div>
       ) : isError ? (
-        <p className="text-red-500">Erro ao carregar os pedidos.</p>
+        <p className="text-destructive">Erro ao carregar os pedidos.</p>
       ) : (
         <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-red-500" />
-          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-blue-500" />
+          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-destructive" />
+          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
           <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-green-500" />
         </div>
       )}

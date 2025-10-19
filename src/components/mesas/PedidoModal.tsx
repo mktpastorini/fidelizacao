@@ -269,7 +269,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                         const precoOriginal = (item.preco || 0) * item.quantidade;
                         const precoFinal = calcularPrecoComDesconto(item);
                         return (
-                          <li key={item.id} className="flex justify-between items-center p-2 bg-gray-50 rounded text-sm">
+                          <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
                             <div>
                               <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
                               {item.desconto_percentual && item.desconto_percentual > 0 && (
@@ -280,7 +280,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                               <div className="text-right">
                                 {item.desconto_percentual && item.desconto_percentual > 0 ? (
                                   <>
-                                    <p className="text-gray-500 line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                    <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
                                     <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
                                   </>
                                 ) : (
@@ -298,7 +298,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                     <Tag className="h-4 w-4 mr-2" />
                                     <span>Aplicar Desconto</span>
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-red-500" onClick={() => deleteItemMutation.mutate(item.id)}>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
                                     <Trash2 className="h-4 w-4 mr-2" />
                                     <span>Remover Item</span>
                                   </DropdownMenuItem>

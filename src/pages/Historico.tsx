@@ -55,11 +55,11 @@ export default function HistoricoPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Histórico de Pedidos</h1>
-        <p className="text-gray-600 mt-2">Consulte todos os pedidos que já foram finalizados.</p>
+        <p className="text-muted-foreground mt-2">Consulte todos os pedidos que já foram finalizados.</p>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        {isLoading ? <p>Carregando histórico...</p> : isError ? <p className="text-red-500">Erro ao carregar o histórico.</p> : pedidos && pedidos.length > 0 ? (
+      <div className="bg-card p-6 rounded-lg border">
+        {isLoading ? <p>Carregando histórico...</p> : isError ? <p className="text-destructive">Erro ao carregar o histórico.</p> : pedidos && pedidos.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -88,7 +88,7 @@ export default function HistoricoPage() {
           </Table>
         ) : (
           <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum pedido finalizado encontrado.</p>
+            <p className="text-muted-foreground">Nenhum pedido finalizado encontrado.</p>
           </div>
         )}
       </div>

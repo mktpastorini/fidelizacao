@@ -39,7 +39,7 @@ export function LogDetailsModal({ isOpen, onOpenChange, log }: LogDetailsModalPr
             <p><strong>Status:</strong>
               <Badge
                 variant={log.status === 'sucesso' ? 'default' : 'destructive'}
-                className={cn(log.status === 'sucesso' && "bg-green-600 hover:bg-green-700")}
+                className={cn(log.status === 'sucesso' && "bg-green-500 hover:bg-green-600 text-primary-foreground")}
               >
                 {log.status}
               </Badge>
@@ -49,7 +49,7 @@ export function LogDetailsModal({ isOpen, onOpenChange, log }: LogDetailsModalPr
           {log.status === 'falha' && log.error_message && (
             <div>
               <h4 className="font-semibold mb-1">Mensagem de Erro</h4>
-              <pre className="bg-gray-100 p-3 rounded-md text-sm text-red-700 whitespace-pre-wrap break-all">
+              <pre className="bg-destructive/10 p-3 rounded-md text-sm text-destructive whitespace-pre-wrap break-all">
                 {log.error_message}
               </pre>
             </div>
@@ -58,7 +58,7 @@ export function LogDetailsModal({ isOpen, onOpenChange, log }: LogDetailsModalPr
           {log.webhook_response && (
             <div>
               <h4 className="font-semibold mb-1">Resposta do Webhook</h4>
-              <pre className="bg-gray-100 p-3 rounded-md text-sm whitespace-pre-wrap break-all">
+              <pre className="bg-secondary p-3 rounded-md text-sm whitespace-pre-wrap break-all">
                 {JSON.stringify(log.webhook_response, null, 2)}
               </pre>
             </div>

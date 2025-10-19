@@ -108,7 +108,7 @@ export default function ProdutosPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Produtos</h1>
-          <p className="text-gray-600 mt-2">Gerencie seu catálogo de produtos e serviços.</p>
+          <p className="text-muted-foreground mt-2">Gerencie seu catálogo de produtos e serviços.</p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
           <DialogTrigger asChild>
@@ -127,8 +127,8 @@ export default function ProdutosPage() {
         </Dialog>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        {isLoading ? <p>Carregando produtos...</p> : isError ? <p className="text-red-500">Erro ao carregar produtos.</p> : produtos && produtos.length > 0 ? (
+      <div className="bg-card p-6 rounded-lg border">
+        {isLoading ? <p>Carregando produtos...</p> : isError ? <p className="text-destructive">Erro ao carregar produtos.</p> : produtos && produtos.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -149,7 +149,7 @@ export default function ProdutosPage() {
                         <DropdownMenuItem onClick={() => { setEditingProduto(produto); setIsDialogOpen(true); }}>
                           <Edit className="w-4 h-4 mr-2" />Editar
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-500" onClick={() => deleteProdutoMutation.mutate(produto.id)} disabled={deleteProdutoMutation.isPending}>
+                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => deleteProdutoMutation.mutate(produto.id)} disabled={deleteProdutoMutation.isPending}>
                           <Trash2 className="w-4 h-4 mr-2" />Excluir
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -161,8 +161,8 @@ export default function ProdutosPage() {
           </Table>
         ) : (
           <div className="text-center py-12">
-            <p className="text-gray-500">Nenhum produto cadastrado ainda.</p>
-            <p className="text-gray-500">Clique em "Adicionar Produto" para começar.</p>
+            <p className="text-muted-foreground">Nenhum produto cadastrado ainda.</p>
+            <p className="text-muted-foreground">Clique em "Adicionar Produto" para começar.</p>
           </div>
         )}
       </div>

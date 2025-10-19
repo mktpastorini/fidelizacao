@@ -22,11 +22,11 @@ const Login = () => {
   }, [navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
+    <div className="flex items-center justify-center min-h-screen bg-background bg-gradient-radial">
+      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg border shadow-lg">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Fidelize</h1>
-          <p className="mt-2 text-gray-600">Faça login para continuar</p>
+          <h1 className="text-3xl font-bold text-card-foreground">Fidelize</h1>
+          <p className="mt-2 text-muted-foreground">Faça login para continuar</p>
         </div>
         <Auth
           supabaseClient={supabase}

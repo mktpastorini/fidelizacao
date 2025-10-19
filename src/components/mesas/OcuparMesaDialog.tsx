@@ -176,7 +176,7 @@ export function OcuparMesaDialog({
               </div>
               <div className="text-sm text-muted-foreground">
                 Capacidade: {mesa?.capacidade} | Ocupantes: {ocupantesCount}
-                {capacidadeExcedida && <span className="text-red-500 font-semibold ml-2">Capacidade excedida!</span>}
+                {capacidadeExcedida && <span className="text-destructive font-semibold ml-2">Capacidade excedida!</span>}
               </div>
             </div>
           )}

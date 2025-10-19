@@ -26,7 +26,7 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
   const preferenciaPrincipal = cliente.gostos?.pizza_favorita ? `Gosta de ${cliente.gostos.pizza_favorita}` : 'Sem preferências registradas.';
 
   return (
-    <Card className="bg-card shadow-md hover:shadow-lg transition-shadow">
+    <Card className="bg-card border hover:border-primary/50 transition-colors">
       <CardContent className="p-4 flex flex-col justify-between h-full">
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -34,7 +34,7 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
               <Avatar className="h-12 w-12">
                 <AvatarImage src={cliente.avatar_url || undefined} />
                 <AvatarFallback>
-                  <User className="h-6 w-6 text-gray-400" />
+                  <User className="h-6 w-6 text-muted-foreground" />
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -52,7 +52,7 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
                 <DropdownMenuItem onClick={onEdit}>
                   <Edit className="w-4 h-4 mr-2" /> Editar
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
                   <Trash2 className="w-4 h-4 mr-2" /> Excluir
                 </DropdownMenuItem>
               </DropdownMenuContent>

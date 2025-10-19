@@ -5,6 +5,7 @@ import { motion, useTransform, MotionValue } from "framer-motion";
 import { NavLink } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type DockIconProps = {
   mouseX: MotionValue;
@@ -28,19 +29,22 @@ export function DockIcon({ mouseX, item }: DockIconProps) {
         <NavLink
           to={item.to}
           end={item.to === "/"}
-          className={({ isActive }) =>
-            `flex items-center justify-center rounded-full transition-colors ${
-              isActive ? "bg-primary/20" : ""
-            }`
-          }
+          className="flex items-center justify-center"
         >
-          <motion.div
-            ref={ref}
-            style={{ width: widthSync, height: heightSync }}
-            className="aspect-square w-10 rounded-full bg-secondary/50 flex items-center justify-center"
-          >
-            <item.icon className="w-6 h-6 text-muted-foreground" />
-          </motion.div>
+          {({ isActive }) => (
+            <motion.div
+              ref={ref}
+              style={{ width: widthSync, height: heightSync }}
+              className={cn(
+                "aspect-square w-10 rounded-full flex items-center justify-center transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+              )}
+            >
+              <item.icon className="w-6 h-6" />
+            </motion.div>
+          )}
         </NavLink>
       </TooltipTrigger>
       <TooltipContent>
