@@ -23,12 +23,6 @@ const birthdayTriggerPayload = `{
   // Corpo vazio - apenas autenticação via header
 }`;
 
-const n8nNotificationPayload = `{
-  "event": "birthday_schedule_updated",
-  "new_time": "09:00",
-  "timestamp": "2023-06-15T10:30:00.000Z"
-}`;
-
 export function ApiDocumentation() {
   return (
     <div className="space-y-6">
@@ -127,33 +121,30 @@ export function ApiDocumentation() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Integração com n8n</CardTitle>
+          <CardTitle>API: Obter Horário de Envio de Aniversários</CardTitle>
           <CardDescription>
-            Notificação automática para atualização de agendamento no n8n.
+            Endpoint para consultar o horário configurado para envio de mensagens de aniversário.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm">
-            Quando você configura uma URL de webhook do n8n nas configurações do Fidelize, 
-            o sistema enviará uma notificação sempre que o horário de envio de mensagens 
-            de aniversário for atualizado.
-          </p>
-          <h4 className="font-semibold">Exemplo de Payload de Notificação:</h4>
-          <CodeBlock code={n8nNotificationPayload} />
-          <h4 className="font-semibold mt-4">Campos do Payload:</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm">
-            <li><code className="bg-gray-100 p-1 rounded">event</code>: O tipo de evento ocorrido (string).</li>
-            <li><code className="bg-gray-100 p-1 rounded">new_time</code>: O novo horário configurado para envio (string, formato HH:MM).</li>
-            <li><code className="bg-gray-100 p-1 rounded">timestamp</code>: Data e hora da atualização (string, formato ISO).</li>
-          </ul>
-          <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-            <h4 className="font-semibold text-yellow-800">Configuração no n8n:</h4>
-            <p className="text-sm text-yellow-700 mt-2">
-              Para configurar a automação no n8n, crie um webhook que receba esta notificação 
-              e atualize o agendamento da sua automação de envio de aniversários. 
-              Você pode usar o campo "new_time" para definir o horário de execução.
-            </p>
+          <div className="text-sm">
+            <Badge variant="secondary">GET</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-birthday-schedule`
           </div>
+          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
+            <li>`Content-Type`: `application/json`</li>
+          </ul>
+          <h4 className="font-semibold">Exemplo de Resposta:</h4>
+          <CodeBlock code={`{
+  "success": true,
+  "aniversario_horario": "09:00"
+}`} />
+          <h4 className="font-semibold">Campos da Resposta:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li><code className="bg-gray-100 p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
+            <li><code className="bg-gray-100 p-1 rounded">aniversario_horario</code>: O horário configurado para envio das mensagens de aniversário (string, formato HH:MM).</li>
+          </ul>
         </CardContent>
       </Card>
     </div>
