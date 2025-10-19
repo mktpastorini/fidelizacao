@@ -50,12 +50,16 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
             setSelectedDeviceId(savedCameraId);
           } else if (videoDevices.length > 0) {
             setSelectedDeviceId(videoDevices[0].deviceId);
-          } else {
+          } else if (videoDevices.length === 0) {
             setCameraError("Nenhuma câmera encontrada. Verifique se uma câmera está conectada.");
           }
         } catch (err) {
           console.error("Erro ao listar dispositivos de câmera:", err);
-          setCameraError("Permissão para acessar a câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.");
+          if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+            setCameraError("Acesso à câmera bloqueado. Certifique-se de que o sistema está sendo acessado via HTTPS.");
+          } else {
+            setCameraError("Permissão para acessar a câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.");
+          }
         }
       };
       getDevices();
@@ -161,7 +165,9 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
         <div className="flex flex-col items-center gap-4 py-4">
           <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
             {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : 
-             cameraError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500">Erro</div> :
+             cameraError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500 p-4 text-center">
+                <p>{cameraError}</p>
+             </div> :
              <Webcam 
                audio={false} 
                ref={webcamRef} 
@@ -171,7 +177,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
                onUserMediaError={(e) => {
                  console.error("Erro ao acessar a câmera:", e);
                  setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
-                 onOpenChange(false);
+                 // Não fechar o modal, apenas mostrar o erro
                }} 
              />
             }

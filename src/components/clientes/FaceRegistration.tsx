@@ -18,6 +18,7 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   useEffect(() => {
     const getDevices = async () => {
@@ -35,8 +36,13 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
           setSelectedDeviceId(videoDevices[0].deviceId);
         }
       } catch (err) {
-        showError("Não foi possível listar os dispositivos de câmera.");
         console.error(err);
+        // Se o erro for de segurança (não HTTPS), o navegador não lista os dispositivos.
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+          setCameraError("Acesso à câmera bloqueado. Certifique-se de que o sistema está sendo acessado via HTTPS.");
+        } else {
+          setCameraError("Não foi possível listar os dispositivos de câmera. Verifique as permissões.");
+        }
       }
     };
     getDevices();
@@ -57,6 +63,7 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
 
   const resetCapture = () => {
     setCapturedImage(null);
+    setCameraError(null);
   };
 
   const dataURLtoFile = (dataurl: string, filename: string) => {
@@ -105,6 +112,11 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
       <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center">
         {capturedImage ? (
           <img src={capturedImage} alt="Rosto capturado" className="w-full h-full object-cover" />
+        ) : cameraError ? (
+          <div className="text-center p-4 text-destructive">
+            <p className="font-semibold">Erro de Câmera</p>
+            <p className="text-sm">{cameraError}</p>
+          </div>
         ) : (
           <Webcam
             audio={false}
@@ -112,11 +124,14 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
             screenshotFormat="image/jpeg"
             videoConstraints={videoConstraints}
             className="w-full h-full object-cover"
-            onUserMediaError={() => showError("Não foi possível acessar a câmera. Verifique as permissões.")}
+            onUserMediaError={(e) => {
+              console.error("Erro ao acessar a câmera:", e);
+              setCameraError("Não foi possível acessar a câmera. Verifique as permissões do navegador.");
+            }}
           />
         )}
       </div>
-      {!capturedImage && devices.length > 1 && (
+      {!capturedImage && devices.length > 1 && !cameraError && (
         <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
           <SelectTrigger className="w-full max-w-xs">
             <SelectValue placeholder="Selecione uma câmera" />
@@ -141,7 +156,7 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
             </Button>
           </>
         ) : (
-          <Button onClick={capture}>
+          <Button onClick={capture} disabled={!!cameraError}>
             <Camera className="w-4 h-4 mr-2" /> Capturar Rosto
           </Button>
         )}
