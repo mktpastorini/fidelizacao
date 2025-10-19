@@ -19,7 +19,7 @@ const updateStatusPayload = `{
   "status": "delivered"
 }`;
 
-const birthdayTriggerPayload = `{
+const triggerPayload = `{
   // Corpo vazio - apenas autenticação via header
 }`;
 
@@ -106,7 +106,7 @@ export function ApiDocumentation() {
             <li>`Content-Type`: `application/json`</li>
           </ul>
           <h4 className="font-semibold">Corpo (Body):</h4>
-          <CodeBlock code={birthdayTriggerPayload} />
+          <CodeBlock code={triggerPayload} />
           <div className="text-sm text-muted-foreground">
             <p>Este endpoint não requer um corpo específico. Apenas a autenticação via header é necessária.</p>
             <p className="mt-2">Quando chamado, o sistema:</p>
@@ -144,6 +144,60 @@ export function ApiDocumentation() {
           <ul className="list-disc list-inside space-y-2 text-sm">
             <li><code className="bg-gray-100 p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
             <li><code className="bg-gray-100 p-1 rounded">aniversario_horario</code>: O horário configurado para envio das mensagens de aniversário (string, formato HH:MM).</li>
+          </ul>
+        </CardContent>
+      </Card>
+      
+      {/* NOVOS ENDPOINTS DE FECHAMENTO DO DIA */}
+      <Card>
+        <CardHeader>
+          <CardTitle>API: Fechamento Automático do Dia</CardTitle>
+          <CardDescription>
+            Endpoint para acionar o fechamento do dia e o envio do relatório diário no horário programado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm">
+            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-close-day`
+          </div>
+          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
+            <li>`Content-Type`: `application/json`</li>
+          </ul>
+          <h4 className="font-semibold">Corpo (Body):</h4>
+          <CodeBlock code={triggerPayload} />
+          <div className="text-sm text-muted-foreground">
+            <p>Este endpoint deve ser chamado pelo seu agendador externo no horário configurado. Ele verifica se o fechamento automático está habilitado e se o estabelecimento já está fechado antes de prosseguir.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>API: Obter Horário de Fechamento</CardTitle>
+          <CardDescription>
+            Endpoint para consultar o horário configurado para o fechamento automático do dia.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm">
+            <Badge variant="secondary">GET</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-close-day-schedule`
+          </div>
+          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
+            <li>`Content-Type`: `application/json`</li>
+          </ul>
+          <h4 className="font-semibold">Exemplo de Resposta:</h4>
+          <CodeBlock code={`{
+  "success": true,
+  "auto_close_time": "23:00"
+}`} />
+          <h4 className="font-semibold">Campos da Resposta:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm">
+            <li><code className="bg-gray-100 p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
+            <li><code className="bg-gray-100 p-1 rounded">auto_close_time</code>: O horário configurado para o fechamento automático (string, formato HH:MM).</li>
           </ul>
         </CardContent>
       </Card>

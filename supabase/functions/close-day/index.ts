@@ -21,27 +21,44 @@ serve(async (req) => {
   try {
     console.log("--- CLOSE-DAY: INICIANDO EXECUÇÃO ---");
 
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error("Cabeçalho de autorização não encontrado.");
-    }
-    console.log("CLOSE-DAY: 1/8 - Cabeçalho de autorização presente.");
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
-    console.log("CLOSE-DAY: 2/8 - Cliente Supabase Admin criado.");
+    console.log("CLOSE-DAY: 1/8 - Cliente Supabase Admin criado.");
 
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError) throw userError;
-    if (!user) throw new Error("Usuário não autenticado ou token inválido.");
-    console.log(`CLOSE-DAY: 3/8 - Usuário autenticado: ${user.id}`);
+    let userId: string;
+    let authHeader = req.headers.get('Authorization');
+    let body: any = {};
+
+    try {
+        body = await req.json();
+    } catch (e) {
+        // Ignorar erro se o corpo estiver vazio (chamada GET ou sem body)
+    }
+
+    // Tenta obter o userId do corpo (usado por trigger-close-day)
+    if (body.userId) {
+        userId = body.userId;
+        console.log(`CLOSE-DAY: 2/8 - Usuário obtido do corpo (ID: ${userId}).`);
+    } 
+    // Tenta obter o userId do token (usado pelo frontend)
+    else if (authHeader) {
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+        if (userError) throw userError;
+        if (!user) throw new Error("Usuário não autenticado ou token inválido.");
+        userId = user.id;
+        console.log(`CLOSE-DAY: 2/8 - Usuário obtido do token (ID: ${userId}).`);
+    } else {
+        throw new Error("ID do usuário não fornecido.");
+    }
+
+    console.log(`CLOSE-DAY: 3/8 - Usuário autenticado: ${userId}`);
 
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('webhook_url, daily_report_phone_number')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
     if (settingsError) throw settingsError;
     if (!settings.webhook_url || !settings.daily_report_phone_number) {
@@ -56,7 +73,7 @@ serve(async (req) => {
     endOfDay.setHours(23, 59, 59, 999);
 
     const { data: stats, error: statsError } = await supabaseAdmin.rpc('get_stats_by_date_range_for_user', {
-      p_user_id: user.id,
+      p_user_id: userId, // Usando o userId obtido
       start_date: startOfDay.toISOString(),
       end_date: endOfDay.toISOString(),
     }).single();
@@ -80,7 +97,7 @@ Um ótimo descanso e até amanhã! ✨
 
     const { data: log, error: logError } = await supabaseAdmin
       .from('message_logs')
-      .insert({ user_id: user.id, trigger_event: 'fechamento_dia', status: 'processando' })
+      .insert({ user_id: userId, trigger_event: 'fechamento_dia', status: 'processando' })
       .select('id')
       .single();
     if (logError) throw logError;
@@ -111,7 +128,7 @@ Um ótimo descanso e até amanhã! ✨
     }
 
     await supabaseAdmin.from('message_logs').update({ status: 'sucesso', webhook_response: responseBody }).eq('id', log.id);
-    await supabaseAdmin.from('user_settings').update({ establishment_is_closed: true }).eq('id', user.id);
+    await supabaseAdmin.from('user_settings').update({ establishment_is_closed: true }).eq('id', userId);
     console.log("CLOSE-DAY: 8/8 - SUCESSO! Dia fechado e status atualizado.");
 
     return new Response(JSON.stringify({ success: true, message: 'Dia fechado e relatório enviado com sucesso!' }), {
