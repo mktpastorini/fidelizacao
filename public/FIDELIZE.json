@@ -1,0 +1,952 @@
+{
+  "name": "FIDELIZE",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Envia Whatsapp",
+        "height": 249,
+        "width": 239
+      },
+      "id": "b720a6c4-d6ce-4c34-9dcc-b04d313935ed",
+      "name": "Sticky Note3",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        16
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "function formatarNumero(telefone) {\n  const numero = telefone.replace(/[^\\d]/g, '');\n\n  let ddd, numeroLocal;\n\n  // Se começa com DDI 55\n  if (numero.startsWith('55')) {\n    const semDDI = numero.slice(2); // Remove o DDI\n    ddd = semDDI.slice(0, 2);\n    numeroLocal = semDDI.slice(2);\n\n    if (numeroLocal.length === 9) {\n      return numero; // Já está formatado\n    }\n\n    if (numeroLocal.length === 8) {\n      return '55' + ddd + '9' + numeroLocal;\n    }\n\n    throw new Error();\n  }\n\n  // Sem DDI\n  if (numero.length === 10) {\n    ddd = numero.slice(0, 2);\n    numeroLocal = numero.slice(2);\n\n    if (numeroLocal.length === 8) {\n      return '55' + ddd + '9' + numeroLocal;\n    }\n  }\n\n  if (numero.length === 11) {\n    return '55' + numero;\n  }\n\n  throw new Error();\n}\n\nconst numeros = $input.all().map((item) => item.json.telefone);\n\nconst resultado = numeros.map((telefone) => {\n  try {\n    return { telefoneFormatado: formatarNumero(telefone) };\n  } catch {\n    return { erro: 'Número inválido. Certifique-se de que possui 11 dígitos.' };\n  }\n});\n\nreturn resultado.map((item) => ({ json: item }));\n"
+      },
+      "id": "d25c8250-4a75-4218-9c12-ee6455e09049",
+      "name": "trata telefone2",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        96
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "body.recipients",
+        "options": {}
+      },
+      "id": "2a4c6320-3dd6-4933-8e14-8fbf45cff997",
+      "name": "Split Out2",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        96
+      ],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "6484a309-b762-4df2-893a-4a3f1e7907d0",
+      "name": "Loop Over Items2",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -304,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "instancias_whatsapp",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "nome",
+              "condition": "fullText",
+              "searchFunction": "wfts",
+              "keyValue": "={{ $('dados1').item.json.instancia }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "desconectado"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        768,
+        352
+      ],
+      "id": "5fafb204-f620-424f-88d5-f915889befe1",
+      "name": "status_para_DESCONECTADO1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "PJboBReHGRIEFV0X",
+          "name": "Supabase mktpastorini"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "08bd632e-bfd0-49e3-8cc7-33e4934c707c",
+              "leftValue": "={{ $json.erro }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notExists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        304,
+        96
+      ],
+      "id": "672efc90-79d0-47fa-b92f-cda8d4841818",
+      "name": "If5"
+    },
+    {
+      "parameters": {
+        "amount": "={{ $json.delay }}",
+        "unit": "=seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        848,
+        -112
+      ],
+      "id": "f7d7ff02-b55c-43b8-9b7a-12c6d650d22c",
+      "name": "espera",
+      "webhookId": "5888cce5-c572-4391-bfa3-3574a180e5de",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "resource": "messages-api",
+        "instanceName": "comercial",
+        "remoteJid": "={{ $('trata telefone2').item.json.telefoneFormatado }}",
+        "messageText": "={{ $('dados1').item.json.Conteudo }}",
+        "options_message": {
+          "delay": "={{ $json.typing_delay }}"
+        }
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "a6e77aba-5005-4da9-af0a-81ccdf1abb0a",
+      "name": "Evolution API",
+      "credentials": {
+        "evolutionApi": {
+          "id": "f37r0DoJth4IPFWH",
+          "name": "Evolution account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "chat-api",
+        "instanceName": "=comercial",
+        "numbers": "={{ $('trata telefone2').item.json.telefoneFormatado }}"
+      },
+      "type": "n8n-nodes-evolution-api.evolutionApi",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -128
+      ],
+      "id": "330191c3-e821-46b8-96c1-c91d3f49e464",
+      "name": "Evolution API1",
+      "credentials": {
+        "evolutionApi": {
+          "id": "f37r0DoJth4IPFWH",
+          "name": "Evolution account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const min = 5;     // mínimo em segundos\nconst max = 230;   // máximo em segundos\nconst media = 45;  // média em segundos\nconst desvio = 15; // desvio padrão em segundos\n\nlet tempoSegundos;\ndo {\n  const u = Math.random();\n  const v = Math.random();\n  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);\n  tempoSegundos = media + desvio * z;\n} while (tempoSegundos < min || tempoSegundos > max);\n\n// adiciona frações de segundo aleatórias (centésimos e milésimos)\nconst fracao = Math.random(); // valor entre 0.000 e 0.999\ntempoSegundos += fracao;\n\n// converte para milissegundos\nconst tempoMs = Math.round(tempoSegundos * 1000);\n\nreturn [{ json: { delay: tempoMs } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        80
+      ],
+      "id": "9d8948ea-e37d-4b2e-9040-c45adaed5566",
+      "name": "randomico"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "58207899-52b4-44a1-a17a-d74bd2182a91",
+              "leftValue": "={{ $json.data[0].exists }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        -128
+      ],
+      "id": "046c3fcc-36a5-4b3e-9c90-612b7af882f6",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "104a8d56-0783-492f-b6ab-139de3c83d27",
+              "name": "telefone",
+              "value": "={{ $json.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "32e24e8b-5901-4350-a394-28363b5fd634",
+              "name": "Conteudo",
+              "value": "={{ $json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "a7ad3aa9-91b0-4db2-a96d-5e58e0bda256",
+              "name": "nome",
+              "value": "={{ $json.client_name }}",
+              "type": "string"
+            },
+            {
+              "id": "57e9be89-63e5-4ea1-b2b2-4552ec3c4a68",
+              "name": "message_id",
+              "value": "={{ $json.log_id }}",
+              "type": "string"
+            },
+            {
+              "id": "bcd949d7-24a0-4203-b1aa-bc3f1391a3a2",
+              "name": "callback",
+              "value": "={{ $json.callback_endpoint }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -80,
+        96
+      ],
+      "id": "abab1a67-f1cd-4d2f-9d4c-a81dd088fd07",
+      "name": "dados1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Espera precisa em milissegundos\nconst delay = $json.delay;\nawait new Promise(resolve => setTimeout(resolve, delay));\nreturn $input.all();\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        80
+      ],
+      "id": "8e0c803d-d9a3-4b32-a9d5-3184d495d747",
+      "name": "timer(ms)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o conteúdo do nó distante \"dados1\"\nconst dados = $items(\"dados1\")[0].json;\nconst texto = dados.Conteudo || \"\";\n\nconst caracteres = texto.length;\n\n// Média e desvio do tempo por caractere (em ms)\nconst mediaCaractere = 180;\nconst desvioCaractere = 60;\n\nlet tempoTotal;\ndo {\n  const u = Math.random();\n  const v = Math.random();\n  const z = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);\n  const tempoPorCaractere = mediaCaractere + desvioCaractere * z;\n  tempoTotal = tempoPorCaractere * caracteres;\n} while (tempoTotal < 500); // evita valores muito curtos\n\n// Adiciona uma pequena variação aleatória (0–400ms)\ntempoTotal += Math.random() * 400;\n\n// Arredonda para inteiro\ntempoTotal = Math.round(tempoTotal);\n\n// Retorna somente o tempo em milissegundos\nreturn [{ json: { typing_delay: tempoTotal } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        944,
+        80
+      ],
+      "id": "04c323d1-f766-4484-bc93-ba5c41d8cf9c",
+      "name": "digitando(ms)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('dados1').item.json.callback }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 8cae2b5a-6588-45ff-ae97-2f46c174d284"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"log_id\": \"{{ $('dados1').item.json.message_id }}\",\n  \"status\": \"failed\"\n}",
+        "options": {}
+      },
+      "id": "df67324a-e247-454b-83ca-e1d7c0dcfb73",
+      "name": "informa não enviou",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        544,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('dados1').item.json.callback }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 8cae2b5a-6588-45ff-ae97-2f46c174d284"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"log_id\": \"{{ $('dados1').item.json.message_id }}\",\n  \"status\": \"delivered\"\n}",
+        "options": {}
+      },
+      "id": "205ef09e-dc82-4f01-b704-1294922a7d4c",
+      "name": "informa enviou",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1376,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "fidelizacao",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -672,
+        96
+      ],
+      "id": "b67707d7-98c0-46cd-8017-fe6a0508e758",
+      "name": "envio de mensagens",
+      "webhookId": "01e619d3-ca94-4a31-9f65-0536ca28e7db"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-birthday-wishes",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 8cae2b5a-6588-45ff-ae97-2f46c174d284"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1268463-4e80-4b22-b0b8-0bf8493a86cb",
+      "name": "inicia função de aniversário",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -496,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 19,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -672,
+        352
+      ],
+      "id": "e8e70759-35c6-43c3-905b-1cfea7a8e9af",
+      "name": "horario de envio"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://n8n.intrategica.com.br/api/v1/workflows/bS4t6Q3EW5SXRRwX",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjNDFmZTQ1My04YzI3LTQ0NzEtODU0MS1lYWQ4Y2M0OGYwZWYiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzYwODI4OTY2fQ.J2CO11Mq26wTITZmIkkmW8GaMn3b8LPM_Ko6WNCnLd0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=={{ JSON.parse(JSON.stringify({ \n  name: $json.name, \n  nodes: $json.nodes, \n  connections: $json.connections, \n  settings: $json.settings \n})) }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        544
+      ],
+      "id": "e52d7ee7-8a28-4bb5-b2f8-97267af667cb",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "url": "https://n8n.intrategica.com.br/api/v1/workflows/bS4t6Q3EW5SXRRwX",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjNDFmZTQ1My04YzI3LTQ0NzEtODU0MS1lYWQ4Y2M0OGYwZWYiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzYwODI4OTY2fQ.J2CO11Mq26wTITZmIkkmW8GaMn3b8LPM_Ko6WNCnLd0"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        832
+      ],
+      "id": "806e9971-2f6a-46b3-b451-1c99316ec624",
+      "name": "obtem json",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const workflow = $json.workflow;\nconst hora = $json.hora;\nconst minuto = $json.minuto;\n\nworkflow.nodes.forEach(node => {\n  if (node.type === 'n8n-nodes-base.scheduleTrigger') {\n    if (\n      node.parameters &&\n      node.parameters.rule &&\n      node.parameters.rule.interval &&\n      node.parameters.rule.interval[0]\n    ) {\n      node.parameters.rule.interval[0].triggerAtHour = hora;\n      node.parameters.rule.interval[0].triggerAtMinute = minuto;\n    }\n  }\n\n  // 🔹 Limpa \\n e \\t dos parâmetros (evita erros no HTTP Request)\n  if (node.parameters) {\n    for (const key in node.parameters) {\n      if (typeof node.parameters[key] === 'string') {\n        node.parameters[key] = node.parameters[key].replace(/\\\\n|\\\\t/g, ' ');\n      }\n    }\n  }\n});\n\n// 🔹 Cria JSON limpo sem caracteres escapados\nconst workflowLimpo = JSON.parse(\n  JSON.stringify({\n    name: workflow.name,\n    nodes: workflow.nodes,\n    connections: workflow.connections,\n    settings: workflow.settings,\n  })\n);\n\nreturn [\n  {\n    json: workflowLimpo,\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        560
+      ],
+      "id": "3b184538-04f4-418c-8f53-a819bf2d8f7c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6495c32c-202a-42b8-900e-c826f6a564ae",
+              "name": "workflow",
+              "value": "={{ $json }}",
+              "type": "object"
+            },
+            {
+              "id": "1a7dc7fb-bcba-4db3-b21b-6f8f05a0943d",
+              "name": "dataHora",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "617e520b-cdb5-40e4-a183-5daa16be49c1",
+              "name": "hora",
+              "value": "={{ $('separa hora minuto').item.json.hora }}",
+              "type": "string"
+            },
+            {
+              "id": "a50224c8-61af-43fa-ad3e-d053ae8e99a1",
+              "name": "minuto",
+              "value": "={{ $('separa hora minuto').item.json.minuto }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -192,
+        560
+      ],
+      "id": "dc9fd870-b6e1-4392-ac24-ceb9edbc15b6",
+      "name": "dados"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "67947883-6297-485b-baa8-7daa60373c6b",
+              "name": "horario",
+              "value": "={{ $json.body.new_time }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -496,
+        560
+      ],
+      "id": "6c590054-c380-4414-a292-fd01d4b5175b",
+      "name": "Set"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pega o valor do campo \"horario\" do nó anterior chamado \"Set\"\nconst horario = $items(\"Set\")[0].json.horario; // ex: \"18:53:00\"\n\n// Separa a string em hora e minuto\nconst partes = horario.split(\":\");\nconst hora = parseInt(partes[0], 10);\nconst minuto = parseInt(partes[1], 10);\n\n// Retorna hora e minuto em JSON\nreturn [{\n  json: {\n    hora,\n    minuto\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -352,
+        560
+      ],
+      "id": "f35d3b5a-034d-453c-9673-1d9cd6a29319",
+      "name": "separa hora minuto"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "envMSG-horarios-aniversario",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -672,
+        560
+      ],
+      "id": "d5db5290-67e0-4f65-8754-05a5903d3c4c",
+      "name": "define horario",
+      "webhookId": "84f81c16-3a46-4632-b467-d3eedabe4256"
+    },
+    {
+      "parameters": {
+        "jsCode": "let workflow = $json;\nconst hora = $json.hora;\nconst minuto = $json.minuto;\n\n// 🔧 Converte strings JSON (com \\n) de volta para objetos\nif (typeof workflow === 'string') {\n  workflow = JSON.parse(workflow);\n}\n\n// 🔁 Percorre os nós e atualiza o horário do Schedule Trigger\nworkflow.nodes.forEach(node => {\n  if (node.type === 'n8n-nodes-base.scheduleTrigger') {\n    if (node.parameters.rule?.interval?.[0]) {\n      node.parameters.rule.interval[0].triggerAtHour = hora;\n      node.parameters.rule.interval[0].triggerAtMinute = minuto;\n    }\n  }\n\n  // 🧹 Corrige o campo jsCode (remove \\n e transforma em texto legível)\n  if (node.parameters?.jsCode && typeof node.parameters.jsCode === 'string') {\n    node.parameters.jsCode = node.parameters.jsCode.replace(/\\\\n/g, '\\n');\n  }\n});\n\nreturn [{\n  json: {\n    name: workflow.name,\n    nodes: workflow.nodes,\n    connections: workflow.connections,\n    settings: workflow.settings\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        720
+      ],
+      "id": "ad5f86ec-cb8c-4821-9974-8887b1b212cc",
+      "name": "Code in JavaScript1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "workflowId": {
+          "__rl": true,
+          "value": "bS4t6Q3EW5SXRRwX",
+          "mode": "list",
+          "cachedResultName": "FIDELIZE (#bS4t6Q3EW5SXRRwX)"
+        },
+        "workflowObject": "={{ $('dados').item.json.workflow }}",
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-base.n8n",
+      "typeVersion": 1,
+      "position": [
+        80,
+        656
+      ],
+      "id": "bbe1a488-9656-438e-90e0-bb377ee3e18e",
+      "name": "Update a workflow",
+      "credentials": {
+        "n8nApi": {
+          "id": "RzQeeV8xxhR6oRJs",
+          "name": "n8n account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "trata telefone2": {
+      "main": [
+        [
+          {
+            "node": "If5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "informa não enviou",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [],
+        [
+          {
+            "node": "dados1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If5": {
+      "main": [
+        [
+          {
+            "node": "Evolution API1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "informa não enviou",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "espera": {
+      "main": [
+        []
+      ]
+    },
+    "Evolution API": {
+      "main": [
+        [
+          {
+            "node": "informa enviou",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "informa não enviou",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evolution API1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "randomico": {
+      "main": [
+        [
+          {
+            "node": "timer(ms)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "randomico",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dados1": {
+      "main": [
+        [
+          {
+            "node": "trata telefone2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "timer(ms)": {
+      "main": [
+        [
+          {
+            "node": "digitando(ms)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "digitando(ms)": {
+      "main": [
+        [
+          {
+            "node": "Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "informa não enviou": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "informa enviou": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "envio de mensagens": {
+      "main": [
+        [
+          {
+            "node": "Split Out2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "horario de envio": {
+      "main": [
+        [
+          {
+            "node": "inicia função de aniversário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "obtem json": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update a workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dados": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "separa hora minuto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "separa hora minuto": {
+      "main": [
+        [
+          {
+            "node": "dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "define horario": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "baccca83-28cc-4d4b-9b99-82b42a9789be",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0a46dda1a09d3ace41010dcc44eb7730d73a355ec46cf74cda7dfbdfb9540ba3"
+  },
+  "id": "bS4t6Q3EW5SXRRwX",
+  "tags": []
+}
