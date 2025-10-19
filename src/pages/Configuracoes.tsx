@@ -190,6 +190,47 @@ export default function ConfiguracoesPage() {
     },
   });
 
+  const testN8nWebhookMutation = useMutation({
+    mutationFn: async () => {
+      if (!settings?.n8n_webhook_url) {
+        throw new Error("Nenhuma URL de webhook n8n configurada.");
+      }
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Adiciona chave de API se fornecida
+      if (settings.n8n_api_key) {
+        headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
+      }
+      
+      // Envia notificação de teste para o n8n
+      const response = await fetch(settings.n8n_webhook_url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          event: 'test_connection',
+          message: 'Teste de conexão bem-sucedido do Fidelize',
+          timestamp: new Date().toISOString()
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Falha ao testar webhook n8n: ${response.status} - ${errorText}`);
+      }
+      
+      return response;
+    },
+    onSuccess: () => {
+      showSuccess("Webhook n8n testado com sucesso! Verifique seu serviço para a mensagem de teste.");
+    },
+    onError: (error: Error) => {
+      showError(`Teste falhou: ${error.message}`);
+    },
+  });
+
   const regenerateApiKeyMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.rpc('regenerate_api_key');
@@ -316,6 +357,8 @@ export default function ConfiguracoesPage() {
                     onSubmit={(values) => updateSettingsMutation.mutate(values)} 
                     isSubmitting={updateSettingsMutation.isPending} 
                     defaultValues={settings || undefined} 
+                    onTest={() => testN8nWebhookMutation.mutate()}
+                    isTesting={testN8nWebhookMutation.isPending}
                   />
                 )}
               </CardContent>

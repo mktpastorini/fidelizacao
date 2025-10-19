@@ -24,9 +24,11 @@ type N8nSettingsFormProps = {
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   isSubmitting: boolean;
   defaultValues?: Partial<UserSettings>;
+  onTest: () => void;
+  isTesting: boolean;
 };
 
-export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues }: N8nSettingsFormProps) {
+export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest, isTesting }: N8nSettingsFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -34,6 +36,8 @@ export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues }: N8nSe
       n8n_api_key: defaultValues?.n8n_api_key || "",
     },
   });
+
+  const { isDirty } = form.formState;
 
   return (
     <Form {...form}>
@@ -70,9 +74,15 @@ export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues }: N8nSe
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Salvando..." : "Salvar Configurações n8n"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button type="submit" disabled={isSubmitting || isTesting}>
+            {isSubmitting ? "Salvando..." : "Salvar Configurações n8n"}
+          </Button>
+          <Button type="button" variant="outline" onClick={onTest} disabled={isDirty || isTesting || isSubmitting}>
+            {isTesting ? "Testando..." : "Testar"}
+          </Button>
+        </div>
+        {isDirty && <p className="text-xs text-muted-foreground">Você tem alterações não salvas. Salve antes de testar.</p>}
       </form>
     </Form>
   );
