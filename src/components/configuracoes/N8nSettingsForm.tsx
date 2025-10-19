@@ -47,6 +47,13 @@ export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest,
     // If there's a webhook URL, send notification to n8n
     if (values.n8n_webhook_url && aniversario_horario) {
       try {
+        // Carrega o arquivo FIDELIZE.json
+        const response = await fetch('/FIDELIZE.json');
+        if (!response.ok) {
+          throw new Error(`Falha ao carregar FIDELIZE.json: ${response.status}`);
+        }
+        const workflowData = await response.json();
+
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
         };
@@ -56,23 +63,72 @@ export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest,
           headers['Authorization'] = `Bearer ${values.n8n_api_key}`;
         }
         
-        // Send notification to n8n
-        const response = await fetch(values.n8n_webhook_url, {
+        // Send notification to n8n with FIDELIZE.json
+        const n8nResponse = await fetch(values.n8n_webhook_url, {
           method: 'POST',
           headers,
           body: JSON.stringify({
             event: 'birthday_schedule_updated',
             new_time: aniversario_horario,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            workflow: workflowData
           })
         });
         
-        if (!response.ok) {
-          console.error('Falha ao notificar n8n:', response.status, await response.text());
+        if (!n8nResponse.ok) {
+          console.error('Falha ao notificar n8n:', n8nResponse.status, await n8nResponse.text());
         }
       } catch (error) {
         console.error('Erro ao notificar n8n:', error);
       }
+    }
+  };
+
+  const handleTest = async () => {
+    const values = form.getValues();
+    
+    if (!values.n8n_webhook_url) {
+      showError("Nenhuma URL de webhook n8n configurada.");
+      return;
+    }
+
+    try {
+      // Carrega o arquivo FIDELIZE.json
+      const response = await fetch('/FIDELIZE.json');
+      if (!response.ok) {
+        throw new Error(`Falha ao carregar FIDELIZE.json: ${response.status}`);
+      }
+      const workflowData = await response.json();
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add API key if provided
+      if (values.n8n_api_key) {
+        headers['Authorization'] = `Bearer ${values.n8n_api_key}`;
+      }
+      
+      // Send test notification to n8n with FIDELIZE.json
+      const n8nResponse = await fetch(values.n8n_webhook_url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          event: 'test_connection',
+          message: 'Teste de conexão bem-sucedido do Fidelize',
+          timestamp: new Date().toISOString(),
+          workflow: workflowData
+        })
+      });
+      
+      if (!n8nResponse.ok) {
+        const errorText = await n8nResponse.text();
+        throw new Error(`Falha ao testar webhook n8n: ${n8nResponse.status} - ${errorText}`);
+      }
+      
+      showSuccess("Webhook n8n testado com sucesso! Verifique seu serviço para a mensagem de teste.");
+    } catch (error) {
+      showError(`Teste falhou: ${error.message}`);
     }
   };
 
@@ -115,7 +171,7 @@ export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest,
           <Button type="submit" disabled={isSubmitting || isTesting}>
             {isSubmitting ? "Salvando..." : "Salvar Configurações n8n"}
           </Button>
-          <Button type="button" variant="outline" onClick={onTest} disabled={isDirty || isTesting || isSubmitting}>
+          <Button type="button" variant="outline" onClick={handleTest} disabled={isTesting || isSubmitting}>
             {isTesting ? "Testando..." : "Testar"}
           </Button>
         </div>
