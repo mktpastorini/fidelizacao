@@ -17,7 +17,6 @@ import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
-import { N8nSettingsForm } from "@/components/configuracoes/N8nSettingsForm";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -100,39 +99,6 @@ function CompreFaceSettingsForm() {
   );
 }
 
-// Função para enviar notificação para o n8n
-async function sendN8nNotification(settings: UserSettings | null, newTime: string) {
-  if (!settings?.n8n_webhook_url) return;
-
-  try {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    
-    // Adiciona chave de API se fornecida
-    if (settings.n8n_api_key) {
-      headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
-    }
-    
-    // Envia notificação para o n8n
-    const response = await fetch(settings.n8n_webhook_url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        event: 'birthday_schedule_updated',
-        new_time: newTime,
-        timestamp: new Date().toISOString()
-      })
-    });
-    
-    if (!response.ok) {
-      console.error('Falha ao notificar n8n:', response.status, await response.text());
-    }
-  } catch (error) {
-    console.error('Erro ao notificar n8n:', error);
-  }
-}
-
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
@@ -161,74 +127,6 @@ export default function ConfiguracoesPage() {
     onError: (error: Error) => showError(error.message),
   });
 
-  const updateBirthdayTimeMutation = useMutation({
-    mutationFn: async (newTime: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-      
-      // Atualiza as configurações no banco de dados
-      const settingsToUpsert = { id: user.id, aniversario_horario: newTime };
-      const { error: updateError } = await supabase.from("user_settings").upsert(settingsToUpsert);
-      if (updateError) throw new Error(updateError.message);
-
-      // Envia notificação para o n8n
-      await sendN8nNotification(settings, newTime);
-    },
-    onSuccess: () => {
-      refetchSettings();
-      showSuccess("Horário de aniversário atualizado com sucesso!");
-    },
-    onError: (error: Error) => showError(error.message),
-  });
-
-  const updateSettingsWithN8nNotificationMutation = useMutation({
-    mutationFn: async (updatedSettings: Partial<UserSettings>) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-      
-      // Atualiza as configurações no banco de dados
-      const settingsToUpsert = { id: user.id, ...updatedSettings };
-      const { error: updateError } = await supabase.from("user_settings").upsert(settingsToUpsert);
-      if (updateError) throw new Error(updateError.message);
-
-      // Se houver uma URL do webhook n8n configurada, notifica sobre a mudança
-      if (settings?.n8n_webhook_url && updatedSettings.aniversario_horario) {
-        try {
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          
-          // Adiciona chave de API se fornecida
-          if (settings.n8n_api_key) {
-            headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
-          }
-          
-          // Envia notificação para o n8n
-          const response = await fetch(settings.n8n_webhook_url, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              event: 'birthday_schedule_updated',
-              new_time: updatedSettings.aniversario_horario,
-              timestamp: new Date().toISOString()
-            })
-          });
-          
-          if (!response.ok) {
-            console.error('Falha ao notificar n8n:', response.status, await response.text());
-          }
-        } catch (error) {
-          console.error('Erro ao notificar n8n:', error);
-        }
-      }
-    },
-    onSuccess: () => {
-      refetchSettings();
-      showSuccess("Configurações salvas com sucesso!");
-    },
-    onError: (error: Error) => showError(error.message),
-  });
-
   const testWebhookMutation = useMutation({
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke('test-webhook');
@@ -237,47 +135,6 @@ export default function ConfiguracoesPage() {
     },
     onSuccess: () => {
       showSuccess("Webhook testado com sucesso! Verifique seu serviço para a mensagem de teste.");
-    },
-    onError: (error: Error) => {
-      showError(`Teste falhou: ${error.message}`);
-    },
-  });
-
-  const testN8nWebhookMutation = useMutation({
-    mutationFn: async () => {
-      if (!settings?.n8n_webhook_url) {
-        throw new Error("Nenhuma URL de webhook n8n configurada.");
-      }
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      // Adiciona chave de API se fornecida
-      if (settings.n8n_api_key) {
-        headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
-      }
-      
-      // Envia notificação de teste para o n8n
-      const response = await fetch(settings.n8n_webhook_url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          event: 'test_connection',
-          message: 'Teste de conexão bem-sucedido do Fidelize',
-          timestamp: new Date().toISOString()
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Falha ao testar webhook n8n: ${response.status} - ${errorText}`);
-      }
-      
-      return response;
-    },
-    onSuccess: () => {
-      showSuccess("Webhook n8n testado com sucesso! Verifique seu serviço para a mensagem de teste.");
     },
     onError: (error: Error) => {
       showError(`Teste falhou: ${error.message}`);
@@ -328,7 +185,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="perfil">Perfil & Integrações</TabsTrigger>
           <TabsTrigger value="automacao">Automação</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
@@ -382,7 +239,7 @@ export default function ConfiguracoesPage() {
                         id="birthday-time" 
                         type="time" 
                         defaultValue={settings?.aniversario_horario || "09:00"} 
-                        onBlur={(e) => updateBirthdayTimeMutation.mutate(e.target.value)} 
+                        onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} 
                       />
                     </div>
                     <Button 
@@ -396,24 +253,6 @@ export default function ConfiguracoesPage() {
                       Para envio automático, consulte a Documentação API para instruções sobre como configurar a automação externa.
                     </p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Integração com n8n</CardTitle>
-                <CardDescription>Configure a conexão com sua automação no n8n.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? <Skeleton className="h-32 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (
-                  <N8nSettingsForm 
-                    onSubmit={(values) => updateSettingsMutation.mutate(values)} 
-                    isSubmitting={updateSettingsMutation.isPending} 
-                    defaultValues={settings || undefined} 
-                    onTest={() => testN8nWebhookMutation.mutate()}
-                    isTesting={testN8nWebhookMutation.isPending}
-                    aniversario_horario={settings?.aniversario_horario}
-                  />
                 )}
               </CardContent>
             </Card>
