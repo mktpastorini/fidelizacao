@@ -70,7 +70,12 @@ serve(async (req) => {
     // 5. Verificar se é o horário correto (usando a hora de Brasília)
     const nowBrazil = getBrazilTime();
     const currentTime = nowBrazil.toTimeString().substring(0, 5); // HH:MM
-    const scheduledTime = settings.auto_close_time || "23:00";
+    
+    // Garante que o horário agendado também esteja no formato HH:MM
+    let scheduledTime = settings.auto_close_time || "23:00";
+    if (scheduledTime.length > 5) {
+        scheduledTime = scheduledTime.substring(0, 5);
+    }
     
     console.log(`Hora atual (BR): ${currentTime}, Hora agendada: ${scheduledTime}`);
 
