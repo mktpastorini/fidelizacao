@@ -119,3 +119,10 @@ export type MessageLog = {
   template: { nome: string } | null;
   delivery_status: 'pending' | 'delivered' | 'failed' | null;
 };
+
+export type LowStockProduct = {
+  id: string;
+  nome: string;
+  estoque_atual: number;
+  alerta_estoque_baixo: number;
+};
