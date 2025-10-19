@@ -106,23 +106,5 @@ export type Produto = {
   estoque_atual: number;
   alerta_estoque_baixo: number;
   valor_compra: number | null;
-};
-
-export type MessageLog = {
-  id: string;
-  created_at: string;
-  status: 'sucesso' | 'falha';
-  trigger_event: 'chegada' | 'pagamento' | 'fechamento_dia' | 'manual' | 'abertura_dia' | 'aniversario';
-  error_message: string | null;
-  webhook_response: Record<string, any> | null;
-  cliente: { nome: string } | null;
-  template: { nome: string } | null;
-  delivery_status: 'pending' | 'delivered' | 'failed' | null;
-};
-
-export type LowStockProduct = {
-  id: string;
-  nome: string;
-  estoque_atual: number;
-  alerta_estoque_baixo: number;
+  mostrar_no_menu?: boolean; // Novo campo para controle de exibição no menu público
 };

@@ -1,9 +1,24 @@
 import { Mesa, Pedido, ItemPedido } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Users, User, Clock, DollarSign } from "lucide-react";
+import { Users, User, Clock, DollarSign, MoreVertical, QrCode } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { QRCodeModal } from "./QRCodeModal";
+
+// Função para obter data/hora no horário de Brasília
+function getBrazilTime() {
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
 
 type MesaComPedido = Mesa & {
   pedido?: (Pedido & { itens_pedido: ItemPedido[] }) | null;
@@ -16,14 +31,9 @@ type MesaCardProps = {
   children?: React.ReactNode;
 };
 
-// Função para obter data/hora no horário de Brasília
-function getBrazilTime() {
-  const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
-}
-
 export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardProps) {
+  const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
+
   const isOcupada = !!mesa.cliente;
   
   const pedidoTotal = mesa.pedido?.itens_pedido.reduce((acc, item) => {
@@ -38,44 +48,78 @@ export function MesaCard({ mesa, ocupantesCount, onClick, children }: MesaCardPr
   
   const hasPendingItems = mesa.pedido?.itens_pedido.some(item => item.status === 'pendente' || item.status === 'preparando');
 
+  // URL pública do menu para a mesa
+  const qrCodeUrl = `${window.location.origin}/menu-publico/${mesa.id}`;
+
   return (
-    <Card
-      className={cn(
-        "border transition-all hover:border-primary/50 cursor-pointer flex flex-col justify-between",
-        isOcupada ? "bg-card" : "bg-secondary/50",
-        hasPendingItems && "border-accent ring-2 ring-accent/50"
-      )}
-    >
-      <CardHeader className="flex flex-row items-start justify-between pb-2">
-        <div onClick={onClick} className="flex-1">
-          <CardTitle className="text-2xl font-bold">Mesa {mesa.numero}</CardTitle>
-          <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
-            <Users className="w-3 h-3" />
-            <span>{ocupantesCount} / {mesa.capacidade}</span>
-          </div>
-        </div>
-        {children}
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col justify-end" onClick={onClick}>
-        {isOcupada ? (
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 font-semibold text-primary">
-              <User className="w-4 h-4" />
-              <span className="truncate">{mesa.cliente?.nome}</span>
-            </div>
-            <div className="flex items-center text-muted-foreground text-xs gap-2">
-              <Clock className="w-3 h-3" />
-              <span>{tempoOcupada}</span>
-            </div>
-            <div className="flex items-center text-muted-foreground text-xs gap-2">
-              <DollarSign className="w-3 h-3" />
-              <span>R$ {pedidoTotal.toFixed(2)}</span>
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm font-semibold text-green-500">Livre</p>
+    <>
+      <Card
+        className={cn(
+          "border transition-all hover:border-primary/50 cursor-pointer flex flex-col justify-between",
+          isOcupada ? "bg-card" : "bg-secondary/50",
+          hasPendingItems && "border-accent ring-2 ring-accent/50"
         )}
-      </CardContent>
-    </Card>
+      >
+        <CardHeader className="flex flex-row items-start justify-between pb-2">
+          <div onClick={onClick} className="flex-1">
+            <CardTitle className="text-2xl font-bold">Mesa {mesa.numero}</CardTitle>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
+              <Users className="w-3 h-3" />
+              <span>{ocupantesCount} / {mesa.capacidade}</span>
+            </div>
+          </div>
+          <div>
+            {children}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  aria-label="Menu da Mesa"
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <MoreVertical className="w-5 h-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                {mesa.cliente_id && (
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onClick(); }}>
+                    <Users className="w-4 h-4 mr-2" /> Ver Detalhes
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setIsQRCodeOpen(true); }}>
+                  <QrCode className="w-4 h-4 mr-2" /> Visualizar QR Code
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1 flex flex-col justify-end" onClick={onClick}>
+          {isOcupada ? (
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center gap-2 font-semibold text-primary">
+                <User className="w-4 h-4" />
+                <span className="truncate">{mesa.cliente?.nome}</span>
+              </div>
+              <div className="flex items-center text-muted-foreground text-xs gap-2">
+                <Clock className="w-3 h-3" />
+                <span>{tempoOcupada}</span>
+              </div>
+              <div className="flex items-center text-muted-foreground text-xs gap-2">
+                <DollarSign className="w-3 h-3" />
+                <span>R$ {pedidoTotal.toFixed(2)}</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm font-semibold text-green-500">Livre</p>
+          )}
+        </CardContent>
+      </Card>
+      <QRCodeModal
+        isOpen={isQRCodeOpen}
+        onOpenChange={setIsQRCodeOpen}
+        mesaNumero={mesa.numero}
+        qrCodeUrl={qrCodeUrl}
+      />
+    </>
   );
 }

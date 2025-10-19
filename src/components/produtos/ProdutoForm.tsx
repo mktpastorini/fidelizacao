@@ -37,6 +37,7 @@ const formSchema = z.object({
   estoque_atual: z.coerce.number().int().min(0, "O estoque atual não pode ser negativo.").default(0),
   alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
   valor_compra: z.coerce.number().min(0, "O valor de compra não pode ser negativo.").nullable().optional().transform(val => val === 0 ? null : val),
+  mostrar_no_menu: z.boolean().default(false),
 });
 
 type ProdutoFormProps = {
@@ -61,6 +62,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       estoque_atual: defaultValues?.estoque_atual || 0,
       alerta_estoque_baixo: defaultValues?.alerta_estoque_baixo || 0,
       valor_compra: defaultValues?.valor_compra || undefined,
+      mostrar_no_menu: defaultValues?.mostrar_no_menu || false,
     },
   });
 
@@ -217,13 +219,13 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
 
         <FormField
           control={form.control}
-          name="requer_preparo"
+          name="mostrar_no_menu"
           render={({ field }) => (
             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
               <div className="space-y-0.5">
-                <FormLabel>Requer Preparo na Cozinha?</FormLabel>
+                <FormLabel>Mostrar no Menu Público</FormLabel>
                 <FormDescription>
-                  Marque se este item deve aparecer no painel da cozinha para ser preparado.
+                  Ative para que este produto apareça no cardápio público acessado pelo QR code.
                 </FormDescription>
               </div>
               <FormControl>
@@ -235,6 +237,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
             </FormItem>
           )}
         />
+
         <FormField
           control={form.control}
           name="descricao"
