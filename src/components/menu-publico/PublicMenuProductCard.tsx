@@ -3,26 +3,34 @@ import { Produto } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { showSuccess, showError } from "@/utils/toast";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type PublicMenuProductCardProps = {
   produto: Produto;
-  onOrder: (produto: Produto) => Promise<void>;
+  onOrder: (produto: Produto, quantidade: number) => Promise<void>;
 };
 
-export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardProps) {
+export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
+  const [quantidade, setQuantidade] = useState(1);
 
   const handleOrderClick = () => {
+    setQuantidade(1); // Reset quantity on open
     setIsConfirmOpen(true);
   };
 
   const handleConfirmOrder = async () => {
+    if (quantidade < 1) {
+      showError("A quantidade deve ser pelo menos 1.");
+      return;
+    }
     setIsOrdering(true);
     try {
-      await onOrder(produto);
-      showSuccess(`Pedido de "${produto.nome}" adicionado com sucesso!`);
+      await onOrder(produto, quantidade);
+      showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
       setIsConfirmOpen(false);
     } catch (error: any) {
       showError(error.message || "Erro ao adicionar pedido.");
@@ -58,7 +66,7 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
             />
             <div className="relative z-20">
               <Button onClick={handleOrderClick} disabled={isOrdering} size="lg" variant="secondary">
-                {isOrdering ? "Enviando..." : "Pedir"}
+                Pedir
               </Button>
             </div>
           </div>
@@ -69,13 +77,27 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar Pedido</DialogTitle>
+            <DialogTitle>Adicionar ao Pedido</DialogTitle>
           </DialogHeader>
-          <p className="p-4 text-center text-lg">Deseja adicionar <strong>{produto.nome}</strong> à sua comanda?</p>
-          <DialogFooter className="flex justify-center gap-4">
+          <div className="p-4 space-y-4">
+            <p className="text-lg">Item: <strong>{produto.nome}</strong></p>
+            <div className="space-y-2">
+              <Label htmlFor="quantidade">Quantidade</Label>
+              <Input 
+                id="quantidade"
+                type="number" 
+                min="1" 
+                value={quantidade} 
+                onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))} 
+                className="w-full"
+              />
+            </div>
+            <p className="text-xl font-bold text-right">Total: R$ {(produto.preco * quantidade).toFixed(2).replace('.', ',')}</p>
+          </div>
+          <DialogFooter className="flex justify-end gap-4">
             <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isOrdering}>Cancelar</Button>
             <Button onClick={handleConfirmOrder} disabled={isOrdering}>
-              {isOrdering ? "Adicionando..." : "Confirmar"}
+              {isOrdering ? "Adicionando..." : "Confirmar Pedido"}
             </Button>
           </DialogFooter>
         </DialogContent>

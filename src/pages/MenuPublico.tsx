@@ -60,7 +60,7 @@ export default function MenuPublicoPage() {
 
   const isMesaOcupada = !!mesaData?.cliente_id;
 
-  const handleOrder = async (produto: Produto) => {
+  const handleOrder = async (produto: Produto, quantidade: number) => {
     if (!mesaId || !mesaData || !mesaData.user_id) {
       throw new Error("Mesa ou dados do estabelecimento não identificados.");
     }
@@ -103,7 +103,7 @@ export default function MenuPublicoPage() {
     const { error: itemError } = await supabase.from("itens_pedido").insert({
       pedido_id: pedidoId,
       nome_produto: produto.nome,
-      quantidade: 1,
+      quantidade: quantidade, // Usando a quantidade selecionada
       preco: produto.preco,
       status: "pendente",
       requer_preparo: produto.requer_preparo,
