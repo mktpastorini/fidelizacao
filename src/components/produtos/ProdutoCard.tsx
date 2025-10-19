@@ -16,21 +16,28 @@ type ProdutoCardProps = {
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
-  const isLowStock = produto.estoque_atual <= produto.alerta_estoque_baixo && produto.estoque_atual > 0;
-  const isOutOfStock = produto.estoque_atual === 0;
+  // Garante que estoque_atual e alerta_estoque_baixo sejam tratados como 0 se forem null/undefined
+  const estoqueAtual = produto.estoque_atual ?? 0;
+  const alertaEstoqueBaixo = produto.alerta_estoque_baixo ?? 0;
+
+  const isLowStock = estoqueAtual <= alertaEstoqueBaixo && estoqueAtual > 0;
+  const isOutOfStock = estoqueAtual === 0;
 
   const getStockBadge = () => {
     if (isOutOfStock) {
       return <Badge variant="destructive">Esgotado</Badge>;
     }
     if (isLowStock) {
-      return <Badge variant="warning">Estoque Baixo ({produto.estoque_atual})</Badge>;
+      return <Badge variant="warning">Estoque Baixo ({estoqueAtual})</Badge>;
     }
-    return <Badge variant="secondary">Em Estoque ({produto.estoque_atual})</Badge>;
+    return <Badge variant="secondary">Em Estoque ({estoqueAtual})</Badge>;
   };
 
   return (
-    <Card className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-56">
+    <Card 
+      className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-56 cursor-pointer"
+      onClick={onEdit} // Adiciona o clique para edição no card
+    >
       {/* Imagem de Fundo (Expansível no Hover) */}
       <div 
         className={cn(
@@ -46,7 +53,9 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
         {/* Overlay para escurecer a imagem e centralizar o botão */}
         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
           <Button 
-            onClick={onEdit} 
+            // O botão de edição aqui é redundante, mas mantemos para clareza visual no hover
+            // O clique principal é no Card, mas este botão reforça a ação
+            onClick={(e) => { e.stopPropagation(); onEdit(); }} 
             className="text-white bg-primary hover:bg-primary/90 transition-all scale-0 group-hover:scale-100"
           >
             <Edit className="w-4 h-4 mr-2" /> Editar Produto
@@ -56,6 +65,8 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
 
       {/* Conteúdo Principal (Visível por padrão, some no Hover) */}
       <CardContent 
+        // Impedimos a propagação do clique aqui para que o dropdown funcione
+        onClick={(e) => e.stopPropagation()}
         className={cn(
           "absolute inset-0 p-4 flex flex-col justify-between transition-opacity duration-300 bg-card",
           "group-hover:opacity-0 opacity-100"
