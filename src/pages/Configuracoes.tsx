@@ -100,18 +100,11 @@ function CompreFaceSettingsForm() {
   );
 }
 
-// Função para enviar notificação para o n8n com o arquivo FIDELIZE.json
+// Função para enviar notificação para o n8n
 async function sendN8nNotification(settings: UserSettings | null, newTime: string) {
   if (!settings?.n8n_webhook_url) return;
 
   try {
-    // Carrega o arquivo FIDELIZE.json
-    const response = await fetch('/FIDELIZE.json');
-    if (!response.ok) {
-      throw new Error(`Falha ao carregar FIDELIZE.json: ${response.status}`);
-    }
-    const workflowData = await response.json();
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -121,20 +114,19 @@ async function sendN8nNotification(settings: UserSettings | null, newTime: strin
       headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
     }
     
-    // Envia notificação para o n8n com o arquivo FIDELIZE.json
-    const n8nResponse = await fetch(settings.n8n_webhook_url, {
+    // Envia notificação para o n8n
+    const response = await fetch(settings.n8n_webhook_url, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         event: 'birthday_schedule_updated',
         new_time: newTime,
-        timestamp: new Date().toISOString(),
-        workflow: workflowData
+        timestamp: new Date().toISOString()
       })
     });
     
-    if (!n8nResponse.ok) {
-      console.error('Falha ao notificar n8n:', n8nResponse.status, await n8nResponse.text());
+    if (!response.ok) {
+      console.error('Falha ao notificar n8n:', response.status, await response.text());
     }
   } catch (error) {
     console.error('Erro ao notificar n8n:', error);
@@ -179,7 +171,7 @@ export default function ConfiguracoesPage() {
       const { error: updateError } = await supabase.from("user_settings").upsert(settingsToUpsert);
       if (updateError) throw new Error(updateError.message);
 
-      // Envia notificação para o n8n com o arquivo FIDELIZE.json
+      // Envia notificação para o n8n
       await sendN8nNotification(settings, newTime);
     },
     onSuccess: () => {
@@ -202,13 +194,6 @@ export default function ConfiguracoesPage() {
       // Se houver uma URL do webhook n8n configurada, notifica sobre a mudança
       if (settings?.n8n_webhook_url && updatedSettings.aniversario_horario) {
         try {
-          // Carrega o arquivo FIDELIZE.json
-          const response = await fetch('/FIDELIZE.json');
-          if (!response.ok) {
-            throw new Error(`Falha ao carregar FIDELIZE.json: ${response.status}`);
-          }
-          const workflowData = await response.json();
-
           const headers: Record<string, string> = {
             'Content-Type': 'application/json',
           };
@@ -218,20 +203,19 @@ export default function ConfiguracoesPage() {
             headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
           }
           
-          // Envia notificação para o n8n com o arquivo FIDELIZE.json
-          const n8nResponse = await fetch(settings.n8n_webhook_url, {
+          // Envia notificação para o n8n
+          const response = await fetch(settings.n8n_webhook_url, {
             method: 'POST',
             headers,
             body: JSON.stringify({
               event: 'birthday_schedule_updated',
               new_time: updatedSettings.aniversario_horario,
-              timestamp: new Date().toISOString(),
-              workflow: workflowData
+              timestamp: new Date().toISOString()
             })
           });
           
-          if (!n8nResponse.ok) {
-            console.error('Falha ao notificar n8n:', n8nResponse.status, await n8nResponse.text());
+          if (!response.ok) {
+            console.error('Falha ao notificar n8n:', response.status, await response.text());
           }
         } catch (error) {
           console.error('Erro ao notificar n8n:', error);
@@ -265,13 +249,6 @@ export default function ConfiguracoesPage() {
         throw new Error("Nenhuma URL de webhook n8n configurada.");
       }
 
-      // Carrega o arquivo FIDELIZE.json
-      const response = await fetch('/FIDELIZE.json');
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar FIDELIZE.json: ${response.status}`);
-      }
-      const workflowData = await response.json();
-
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -281,24 +258,23 @@ export default function ConfiguracoesPage() {
         headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
       }
       
-      // Envia notificação de teste para o n8n com o arquivo FIDELIZE.json
-      const n8nResponse = await fetch(settings.n8n_webhook_url, {
+      // Envia notificação de teste para o n8n
+      const response = await fetch(settings.n8n_webhook_url, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           event: 'test_connection',
           message: 'Teste de conexão bem-sucedido do Fidelize',
-          timestamp: new Date().toISOString(),
-          workflow: workflowData
+          timestamp: new Date().toISOString()
         })
       });
       
-      if (!n8nResponse.ok) {
-        const errorText = await n8nResponse.text();
-        throw new Error(`Falha ao testar webhook n8n: ${n8nResponse.status} - ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Falha ao testar webhook n8n: ${response.status} - ${errorText}`);
       }
       
-      return n8nResponse;
+      return response;
     },
     onSuccess: () => {
       showSuccess("Webhook n8n testado com sucesso! Verifique seu serviço para a mensagem de teste.");
