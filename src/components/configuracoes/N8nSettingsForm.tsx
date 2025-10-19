@@ -26,9 +26,10 @@ type N8nSettingsFormProps = {
   defaultValues?: Partial<UserSettings>;
   onTest: () => void;
   isTesting: boolean;
+  aniversario_horario?: string | null;
 };
 
-export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest, isTesting }: N8nSettingsFormProps) {
+export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest, isTesting, aniversario_horario }: N8nSettingsFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -39,9 +40,45 @@ export function N8nSettingsForm({ onSubmit, isSubmitting, defaultValues, onTest,
 
   const { isDirty } = form.formState;
 
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    // Call the original submit function
+    onSubmit(values);
+    
+    // If there's a webhook URL, send notification to n8n
+    if (values.n8n_webhook_url && aniversario_horario) {
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        
+        // Add API key if provided
+        if (values.n8n_api_key) {
+          headers['Authorization'] = `Bearer ${values.n8n_api_key}`;
+        }
+        
+        // Send notification to n8n
+        const response = await fetch(values.n8n_webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            event: 'birthday_schedule_updated',
+            new_time: aniversario_horario,
+            timestamp: new Date().toISOString()
+          })
+        });
+        
+        if (!response.ok) {
+          console.error('Falha ao notificar n8n:', response.status, await response.text());
+        }
+      } catch (error) {
+        console.error('Erro ao notificar n8n:', error);
+      }
+    }
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
         <FormField
           control={form.control}
           name="n8n_webhook_url"

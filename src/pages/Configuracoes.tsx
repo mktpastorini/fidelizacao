@@ -359,6 +359,7 @@ export default function ConfiguracoesPage() {
                     defaultValues={settings || undefined} 
                     onTest={() => testN8nWebhookMutation.mutate()}
                     isTesting={testN8nWebhookMutation.isPending}
+                    aniversario_horario={settings?.aniversario_horario}
                   />
                 )}
               </CardContent>
