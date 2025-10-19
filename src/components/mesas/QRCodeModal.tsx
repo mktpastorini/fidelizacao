@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
-import { QRCode } from "qrcode.react";
+import QRCode from "react-qr-code";
 
 type QRCodeModalProps = {
   isOpen: boolean;
@@ -11,18 +11,21 @@ type QRCodeModalProps = {
 };
 
 export function QRCodeModal({ isOpen, onOpenChange, mesaNumero, qrCodeUrl }: QRCodeModalProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
 
   const handleDownload = () => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const pngUrl = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
+    if (!svgRef.current) return;
+    const svg = svgRef.current;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(svgBlob);
     const downloadLink = document.createElement("a");
-    downloadLink.href = pngUrl;
-    downloadLink.download = `mesa-${mesaNumero}-qrcode.png`;
+    downloadLink.href = url;
+    downloadLink.download = `mesa-${mesaNumero}-qrcode.svg`;
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -35,13 +38,15 @@ export function QRCodeModal({ isOpen, onOpenChange, mesaNumero, qrCodeUrl }: QRC
           <QRCode
             value={qrCodeUrl}
             size={256}
-            includeMargin
-            renderAs="canvas"
-            ref={canvasRef}
+            ref={svgRef}
+            bgColor="white"
+            fgColor="black"
+            level="Q"
+            includeMargin={true}
           />
         </div>
         <DialogFooter>
-          <Button onClick={handleDownload}>Baixar QR Code</Button>
+          <Button onClick={handleDownload}>Baixar QR Code (SVG)</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
