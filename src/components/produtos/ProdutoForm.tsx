@@ -31,7 +31,7 @@ const formSchema = z.object({
   tipo: z.enum(["venda", "rodizio", "componente_rodizio"]),
   requer_preparo: z.boolean().default(true),
   imagem_url: z.string().nullable().optional(),
-  categoria_id: z.string().uuid().nullable().optional(),
+  categoria_id: z.string().uuid().nullable().optional().or(z.literal("none")).transform(val => val === "none" ? null : val),
 });
 
 type ProdutoFormProps = {
@@ -51,7 +51,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       tipo: defaultValues?.tipo || "venda",
       requer_preparo: defaultValues?.requer_preparo ?? true,
       imagem_url: defaultValues?.imagem_url || null,
-      categoria_id: defaultValues?.categoria_id || undefined,
+      categoria_id: defaultValues?.categoria_id || "none", // Use "none" for null/undefined
     },
   });
 
@@ -94,14 +94,17 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
           render={({ field }) => (
             <FormItem>
               <FormLabel>Categoria</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+              <Select 
+                onValueChange={field.onChange} 
+                value={field.value || "none"} // Ensure value is never null/undefined for Select
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma categoria" />
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {categorias.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
                   ))}
