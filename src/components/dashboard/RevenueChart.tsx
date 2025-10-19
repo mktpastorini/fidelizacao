@@ -28,7 +28,7 @@ export function RevenueChart() {
 
   if (isLoading) {
     return (
-      <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+      <Card>
         <CardHeader>
           <CardTitle>Faturamento dos Últimos 7 Dias</CardTitle>
           <CardDescription>Analisando os dados...</CardDescription>
@@ -41,7 +41,7 @@ export function RevenueChart() {
   }
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+    <Card>
       <CardHeader>
         <CardTitle>Faturamento dos Últimos 7 Dias</CardTitle>
         <CardDescription>Visão geral do faturamento diário da última semana.</CardDescription>

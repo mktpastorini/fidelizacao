@@ -30,7 +30,7 @@ export function TopClientsByVisitsCard() {
   });
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+    <Card>
       <CardHeader>
         <CardTitle>Clientes Mais Frequentes</CardTitle>
       </CardHeader>

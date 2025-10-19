@@ -109,6 +109,15 @@ export default function DashboardPage() {
     return <WelcomeCard />;
   }
 
+  const kitchenValue = (
+    <div className="flex items-baseline gap-2">
+      <span className="text-orange-300">{dailyData.dailyStats.pending_kitchen_orders}</span>
+      <span className="text-sm text-white/80">Pend.</span>
+      <span className="text-green-300">{dailyData.dailyStats.preparing_kitchen_orders}</span>
+      <span className="text-sm text-white/80">Prep.</span>
+    </div>
+  );
+
   const occupiedPercentage = dailyData.dailyStats.total_tables > 0 ? (dailyData.dailyStats.occupied_tables / dailyData.dailyStats.total_tables) * 100 : 0;
 
   return (
@@ -126,18 +135,20 @@ export default function DashboardPage() {
         
         <TabsContent value="today" className="mt-6 space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title="Faturamento do Dia" value={formatCurrency(dailyData.dailyStats.revenue_today)} icon={DollarSign} />
-            <StatCard title="Ticket Médio" value={formatCurrency(dailyData.dailyStats.avg_ticket_today)} icon={BarChart2} />
+            <StatCard title="Faturamento do Dia" value={formatCurrency(dailyData.dailyStats.revenue_today)} icon={DollarSign} variant="green" />
+            <StatCard title="Ticket Médio" value={formatCurrency(dailyData.dailyStats.avg_ticket_today)} icon={BarChart2} variant="blue" />
             <StatCard 
               title="Mesas Ocupadas" 
               value={`${dailyData.dailyStats.occupied_tables} / ${dailyData.dailyStats.total_tables}`} 
               icon={Users}
-              progress={occupiedPercentage}
+              variant="orange"
+              description={`${occupiedPercentage.toFixed(0)}% de ocupação`}
             />
             <StatCard 
               title="Pedidos na Cozinha" 
-              value={`${dailyData.dailyStats.pending_kitchen_orders} Pend. / ${dailyData.dailyStats.preparing_kitchen_orders} Prep.`} 
+              value={kitchenValue} 
               icon={ChefHat} 
+              variant="purple"
             />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -160,10 +171,10 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Faturamento Total" value={formatCurrency(rangeData?.total_revenue)} icon={DollarSign} />
-              <StatCard title="Total de Pedidos" value={rangeData?.total_orders || 0} icon={ReceiptText} />
-              <StatCard title="Ticket Médio" value={formatCurrency(rangeData?.avg_order_value)} icon={BarChart2} />
-              <StatCard title="Novos Clientes" value={rangeData?.new_clients || 0} icon={Users} />
+              <StatCard title="Faturamento Total" value={formatCurrency(rangeData?.total_revenue)} icon={DollarSign} variant="green" />
+              <StatCard title="Total de Pedidos" value={rangeData?.total_orders || 0} icon={ReceiptText} variant="blue" />
+              <StatCard title="Ticket Médio" value={formatCurrency(rangeData?.avg_order_value)} icon={BarChart2} variant="orange" />
+              <StatCard title="Novos Clientes" value={rangeData?.new_clients || 0} icon={Users} variant="purple" />
             </div>
           )}
         </TabsContent>

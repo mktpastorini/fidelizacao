@@ -27,7 +27,7 @@ export function TopClientsCard() {
   });
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border/50">
+    <Card>
       <CardHeader>
         <CardTitle>Top Clientes</CardTitle>
       </CardHeader>
