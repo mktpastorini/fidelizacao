@@ -79,9 +79,9 @@ export default function CozinhaPage() {
         <p className="text-destructive">Erro ao carregar os pedidos.</p>
       ) : (
         <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-destructive" />
+          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
           <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
-          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-green-500" />
+          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
         </div>
       )}
     </div>
