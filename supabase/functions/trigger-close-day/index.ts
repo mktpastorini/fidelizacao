@@ -67,20 +67,31 @@ serve(async (req) => {
       });
     }
 
-    // 5. Verificar se é o horário correto (usando a hora de Brasília)
+    // 5. Verificar se é o horário correto (com tolerância de 5 minutos)
     const nowBrazil = getBrazilTime();
-    const currentTime = nowBrazil.toTimeString().substring(0, 5); // HH:MM
     
-    // Garante que o horário agendado também esteja no formato HH:MM
-    let scheduledTime = settings.auto_close_time || "23:00";
-    if (scheduledTime.length > 5) {
-        scheduledTime = scheduledTime.substring(0, 5);
+    // Pega o horário agendado (HH:MM)
+    let scheduledTimeStr = settings.auto_close_time || "23:00";
+    if (scheduledTimeStr.length > 5) {
+        scheduledTimeStr = scheduledTimeStr.substring(0, 5);
     }
     
-    console.log(`Hora atual (BR): ${currentTime}, Hora agendada: ${scheduledTime}`);
+    // Cria um objeto Date para o horário agendado HOJE (em Brasília)
+    const [scheduledHour, scheduledMinute] = scheduledTimeStr.split(':').map(Number);
+    const scheduledTime = new Date(nowBrazil);
+    scheduledTime.setHours(scheduledHour, scheduledMinute, 0, 0);
 
-    if (currentTime !== scheduledTime) {
-      return new Response(JSON.stringify({ success: true, message: `Ainda não é o horário agendado (${scheduledTime}).` }), {
+    // Define a janela de tolerância: 5 minutos após o horário agendado
+    const toleranceWindowEnd = new Date(scheduledTime.getTime() + 5 * 60000); // + 5 minutos
+
+    // Verifica se o horário atual está dentro da janela de execução (após o horário agendado E antes do fim da tolerância)
+    const isTimeForClose = nowBrazil >= scheduledTime && nowBrazil <= toleranceWindowEnd;
+
+    console.log(`Hora atual (BR): ${nowBrazil.toLocaleTimeString()}, Hora agendada: ${scheduledTimeStr}`);
+    console.log(`Janela de tolerância termina em: ${toleranceWindowEnd.toLocaleTimeString()}`);
+
+    if (!isTimeForClose) {
+      return new Response(JSON.stringify({ success: true, message: `Ainda não é o horário agendado (${scheduledTimeStr}) ou a janela de tolerância expirou.` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
       });
     }
