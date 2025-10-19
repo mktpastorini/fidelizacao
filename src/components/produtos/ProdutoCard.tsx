@@ -30,7 +30,7 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
   };
 
   return (
-    <Card className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-40">
+    <Card className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-56">
       {/* Imagem de Fundo (Expansível no Hover) */}
       <div 
         className={cn(
