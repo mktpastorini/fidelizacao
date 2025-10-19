@@ -100,6 +100,39 @@ function CompreFaceSettingsForm() {
   );
 }
 
+// Função para enviar notificação para o n8n
+async function sendN8nNotification(settings: UserSettings | null, newTime: string) {
+  if (!settings?.n8n_webhook_url) return;
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Adiciona chave de API se fornecida
+    if (settings.n8n_api_key) {
+      headers['Authorization'] = `Bearer ${settings.n8n_api_key}`;
+    }
+    
+    // Envia notificação para o n8n
+    const response = await fetch(settings.n8n_webhook_url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        event: 'birthday_schedule_updated',
+        new_time: newTime,
+        timestamp: new Date().toISOString()
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('Falha ao notificar n8n:', response.status, await response.text());
+    }
+  } catch (error) {
+    console.error('Erro ao notificar n8n:', error);
+  }
+}
+
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
@@ -124,6 +157,26 @@ export default function ConfiguracoesPage() {
     onSuccess: () => {
       refetchSettings();
       showSuccess("Configurações salvas com sucesso!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const updateBirthdayTimeMutation = useMutation({
+    mutationFn: async (newTime: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+      
+      // Atualiza as configurações no banco de dados
+      const settingsToUpsert = { id: user.id, aniversario_horario: newTime };
+      const { error: updateError } = await supabase.from("user_settings").upsert(settingsToUpsert);
+      if (updateError) throw new Error(updateError.message);
+
+      // Envia notificação para o n8n
+      await sendN8nNotification(settings, newTime);
+    },
+    onSuccess: () => {
+      refetchSettings();
+      showSuccess("Horário de aniversário atualizado com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -329,7 +382,7 @@ export default function ConfiguracoesPage() {
                         id="birthday-time" 
                         type="time" 
                         defaultValue={settings?.aniversario_horario || "09:00"} 
-                        onBlur={(e) => updateSettingsWithN8nNotificationMutation.mutate({ aniversario_horario: e.target.value })} 
+                        onBlur={(e) => updateBirthdayTimeMutation.mutate(e.target.value)} 
                       />
                     </div>
                     <Button 
