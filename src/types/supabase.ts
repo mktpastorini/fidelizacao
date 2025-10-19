@@ -84,6 +84,13 @@ export type ItemPedido = {
   updated_at: string;
 };
 
+export type Categoria = {
+  id: string;
+  user_id: string;
+  nome: string;
+  created_at: string;
+};
+
 export type Produto = {
   id: string;
   nome: string;
@@ -92,6 +99,9 @@ export type Produto = {
   tipo: 'venda' | 'rodizio' | 'componente_rodizio';
   requer_preparo: boolean;
   created_at: string;
+  categoria_id: string | null;
+  imagem_url: string | null;
+  categoria?: Categoria | null;
 };
 
 export type MessageLog = {

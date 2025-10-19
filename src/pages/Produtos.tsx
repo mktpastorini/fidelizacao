@@ -1,56 +1,47 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Produto } from "@/types/supabase";
+import { Produto, Categoria } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ProdutoForm } from "@/components/produtos/ProdutoForm";
-import { PlusCircle, MoreHorizontal, Trash2, Edit } from "lucide-react";
+import { ProdutoCard } from "@/components/produtos/ProdutoCard";
+import { CategoriaManager } from "@/components/produtos/CategoriaManager";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PlusCircle, FileCog } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
+import { Skeleton } from "@/components/ui/skeleton";
 
 async function fetchProdutos(): Promise<Produto[]> {
-  const { data, error } = await supabase
-    .from("produtos")
-    .select("*")
-    .order("created_at", { ascending: false });
-
+  const { data, error } = await supabase.from("produtos").select("*").order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
+  return data || [];
+}
+
+async function fetchCategorias(): Promise<Categoria[]> {
+  const { data, error } = await supabase.from("categorias").select("*").order("nome");
+  if (error) throw error;
   return data || [];
 }
 
 export default function ProdutosPage() {
   const queryClient = useQueryClient();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
-  const { data: produtos, isLoading, isError } = useQuery({
-    queryKey: ["produtos"],
-    queryFn: fetchProdutos,
-  });
+  const { data: produtos, isLoading: isLoadingProdutos } = useQuery({ queryKey: ["produtos"], queryFn: fetchProdutos });
+  const { data: categorias, isLoading: isLoadingCategorias } = useQuery({ queryKey: ["categorias"], queryFn: fetchCategorias });
 
-  const handleDialogChange = (isOpen: boolean) => {
-    if (!isOpen) setEditingProduto(null);
-    setIsDialogOpen(isOpen);
+  const handleFormOpen = (produto: Produto | null = null) => {
+    setEditingProduto(produto);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setEditingProduto(null);
+    setIsFormOpen(false);
   };
 
   const addProdutoMutation = useMutation({
@@ -62,7 +53,7 @@ export default function ProdutosPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
       showSuccess("Produto adicionado!");
-      handleDialogChange(false);
+      handleFormClose();
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -76,7 +67,7 @@ export default function ProdutosPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
       showSuccess("Produto atualizado!");
-      handleDialogChange(false);
+      handleFormClose();
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -101,71 +92,79 @@ export default function ProdutosPage() {
     }
   };
 
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const filteredProdutos = useMemo(() => {
+    if (!produtos) return [];
+    if (selectedCategory === "all") return produtos;
+    return produtos.filter(p => p.categoria_id === selectedCategory);
+  }, [produtos, selectedCategory]);
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">Produtos</h1>
-          <p className="text-muted-foreground mt-2">Gerencie seu catálogo de produtos e serviços.</p>
+          <h1 className="text-3xl font-bold">Cardápio / Produtos</h1>
+          <p className="text-muted-foreground mt-2">Navegue pelas categorias e gerencie seu catálogo.</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
-          <DialogTrigger asChild>
-            <Button><PlusCircle className="w-4 h-4 mr-2" />Adicionar Produto</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingProduto ? "Editar Produto" : "Adicionar Novo Produto"}</DialogTitle>
-            </DialogHeader>
-            <ProdutoForm
-              onSubmit={handleSubmit}
-              isSubmitting={addProdutoMutation.isPending || editProdutoMutation.isPending}
-              defaultValues={editingProduto || undefined}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsCategoryManagerOpen(true)}>
+            <FileCog className="w-4 h-4 mr-2" /> Gerenciar Categorias
+          </Button>
+          <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Produto</Button>
+        </div>
       </div>
 
-      <div className="bg-card p-6 rounded-lg border">
-        {isLoading ? <p>Carregando produtos...</p> : isError ? <p className="text-destructive">Erro ao carregar produtos.</p> : produtos && produtos.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Preço</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {produtos.map((produto) => (
-                <TableRow key={produto.id}>
-                  <TableCell className="font-medium">{produto.nome}</TableCell>
-                  <TableCell>{formatCurrency(produto.preco)}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button></DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => { setEditingProduto(produto); setIsDialogOpen(true); }}>
-                          <Edit className="w-4 h-4 mr-2" />Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => deleteProdutoMutation.mutate(produto.id)} disabled={deleteProdutoMutation.isPending}>
-                          <Trash2 className="w-4 h-4 mr-2" />Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Nenhum produto cadastrado ainda.</p>
-            <p className="text-muted-foreground">Clique em "Adicionar Produto" para começar.</p>
-          </div>
-        )}
-      </div>
+      {isLoadingCategorias ? <Skeleton className="h-10 w-full" /> : (
+        <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
+          <TabsList>
+            <TabsTrigger value="all">Todos</TabsTrigger>
+            {categorias?.map(cat => (
+              <TabsTrigger key={cat.id} value={cat.id}>{cat.nome}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
+
+      {isLoadingProdutos ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+          {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-64" />)}
+        </div>
+      ) : filteredProdutos.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mt-6">
+          {filteredProdutos.map((produto) => (
+            <ProdutoCard
+              key={produto.id}
+              produto={produto}
+              onEdit={() => handleFormOpen(produto)}
+              onDelete={() => deleteProdutoMutation.mutate(produto.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-20 bg-card rounded-lg mt-6">
+          <p className="text-muted-foreground">Nenhum produto encontrado nesta categoria.</p>
+        </div>
+      )}
+
+      <Dialog open={isFormOpen} onOpenChange={handleFormClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingProduto ? "Editar Produto" : "Adicionar Novo Produto"}</DialogTitle>
+          </DialogHeader>
+          <ProdutoForm
+            onSubmit={handleSubmit}
+            isSubmitting={addProdutoMutation.isPending || editProdutoMutation.isPending}
+            defaultValues={editingProduto || undefined}
+            categorias={categorias || []}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCategoryManagerOpen} onOpenChange={setIsCategoryManagerOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Gerenciar Categorias</DialogTitle></DialogHeader>
+          <CategoriaManager />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

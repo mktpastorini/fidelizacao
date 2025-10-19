@@ -21,7 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Produto } from "@/types/supabase";
+import { Produto, Categoria } from "@/types/supabase";
+import { ImageUpload } from "@/components/ui/ImageUpload";
 
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome do produto é obrigatório." }),
@@ -29,15 +30,18 @@ const formSchema = z.object({
   descricao: z.string().optional(),
   tipo: z.enum(["venda", "rodizio", "componente_rodizio"]),
   requer_preparo: z.boolean().default(true),
+  imagem_url: z.string().nullable().optional(),
+  categoria_id: z.string().uuid().nullable().optional(),
 });
 
 type ProdutoFormProps = {
   onSubmit: (values: z.infer<typeof formSchema>) => void;
   isSubmitting: boolean;
   defaultValues?: Partial<Produto>;
+  categorias: Categoria[];
 };
 
-export function ProdutoForm({ onSubmit, isSubmitting, defaultValues }: ProdutoFormProps) {
+export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias }: ProdutoFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -46,12 +50,31 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues }: ProdutoFo
       descricao: defaultValues?.descricao || "",
       tipo: defaultValues?.tipo || "venda",
       requer_preparo: defaultValues?.requer_preparo ?? true,
+      imagem_url: defaultValues?.imagem_url || null,
+      categoria_id: defaultValues?.categoria_id || undefined,
     },
   });
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
+        <FormField
+          control={form.control}
+          name="imagem_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Imagem do Produto</FormLabel>
+              <FormControl>
+                <ImageUpload
+                  bucket="client_avatars"
+                  url={field.value}
+                  onUpload={(url) => field.onChange(url)}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="nome"
@@ -61,6 +84,29 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues }: ProdutoFo
               <FormControl>
                 <Input placeholder="Ex: Pizza de Calabresa" {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="categoria_id"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Categoria</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma categoria" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  {categorias.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
