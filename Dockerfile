@@ -1,8 +1,31 @@
 # Estágio de Build
 FROM node:18-alpine AS builder
 
-# Instalar dependências de compilação para pacotes nativos (como canvas)
-RUN apk add --no-cache python3 make g++ build-base
+# Instalar dependências de compilação para pacotes nativos (canvas, tfjs-node)
+# Inclui Python, make, g++, build-base (para node-gyp)
+# E as libs necessárias para canvas (cairo, pango, jpeg, gif, etc.)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    build-base \
+    pkgconfig \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    libtool \
+    autoconf \
+    automake \
+    libpng-dev \
+    zlib-dev \
+    libxml2-dev \
+    libjpeg-turbo-dev \
+    libwebp-dev \
+    freetype-dev \
+    fontconfig-dev \
+    harfbuzz-dev \
+    pixman-dev
 
 WORKDIR /app
 
