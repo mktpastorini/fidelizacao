@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Bell, Phone, PackageWarning, Cake } from "lucide-react";
+import { Bell, Phone, AlertTriangle, Cake } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { LowStockProduct } from "@/types/supabase";
 import { Separator } from "@/components/ui/separator";
@@ -64,7 +64,7 @@ export function NotificationCenter() {
           {lowStockCount > 0 && (
             <>
               <div className="space-y-2">
-                <h5 className="flex items-center font-semibold text-warning"><PackageWarning className="w-4 h-4 mr-2" /> Estoque Baixo ({lowStockCount})</h5>
+                <h5 className="flex items-center font-semibold text-warning"><AlertTriangle className="w-4 h-4 mr-2" /> Estoque Baixo ({lowStockCount})</h5>
                 <div className="grid gap-2">
                   {lowStockProducts?.map((product) => (
                     <div key={product.id} className="grid gap-1 text-sm">
