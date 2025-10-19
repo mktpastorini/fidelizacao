@@ -17,6 +17,7 @@ import Historico from "./pages/Historico";
 import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import MenuPublicoPage from "./pages/MenuPublico"; // Importando a página do menu público
 
 const queryClient = new QueryClient();
 
@@ -27,7 +28,13 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Rota Pública para o Menu */}
+            <Route path="/menu-publico/:mesaId" element={<MenuPublicoPage />} />
+            
+            {/* Rotas de Autenticação */}
             <Route path="/login" element={<Login />} />
+            
+            {/* Rotas Protegidas */}
             <Route
               element={
                 <SettingsProvider>
