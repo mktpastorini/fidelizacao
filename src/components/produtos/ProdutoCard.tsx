@@ -1,9 +1,11 @@
 import { Produto } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit, Trash2 } from "lucide-react";
+import { MoreVertical, Edit, Trash2, Utensils, DollarSign } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 type ProdutoCardProps = {
   produto: Produto;
@@ -17,21 +19,63 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
   const isLowStock = produto.estoque_atual <= produto.alerta_estoque_baixo && produto.estoque_atual > 0;
   const isOutOfStock = produto.estoque_atual === 0;
 
+  const getStockBadge = () => {
+    if (isOutOfStock) {
+      return <Badge variant="destructive">Esgotado</Badge>;
+    }
+    if (isLowStock) {
+      return <Badge variant="warning">Estoque Baixo ({produto.estoque_atual})</Badge>;
+    }
+    return <Badge variant="secondary">Em Estoque ({produto.estoque_atual})</Badge>;
+  };
+
   return (
-    <Card className="group overflow-hidden shadow-sm transition-all hover:shadow-xl">
-      <div className="relative h-40 overflow-hidden">
+    <Card className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-40">
+      {/* Imagem de Fundo (Expansível no Hover) */}
+      <div 
+        className={cn(
+          "absolute inset-0 transition-opacity duration-300",
+          "group-hover:opacity-100 opacity-0"
+        )}
+      >
         <img
           src={produto.imagem_url || '/placeholder.svg'}
           alt={produto.nome}
-          className="h-full w-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+          className="h-full w-full object-cover"
         />
+        {/* Overlay para escurecer a imagem e centralizar o botão */}
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+          <Button 
+            onClick={onEdit} 
+            className="text-white bg-primary hover:bg-primary/90 transition-all scale-0 group-hover:scale-100"
+          >
+            <Edit className="w-4 h-4 mr-2" /> Editar Produto
+          </Button>
+        </div>
       </div>
-      <CardContent className="p-4">
+
+      {/* Conteúdo Principal (Visível por padrão, some no Hover) */}
+      <CardContent 
+        className={cn(
+          "absolute inset-0 p-4 flex flex-col justify-between transition-opacity duration-300 bg-card",
+          "group-hover:opacity-0 opacity-100"
+        )}
+      >
         <div className="flex items-start justify-between">
+          {/* Avatar do Produto */}
+          <Avatar className="h-12 w-12 mr-3 shrink-0 ring-2 ring-primary/50">
+            <AvatarImage src={produto.imagem_url || undefined} />
+            <AvatarFallback>
+              <Utensils className="h-6 w-6 text-muted-foreground" />
+            </AvatarFallback>
+          </Avatar>
+          
           <div className="flex-1 min-w-0">
             <h3 className="font-bold truncate text-lg">{produto.nome}</h3>
             <p className="text-sm text-muted-foreground truncate">{produto.descricao || 'Sem descrição'}</p>
           </div>
+          
+          {/* Dropdown de Ações */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 -mt-1 -mr-2">
@@ -44,20 +88,18 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="mt-4">
+
+        {/* Informações de Preço e Estoque */}
+        <div className="mt-4 pt-2 border-t">
           <p className="text-2xl font-bold text-primary">{formatCurrency(produto.preco)}</p>
           {produto.valor_compra !== null && produto.valor_compra !== undefined && (
-            <p className="text-xs text-muted-foreground">Custo: {formatCurrency(produto.valor_compra)}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              <DollarSign className="w-3 h-3" /> Custo: {formatCurrency(produto.valor_compra)}
+            </p>
           )}
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          {isOutOfStock ? (
-            <Badge variant="destructive">Esgotado</Badge>
-          ) : isLowStock ? (
-            <Badge variant="warning">Estoque Baixo ({produto.estoque_atual})</Badge>
-          ) : (
-            <Badge variant="secondary">Em Estoque ({produto.estoque_atual})</Badge>
-          )}
+          <div className="mt-2">
+            {getStockBadge()}
+          </div>
         </div>
       </CardContent>
     </Card>
