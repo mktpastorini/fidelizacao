@@ -87,23 +87,21 @@ Para Windows, use o Task Scheduler:
 curl -X POST -H "Content-Type: application/json" -d "{}" http://localhost:54321/functions/v1/send-daily-birthday-wishes
 ```
 
-## Como consultar o horário de envio de aniversários
+## Integração com n8n
 
-Para consultar o horário configurado para envio de mensagens de aniversário, utilize a API:
+Para sincronizar automaticamente o horário de envio de mensagens de aniversário com uma automação no n8n:
 
-`GET https://YOUR_PROJECT_ID.supabase.co/functions/v1/get-birthday-schedule`
+1. Configure a URL do webhook do n8n nas configurações do Fidelize (Configurações > Automação > Integração com n8n)
+2. Se necessário, adicione uma chave de API para autenticação
+3. Sempre que você atualizar o horário de envio nas configurações do Fidelize, uma notificação será enviada para o n8n
+4. No n8n, crie um webhook que receba esta notificação e atualize o agendamento da sua automação
 
-Com os seguintes headers:
-```
-Authorization: Bearer SUA_CHAVE_DE_API
-Content-Type: application/json
-```
-
-A resposta será um JSON no formato:
+O payload enviado para o n8n terá o seguinte formato:
 ```json
 {
-  "success": true,
-  "aniversario_horario": "09:00"
+  "event": "birthday_schedule_updated",
+  "new_time": "09:00",
+  "timestamp": "2023-06-15T10:30:00.000Z"
 }
 ```
 
