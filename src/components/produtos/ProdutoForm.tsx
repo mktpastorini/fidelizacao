@@ -25,6 +25,11 @@ import { Produto, Categoria } from "@/types/supabase";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
+// Função auxiliar para transformar string vazia em null antes da coerção
+const emptyStringToNull = z.literal("").transform(() => null);
+
+const numericOrNull = z.union([z.coerce.number().min(0, "O valor não pode ser negativo."), emptyStringToNull]);
+
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome do produto é obrigatório." }),
   preco: z.coerce.number().min(0, { message: "O preço não pode ser negativo." }),
@@ -36,7 +41,7 @@ const formSchema = z.object({
   // Inventory fields
   estoque_atual: z.coerce.number().int().min(0, "O estoque atual não pode ser negativo.").default(0),
   alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
-  valor_compra: z.coerce.number().min(0, "O valor de compra não pode ser negativo.").nullable().optional().transform(val => val === 0 ? null : val),
+  valor_compra: numericOrNull.nullable().optional(),
   mostrar_no_menu: z.boolean().default(false),
 });
 
