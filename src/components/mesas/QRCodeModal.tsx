@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
-import QRCode from "qrcode.react";
+import { QRCode } from "qrcode.react";
 
 type QRCodeModalProps = {
   isOpen: boolean;
