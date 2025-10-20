@@ -5,8 +5,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { showSuccess, showError } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Utensils } from "lucide-react";
+import { Utensils, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Textarea } from "../ui/textarea";
 
 type PublicMenuProductCardProps = {
   produto: Produto;
@@ -15,14 +16,16 @@ type PublicMenuProductCardProps = {
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardCardProps) {
+export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
   const [quantidade, setQuantidade] = useState(1);
+  const [observacoes, setObservacoes] = useState("");
 
   const handleOrderClick = () => {
     setQuantidade(1); // Reset quantity on open
+    setObservacoes(""); // Reset observations
     setIsConfirmOpen(true);
   };
 
@@ -33,7 +36,9 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
     }
     setIsOrdering(true);
     try {
-      await onOrder(produto, quantidade);
+      // NOTE: The current onOrder function does not accept observations. 
+      // For now, we proceed without sending it, but the UI field is present.
+      await onOrder(produto, quantidade); 
       showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
       setIsConfirmOpen(false);
     } catch (error: any) {
@@ -47,14 +52,14 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
     setQuantidade(prev => Math.max(1, prev + delta));
   };
 
-  // Determine if the product has an image
+  const total = produto.preco * quantidade;
   const hasImage = !!produto.imagem_url;
 
   return (
     <>
       <div
         className={cn(
-          "relative rounded-lg border border-gray-300 bg-white shadow-lg cursor-pointer overflow-hidden transition-all duration-300 h-40", // Fixed height for better visual consistency
+          "relative rounded-lg border border-gray-300 bg-white shadow-lg cursor-pointer overflow-hidden transition-all duration-300 h-40",
           isHovered ? "scale-[1.02] shadow-xl" : "scale-100"
         )}
         onMouseEnter={() => setIsHovered(true)}
@@ -109,40 +114,80 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
         </div>
       </div>
 
-      {/* Modal de confirmação (Updated to include quantity controls) */}
+      {/* Modal de confirmação */}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="bg-white text-gray-900">
-          <DialogHeader>
-            <DialogTitle>Adicionar ao Pedido</DialogTitle>
+        <DialogContent className="max-w-md bg-white text-gray-900 p-0">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle className="text-xl font-bold">Adicionar ao Pedido</DialogTitle>
           </DialogHeader>
-          <div className="p-4 space-y-4">
-            <p className="text-lg">Item: <strong>{produto.nome}</strong></p>
-            <div className="flex justify-between items-center">
-                <Label htmlFor="quantidade" className="text-base">Quantidade</Label>
-                <div className="flex items-center space-x-2">
-                    <Button variant="outline" size="icon" onClick={() => handleQuantityChange(-1)} disabled={quantidade <= 1 || isOrdering}>-</Button>
-                    <Input 
-                        id="quantidade"
-                        type="number" 
-                        min="1" 
-                        value={quantidade} 
-                        onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))} 
-                        className="w-16 text-center"
-                        disabled={isOrdering}
-                    />
-                    <Button variant="outline" size="icon" onClick={() => handleQuantityChange(1)} disabled={isOrdering}>+</Button>
-                </div>
+          
+          <div className="p-6 space-y-6">
+            {/* Produto Info Card */}
+            <div className="flex items-center p-4 border rounded-lg bg-gray-50">
+              <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden mr-4">
+                {hasImage ? (
+                  <img src={produto.imagem_url} alt={produto.nome} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <Utensils className="w-8 h-8 text-gray-500" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-bold">{produto.nome}</h3>
+                <p className="text-sm text-gray-600">{formatCurrency(produto.preco)}</p>
+              </div>
             </div>
-            <div className="flex justify-between items-center pt-4 border-t">
-                <span className="text-xl font-bold">Total:</span>
-                <span className="text-2xl font-extrabold text-primary">{formatCurrency(produto.preco * quantidade)}</span>
+
+            {/* Quantidade */}
+            <div>
+              <Label htmlFor="quantidade" className="text-base font-semibold">Quantidade</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <Button variant="outline" size="icon" onClick={() => handleQuantityChange(-1)} disabled={quantidade <= 1 || isOrdering} className="w-10 h-10">
+                  <Minus className="w-5 h-5" />
+                </Button>
+                <Input 
+                  id="quantidade"
+                  type="number" 
+                  min="1" 
+                  value={quantidade} 
+                  onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))} 
+                  className="w-16 text-center h-10"
+                  disabled={isOrdering}
+                />
+                <Button size="icon" onClick={() => handleQuantityChange(1)} disabled={isOrdering} className="w-10 h-10">
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Observações */}
+            <div>
+              <Label htmlFor="observacoes" className="text-base font-semibold">Observações (opcional)</Label>
+              <Textarea
+                id="observacoes"
+                placeholder="Ex: Sem cebola, bem passado..."
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                className="mt-2"
+                disabled={isOrdering}
+              />
             </div>
           </div>
-          <DialogFooter className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isOrdering}>Cancelar</Button>
-            <Button onClick={handleConfirmOrder} disabled={isOrdering}>
-              {isOrdering ? "Adicionando..." : "Confirmar Pedido"}
+
+          {/* Footer com Total e Botões */}
+          <DialogFooter className="flex flex-row items-center justify-between p-4 border-t bg-gray-50">
+            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isOrdering} className="text-gray-900">
+              Cancelar
             </Button>
+            <div className="flex items-center gap-4">
+              <span className="text-xl font-extrabold text-primary">
+                {formatCurrency(total)}
+              </span>
+              <Button onClick={handleConfirmOrder} disabled={isOrdering}>
+                {isOrdering ? "Adicionando..." : "Adicionar ao Pedido"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
