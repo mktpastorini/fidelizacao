@@ -58,11 +58,16 @@ export function AuthLayout() {
 
   useEffect(() => {
     if (!loading && !session) {
+      console.log("AuthLayout: Tentando salvar login_video_url no localStorage.");
+      console.log("AuthLayout: Valor lido do settings:", settings?.login_video_url);
+      
       // Antes de redirecionar para /login, salva a URL do vídeo se estiver disponível
       if (settings?.login_video_url) {
         localStorage.setItem('login_video_url', settings.login_video_url);
+        console.log("AuthLayout: URL salva com sucesso no localStorage.");
       } else {
         localStorage.removeItem('login_video_url');
+        console.log("AuthLayout: Nenhuma URL encontrada no settings, removendo do localStorage.");
       }
       navigate("/login");
     }
