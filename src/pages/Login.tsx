@@ -14,7 +14,7 @@ const Login = () => {
   useEffect(() => {
     // Tenta obter a URL salva no localStorage
     const savedUrl = localStorage.getItem('login_video_url');
-    if (savedUrl) {
+    if (savedUrl && savedUrl.startsWith('http')) {
       setVideoUrl(savedUrl);
     } else {
       setVideoUrl(DEFAULT_VIDEO_URL);
@@ -33,9 +33,12 @@ const Login = () => {
     };
   }, [navigate]);
 
+  // Verifica se a URL é válida antes de renderizar o componente de vídeo
+  const isVideoUrlValid = videoUrl && videoUrl.startsWith('http');
+
   return (
     <div className="relative flex items-center justify-center min-h-screen text-white">
-      <VideoBackground videoUrl={videoUrl} />
+      {isVideoUrlValid && <VideoBackground videoUrl={videoUrl} />}
       <LoginForm />
     </div>
   );
