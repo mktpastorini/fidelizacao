@@ -20,7 +20,7 @@ import { ptBR } from 'date-fns/locale';
 type ClienteDetalhesModalProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  cliente: Cliente | null;
+  clienteId: string | null;
 };
 
 type PedidoComItens = Pedido & { itens_pedido: ItemPedido[] };
@@ -30,6 +30,17 @@ function getBrazilTime() {
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
   return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+}
+
+async function fetchClienteCompleto(clienteId: string): Promise<Cliente | null> {
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("*, indicado_por:clientes!indicado_por_id(nome), filhos(*)")
+    .eq("id", clienteId)
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as Cliente | null;
 }
 
 async function fetchHistoricoCliente(clienteId: string): Promise<PedidoComItens[]> {
@@ -45,17 +56,17 @@ async function fetchHistoricoCliente(clienteId: string): Promise<PedidoComItens[
 }
 
 const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: React.ElementType, children: React.ReactNode }) => (
-  <div className="p-2 bg-background/50 rounded-lg"> {/* Diminuído padding de 4 para 2 */}
-    <h4 className="flex items-center font-semibold text-foreground mb-1"> {/* Diminuído margin-bottom de 2 para 1 */}
+  <div className="p-2 bg-background/50 rounded-lg">
+    <h4 className="flex items-center font-semibold text-foreground mb-1">
       <Icon className="w-5 h-5 mr-2 text-primary" />
       {title}
     </h4>
-    <div className="pl-6 text-muted-foreground space-y-1 text-sm">{children}</div> {/* Diminuído padding-left de 7 para 6 */}
+    <div className="pl-6 text-muted-foreground space-y-1 text-sm">{children}</div>
   </div>
 );
 
 const StatDisplay = ({ title, value, className, icon: Icon }: { title: string, value: string | number, className?: string, icon: React.ElementType }) => (
-  <div className={`p-2 rounded-lg text-center flex flex-col items-center justify-center ${className}`}> {/* Diminuído padding de 3 para 2 */}
+  <div className={`p-2 rounded-lg text-center flex flex-col items-center justify-center ${className}`}>
     <Icon className="w-5 h-5 mb-1 text-primary-foreground/80" />
     <p className="text-xs text-primary-foreground/80">{title}</p>
     <p className="text-xl font-bold text-primary-foreground">{value}</p>
@@ -64,11 +75,17 @@ const StatDisplay = ({ title, value, className, icon: Icon }: { title: string, v
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteDetalhesModalProps) {
+export function ClienteDetalhesModal({ isOpen, onOpenChange, clienteId }: ClienteDetalhesModalProps) {
+  const { data: cliente, isLoading: isClienteLoading } = useQuery({
+    queryKey: ['clienteCompleto', clienteId],
+    queryFn: () => clienteId ? fetchClienteCompleto(clienteId) : null,
+    enabled: isOpen && !!clienteId,
+  });
+
   const { data: historico, isLoading: isHistoryLoading } = useQuery({
-    queryKey: ['historicoCliente', cliente?.id],
-    queryFn: () => fetchHistoricoCliente(cliente!.id),
-    enabled: isOpen && !!cliente,
+    queryKey: ['historicoCliente', clienteId],
+    queryFn: () => clienteId ? fetchHistoricoCliente(clienteId) : [],
+    enabled: isOpen && !!clienteId,
   });
 
   const calculateTotal = (itens: ItemPedido[]) => {
@@ -84,6 +101,16 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
     const averageTicket = totalSpent / totalPedidosPagos;
     return { totalPedidosPagos, totalSpent, averageTicket };
   }, [historico]);
+
+  if (isClienteLoading) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0">
+          <div className="flex justify-center items-center p-10">Carregando...</div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
