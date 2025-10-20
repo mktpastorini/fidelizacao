@@ -1,8 +1,11 @@
-import { Auth } from "@supabase/auth-ui-react";
-import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { LoginForm } from "@/components/login/LoginForm";
+import { VideoBackground } from "@/components/login/VideoBackground";
+
+// URL padrão do vídeo de fundo. O usuário pode configurar um URL personalizado nas configurações.
+const DEFAULT_VIDEO_URL = "https://hgqcmpuihoflkkobtyfa.supabase.co/storage/v1/object/public/assets/login_video.mp4";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -21,50 +24,14 @@ const Login = () => {
     };
   }, [navigate]);
 
+  // Nota: O URL do vídeo configurado pelo usuário é buscado e usado no componente AuthLayout/Layout, 
+  // mas como esta é a página de login (não autenticada), usamos o padrão.
+  // O usuário pode configurar o vídeo padrão nas configurações.
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background bg-gradient-radial">
-      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg border shadow-lg">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-card-foreground">Fidelize</h1>
-          <p className="mt-2 text-muted-foreground">Faça login para continuar</p>
-        </div>
-        <Auth
-          supabaseClient={supabase}
-          appearance={{ theme: ThemeSupa }}
-          providers={[]}
-          theme="light"
-          localization={{
-            variables: {
-              sign_in: {
-                email_label: "Endereço de e-mail",
-                password_label: "Senha",
-                email_input_placeholder: "Seu endereço de e-mail",
-                password_input_placeholder: "Sua senha",
-                button_label: "Entrar",
-                social_provider_text: "Entrar com {{provider}}",
-                link_text: "Já tem uma conta? Entre",
-              },
-              sign_up: {
-                email_label: "Endereço de e-mail",
-                password_label: "Senha",
-                email_input_placeholder: "Seu endereço de e-mail",
-                password_input_placeholder: "Sua senha",
-                button_label: "Cadastrar",
-                social_provider_text: "Cadastrar com {{provider}}",
-                link_text: "Não tem uma conta? Cadastre-se",
-                confirmation_text: "Verifique seu e-mail para o link de confirmação"
-              },
-              forgotten_password: {
-                email_label: "Endereço de e-mail",
-                email_input_placeholder: "Seu endereço de e-mail",
-                button_label: "Enviar instruções de recuperação",
-                link_text: "Esqueceu sua senha?",
-                confirmation_text: "Verifique seu e-mail para o link de recuperação"
-              }
-            },
-          }}
-        />
-      </div>
+    <div className="relative flex items-center justify-center min-h-screen text-white">
+      <VideoBackground videoUrl={DEFAULT_VIDEO_URL} />
+      <LoginForm />
     </div>
   );
 };

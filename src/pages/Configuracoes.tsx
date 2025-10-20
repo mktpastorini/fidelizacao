@@ -268,10 +268,29 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="aparencia" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Estilo do Menu</CardTitle><CardDescription>Escolha como você prefere navegar pelo sistema.</CardDescription></CardHeader>
-            <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Estilo do Menu</CardTitle><CardDescription>Escolha como você prefere navegar pelo sistema.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Vídeo de Fundo do Login</CardTitle><CardDescription>Defina a URL do vídeo que será exibido na tela de login.</CardDescription></CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-16 w-full" /> : (
+                  <div className="space-y-2">
+                    <Label htmlFor="login-video-url">URL do Vídeo (MP4)</Label>
+                    <Input
+                      id="login-video-url"
+                      placeholder="https://seu-servidor.com/video.mp4"
+                      defaultValue={settings?.login_video_url || ""}
+                      onBlur={(e) => updateSettingsMutation.mutate({ login_video_url: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">Se vazio, será usado o vídeo padrão.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="reconhecimento" className="mt-6">
