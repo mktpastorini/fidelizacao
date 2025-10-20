@@ -232,22 +232,6 @@ export function LoginForm() {
                 </button>
             </form>
 
-            <div className="mt-8">
-                <div className="relative flex items-center justify-center">
-                    <div className="border-t border-white/10 absolute w-full"></div>
-                    <div className="bg-transparent px-4 relative text-white/60 text-sm">
-                        acesso rápido via
-                    </div>
-                </div>
-
-                <div className="mt-6 grid grid-cols-3 gap-3">
-                    {/* Note: Supabase supports Google, Twitter, and Steam providers. */}
-                    <SocialButton icon={<Chrome size={18} />} provider="google" disabled={isSubmitting} onClick={handleSocialLogin} />
-                    <SocialButton icon={<Twitter size={18} />} provider="twitter" disabled={isSubmitting} onClick={handleSocialLogin} />
-                    <SocialButton icon={<Gamepad2 size={18} />} provider="steam" disabled={isSubmitting} onClick={handleSocialLogin} />
-                </div>
-            </div>
-
             <p className="mt-8 text-center text-sm text-white/60">
                 Não tem uma conta?{' '}
                 <a 
