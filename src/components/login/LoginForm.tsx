@@ -164,11 +164,6 @@ export function LoginForm() {
                     <span className="text-xs text-white/50 animate-pulse">
                         [Pressione Entrar para servir a excelência]
                     </span>
-                    <div className="flex space-x-2 text-xs text-white/40">
-                        <span className="animate-pulse">🍽️</span>
-                        <span className="animate-bounce">⭐</span>
-                        <span className="animate-pulse">🥂</span>
-                    </div>
                 </div>
             </div>
 
