@@ -116,17 +116,17 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
 
       {/* Modal de confirmação */}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="max-w-md bg-white text-gray-900 p-0 dark:bg-gray-900 dark:text-white">
+        <DialogContent className="max-w-md bg-white text-gray-900 p-0">
           <DialogHeader className="p-6 pb-0">
             <DialogTitle className="text-xl font-bold">Adicionar ao Pedido</DialogTitle>
           </DialogHeader>
           
           <div className="p-6 space-y-6">
-            {/* Produto Info Card e Quantidade na mesma linha */}
-            <div className="flex items-start justify-between gap-4">
-              {/* Produto Info Card */}
-              <div className="flex items-center p-4 border rounded-lg bg-gray-100 dark:bg-gray-800 flex-1">
-                <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden mr-4">
+            {/* Bloco de Produto e Quantidade */}
+            <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+              {/* Produto Info */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden">
                   {hasImage ? (
                     <img src={produto.imagem_url} alt={produto.nome} className="w-full h-full object-cover" />
                   ) : (
@@ -136,31 +136,28 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
                   )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{produto.nome}</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatCurrency(produto.preco)}</p>
+                  <h3 className="text-lg font-bold">{produto.nome}</h3>
+                  <p className="text-sm text-gray-600">{formatCurrency(produto.preco)}</p>
                 </div>
               </div>
               
               {/* Quantidade Selector */}
-              <div className="flex flex-col items-center justify-center h-full pt-4">
-                <Label htmlFor="quantidade" className="text-xs font-semibold mb-2 text-gray-600 dark:text-gray-400">Qtd</Label>
-                <div className="flex flex-col items-center space-y-1">
-                  <Button size="icon" onClick={() => handleQuantityChange(1)} disabled={isOrdering} className="w-8 h-8">
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                  <Input 
-                    id="quantidade"
-                    type="number" 
-                    min="1" 
-                    value={quantidade} 
-                    onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))} 
-                    className="w-10 text-center h-8 p-0 bg-gray-900 text-white dark:bg-gray-700 dark:text-white border-gray-700"
-                    disabled={isOrdering}
-                  />
-                  <Button variant="outline" size="icon" onClick={() => handleQuantityChange(-1)} disabled={quantidade <= 1 || isOrdering} className="w-8 h-8 bg-gray-300 dark:bg-gray-600 border-gray-400 dark:border-gray-500 text-gray-900 dark:text-white hover:bg-gray-400 dark:hover:bg-gray-500">
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                </div>
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="icon" onClick={() => handleQuantityChange(-1)} disabled={quantidade <= 1 || isOrdering} className="w-8 h-8">
+                  <Minus className="w-4 h-4" />
+                </Button>
+                <Input 
+                  id="quantidade"
+                  type="number" 
+                  min="1" 
+                  value={quantidade} 
+                  onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))} 
+                  className="w-12 text-center h-8 p-0"
+                  disabled={isOrdering}
+                />
+                <Button size="icon" onClick={() => handleQuantityChange(1)} disabled={isOrdering} className="w-8 h-8">
+                  <Plus className="w-4 h-4" />
+                </Button>
               </div>
             </div>
 
@@ -172,25 +169,26 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
                 placeholder="Ex: Sem cebola, bem passado..."
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                className="mt-2 bg-gray-900 text-white dark:bg-gray-800 dark:text-white border-gray-700"
+                className="mt-2"
                 disabled={isOrdering}
               />
             </div>
+            
+            {/* Total Display */}
+            <div className="flex items-center justify-between pt-2">
+                <Label className="text-base font-semibold">Total:</Label>
+                <span className="text-xl font-extrabold text-gray-900">{formatCurrency(total)}</span>
+            </div>
           </div>
 
-          {/* Footer com Total e Botões */}
-          <DialogFooter className="flex flex-row items-center justify-between p-4 border-t bg-gray-100 dark:bg-gray-800">
-            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isOrdering} className="text-gray-900 dark:text-white dark:bg-gray-700 dark:hover:bg-gray-600">
+          {/* Footer com Botões */}
+          <DialogFooter className="flex flex-row items-center justify-between p-4 border-t bg-gray-100">
+            <Button variant="outline" onClick={() => setIsConfirmOpen(false)} disabled={isOrdering} className="text-gray-900">
               Cancelar
             </Button>
-            <div className="flex items-center gap-4">
-              <span className="text-xl font-extrabold text-primary">
-                {formatCurrency(total)}
-              </span>
-              <Button onClick={handleConfirmOrder} disabled={isOrdering}>
-                {isOrdering ? "Adicionando..." : "Adicionar ao Pedido"}
-              </Button>
-            </div>
+            <Button onClick={handleConfirmOrder} disabled={isOrdering}>
+              {isOrdering ? "Adicionando..." : "Adicionar ao Pedido"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
