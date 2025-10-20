@@ -5,7 +5,7 @@ import { LoginForm } from "@/components/login/LoginForm";
 import { VideoBackground } from "@/components/login/VideoBackground";
 
 // URL padrão do vídeo de fundo (usando um placeholder público funcional).
-const DEFAULT_VIDEO_URL = "https://cdn.videvo.net/videvo_files/video/free/2019-09/large_watermarked/190828_01_Restaurant_4k_001_preview.mp4";
+const DEFAULT_VIDEO_URL = "https://assets.mixkit.co/videos/preview/mixkit-restaurant-with-a-view-of-the-city-at-night-4416-large.mp4";
 
 const Login = () => {
   const navigate = useNavigate();
