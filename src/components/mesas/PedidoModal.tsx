@@ -26,7 +26,11 @@ async function fetchProdutos(): Promise<Produto[]> {
 
 export function PedidoModal({ isOpen, onOpenChange, mesa }) {
   const queryClient = useQueryClient();
-  const { data: produtos } = useQuery(["produtos"], fetchProdutos, { enabled: isOpen });
+  const { data: produtos } = useQuery({
+    queryKey: ["produtos"],
+    queryFn: fetchProdutos,
+    enabled: isOpen,
+  });
 
   const addItemMutation = useMutation({
     mutationFn: async (item: any) => {
@@ -34,7 +38,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }) {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["itensPedido", mesa?.id]);
+      queryClient.invalidateQueries({ queryKey: ["itensPedido", mesa?.id] });
     },
   });
 
@@ -56,16 +60,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }) {
     let status = 'pendente';
 
     if (produtoSelecionado) {
-      // Se for tipo rodizio (pacote rodizio), não vai para cozinha e não requer preparo
       if (produtoSelecionado.tipo === 'rodizio') {
         requerPreparo = false;
         status = 'entregue';
       } else if (produtoSelecionado.tipo === 'venda') {
-        // Alacarte: vai para cozinha e requer preparo
         requerPreparo = true;
         status = 'pendente';
       } else if (produtoSelecionado.tipo === 'componente_rodizio') {
-        // Componente rodizio: pode ter preparo, depende do produto
         requerPreparo = produtoSelecionado.requer_preparo ?? true;
         status = 'pendente';
       }
@@ -76,8 +77,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }) {
   };
 
   return (
-    // JSX do modal com formulário para adicionar item, usando form.handleSubmit(onSubmit)
-    // ... (restante do componente permanece igual)
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
       <Select onValueChange={(val) => {
         form.setValue("nome_produto", val);
