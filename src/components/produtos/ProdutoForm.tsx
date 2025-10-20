@@ -25,6 +25,7 @@ import { Produto, Categoria } from "@/types/supabase";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
+// Função auxiliar para transformar string vazia em null antes da coerção
 const emptyStringToNull = z.literal("").transform(() => null);
 
 const numericOrNull = z.union([z.coerce.number().min(0, "O valor não pode ser negativo."), emptyStringToNull]);
@@ -33,10 +34,11 @@ const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome do produto é obrigatório." }),
   preco: z.coerce.number().min(0, { message: "O preço não pode ser negativo." }),
   descricao: z.string().optional(),
-  tipo: z.enum(["venda", "rodizio", "componente_rodizio"]), // Mantendo tipos válidos do banco
+  tipo: z.enum(["venda", "rodizio", "componente_rodizio"]),
   requer_preparo: z.boolean().default(true),
   imagem_url: z.string().nullable().optional(),
   categoria_id: z.string().uuid().nullable().optional().or(z.literal("none")).transform(val => val === "none" ? null : val),
+  // Inventory fields
   estoque_atual: z.coerce.number().int().min(0, "O estoque atual não pode ser negativo.").default(0),
   alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
   valor_compra: numericOrNull.nullable().optional(),
@@ -61,6 +63,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       requer_preparo: defaultValues?.requer_preparo ?? true,
       imagem_url: defaultValues?.imagem_url || null,
       categoria_id: defaultValues?.categoria_id || "none",
+      // Inventory defaults
       estoque_atual: defaultValues?.estoque_atual || 0,
       alerta_estoque_baixo: defaultValues?.alerta_estoque_baixo || 0,
       valor_compra: defaultValues?.valor_compra || undefined,
@@ -140,8 +143,8 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="venda">Alacarte (Vai para cozinha, sem estoque)</SelectItem>
-                  <SelectItem value="rodizio">Rodízio (Consumo Imediato, sem estoque)</SelectItem>
+                  <SelectItem value="venda">Venda Direta (Ex: Bebida, Sobremesa)</SelectItem>
+                  <SelectItem value="rodizio">Pacote Rodízio (Ex: Rodízio Completo)</SelectItem>
                   <SelectItem value="componente_rodizio">Item de Rodízio (Ex: Picanha, Coração)</SelectItem>
                 </SelectContent>
               </Select>
@@ -191,38 +194,29 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
               <FormField
                 control={form.control}
                 name="estoque_atual"
-                render={({ field, formState }) => {
-                  const tipo = form.getValues("tipo");
-                  // Alacarte não tem estoque, Rodízio não tem estoque, só componente_rodizio tem estoque
-                  const disabled = tipo !== "componente_rodizio";
-                  return (
-                    <FormItem>
-                      <FormLabel>Estoque Atual</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} disabled={disabled} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Estoque Atual</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
               <FormField
                 control={form.control}
                 name="alerta_estoque_baixo"
-                render={({ field, formState }) => {
-                  const tipo = form.getValues("tipo");
-                  const disabled = tipo !== "componente_rodizio";
-                  return (
-                    <FormItem>
-                      <FormLabel>Alerta de Estoque Baixo (Quantidade)</FormLabel>
-                      <FormControl>
-                        <Input type="number" {...field} disabled={disabled} />
-                      </FormControl>
-                      <FormDescription>Receba um alerta visual quando o estoque atingir ou cair abaixo desta quantidade.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Alerta de Estoque Baixo (Quantidade)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormDescription>Receba um alerta visual quando o estoque atingir ou cair abaixo desta quantidade.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
             </AccordionContent>
           </AccordionItem>

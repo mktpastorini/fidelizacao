@@ -17,7 +17,7 @@ export default function Index() {
 
   const addClienteMutation = useMutation({
     mutationFn: async (newCliente: any) => {
-      const { data: { user } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
       const { avatar_urls, ...clienteData } = newCliente;

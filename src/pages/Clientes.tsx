@@ -227,7 +227,7 @@ export default function ClientesPage() {
           <div className="p-4 max-h-[80vh] overflow-y-auto">
             <ClienteForm 
               onSubmit={handleSubmit} 
-              isSubmitting={addClienteMutation.isLoading || editClienteMutation.isLoading} 
+              isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} 
               defaultValues={editingCliente || undefined}
               clientes={clientes || []}
               isEditing={!!editingCliente}
@@ -236,7 +236,7 @@ export default function ClientesPage() {
         </DialogContent>
       </Dialog>
 
-      <ClienteDetalhesModal isOpen={isDetalhesOpen} onOpenChange={setIsDetalhesOpen} clienteId={selectedCliente?.id || null} />
+      <ClienteDetalhesModal isOpen={isDetalhesOpen} onOpenChange={setIsDetalhesOpen} cliente={selectedCliente} />
 
       {clienteToDelete && (
         <AlertDialog open={!!clienteToDelete} onOpenChange={() => setClienteToDelete(null)}>
