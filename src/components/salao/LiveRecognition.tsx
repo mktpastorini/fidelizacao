@@ -20,6 +20,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const videoConstraints = {
@@ -63,17 +64,31 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     };
   }, [isCameraOn, isReady, handleRecognition]);
 
+  const handleMediaError = (err: any) => {
+    console.error("Erro ao acessar a câmera no LiveRecognition:", err);
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      setMediaError("Acesso à câmera negado. Verifique as permissões do navegador.");
+    } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setMediaError("Acesso à câmera bloqueado. O sistema deve ser acessado via HTTPS.");
+    } else {
+      setMediaError(`Erro de mídia: ${err.message}`);
+    }
+    setIsCameraOn(false);
+  };
+
+  const displayError = error || mediaError;
+
   return (
     <Card className="sticky top-6">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Câmera de Reconhecimento</CardTitle>
-        <Button variant="ghost" size="icon" onClick={() => setIsCameraOn(prev => !prev)}>
+        <Button variant="ghost" size="icon" onClick={() => setIsCameraOn(prev => !prev)} disabled={!!mediaError}>
           {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </Button>
       </CardHeader>
       <CardContent className="flex flex-col items-center gap-4">
         <div className="w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
-          {isCameraOn ? (
+          {isCameraOn && !displayError ? (
             <Webcam
               audio={false}
               ref={webcamRef}
@@ -81,15 +96,16 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
               videoConstraints={videoConstraints}
               className="w-full h-full object-cover"
               mirrored={true}
+              onUserMediaError={handleMediaError}
             />
           ) : (
-            <div className="flex flex-col items-center text-muted-foreground">
+            <div className="flex flex-col items-center text-muted-foreground p-4">
               <VideoOff className="w-12 h-12 mb-2" />
-              <p>Câmera desligada</p>
+              <p>{isCameraOn ? "Câmera indisponível" : "Câmera desligada"}</p>
             </div>
           )}
         </div>
-        {error && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>}
+        {displayError && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
         <div className="w-full h-24 flex items-center justify-center">
           {isScanning ? (
