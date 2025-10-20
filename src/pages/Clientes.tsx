@@ -236,7 +236,7 @@ export default function ClientesPage() {
         </DialogContent>
       </Dialog>
 
-      <ClienteDetalhesModal isOpen={isDetalhesOpen} onOpenChange={setIsDetalhesOpen} cliente={selectedCliente} />
+      <ClienteDetalhesModal isOpen={isDetalhesOpen} onOpenChange={setIsDetalhesOpen} clienteId={selectedCliente?.id || null} />
 
       {clienteToDelete && (
         <AlertDialog open={!!clienteToDelete} onOpenChange={() => setClienteToDelete(null)}>
