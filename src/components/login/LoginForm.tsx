@@ -158,7 +158,7 @@ export function LoginForm() {
                 </h2>
                 <div className="text-white/80 flex flex-col items-center space-y-1">
                     <span className="text-xs text-white/50 animate-pulse">
-                        [Pressione Entrar para servir a excelência]
+                        [Distancie-se da concorrência!]
                     </span>
                 </div>
             </div>
