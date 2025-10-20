@@ -3,7 +3,6 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { LoginBackground } from "@/components/LoginBackground";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -23,46 +22,17 @@ const Login = () => {
   }, [navigate]);
 
   return (
-    <LoginBackground>
-      <div className="w-full max-w-sm p-8 space-y-8 bg-card rounded-xl">
+    <div className="flex items-center justify-center min-h-screen bg-background bg-gradient-radial">
+      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg border shadow-lg">
         <div className="text-center">
-          <h1 className="text-4xl font-extrabold text-primary">Fidelize</h1>
-          <p className="mt-2 text-muted-foreground">Acesse sua conta</p>
+          <h1 className="text-3xl font-bold text-card-foreground">Fidelize</h1>
+          <p className="mt-2 text-muted-foreground">Faça login para continuar</p>
         </div>
         <Auth
           supabaseClient={supabase}
-          appearance={{
-            theme: ThemeSupa,
-            variables: {
-              default: {
-                colors: {
-                  brand: 'hsl(var(--primary))',
-                  brandAccent: 'hsl(var(--primary-foreground))',
-                  // Estilos para replicar o visual futurista
-                  inputBackground: 'hsl(var(--secondary))',
-                  inputBorder: 'hsl(var(--border))',
-                  inputBorderHover: 'hsl(var(--primary))',
-                  inputBorderFocus: 'hsl(var(--primary))',
-                  inputLabelText: 'hsl(var(--foreground))',
-                  inputText: 'hsl(var(--foreground))',
-                  defaultButtonBackground: 'hsl(var(--primary))',
-                  defaultButtonBackgroundHover: 'hsl(var(--primary) / 0.9)',
-                  defaultButtonText: 'hsl(var(--primary-foreground))',
-                  anchorText: 'hsl(var(--primary))',
-                  anchorTextHover: 'hsl(var(--primary) / 0.8)',
-                },
-                borderWidths: {
-                  inputBorderWidth: '2px',
-                },
-                radii: {
-                  borderRadiusButton: '0.5rem',
-                  inputBorderRadius: '0.5rem',
-                },
-              },
-            },
-          }}
+          appearance={{ theme: ThemeSupa }}
           providers={[]}
-          theme="dark"
+          theme="light"
           localization={{
             variables: {
               sign_in: {
@@ -95,7 +65,7 @@ const Login = () => {
           }}
         />
       </div>
-    </LoginBackground>
+    </div>
   );
 };
 

@@ -5,7 +5,6 @@ import { WebhookForm } from "@/components/configuracoes/WebhookForm";
 import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSettingsForm";
 import { ApiDocumentation } from "@/components/configuracoes/ApiDocumentation";
 import { CameraSettings } from "@/components/configuracoes/CameraSettings";
-import { LoginVideoSettingsForm } from "@/components/configuracoes/LoginVideoSettingsForm"; // Importando o novo componente
 import { showError, showSuccess } from "@/utils/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -186,7 +185,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="perfil">Perfil & Integrações</TabsTrigger>
           <TabsTrigger value="automacao">Automação</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
@@ -268,22 +267,10 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="aparencia" className="mt-6 space-y-6">
+        <TabsContent value="aparencia" className="mt-6">
           <Card>
             <CardHeader><CardTitle>Estilo do Menu</CardTitle><CardDescription>Escolha como você prefere navegar pelo sistema.</CardDescription></CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
-          </Card>
-          <Card>
-            <CardHeader><CardTitle>Vídeo de Fundo do Login</CardTitle><CardDescription>Personalize a tela de login com um vídeo de fundo.</CardDescription></CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-24 w-full" /> : (
-                <LoginVideoSettingsForm
-                  onSubmit={(values) => updateSettingsMutation.mutate(values)}
-                  isSubmitting={updateSettingsMutation.isPending}
-                  defaultValues={settings || undefined}
-                />
-              )}
-            </CardContent>
           </Card>
         </TabsContent>
 
