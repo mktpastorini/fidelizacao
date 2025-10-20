@@ -6,14 +6,14 @@ import { Skeleton } from "./ui/skeleton";
 import { Header } from "./Header";
 
 const MainContent = () => (
-  <main className="flex-1 p-6 lg:p-8 overflow-y-auto relative">
+  <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto relative">
     <Header />
     <Outlet />
   </main>
 );
 
 const DockContent = () => (
-  <main className="p-6 lg:p-8 pb-24 relative">
+  <main className="p-4 sm:p-6 lg:p-8 pb-24 relative">
     <Header />
     <Outlet />
   </main>

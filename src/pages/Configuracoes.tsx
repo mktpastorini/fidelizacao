@@ -176,7 +176,7 @@ export default function ConfiguracoesPage() {
   const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
 
   return (
-    <div>
+    <div className="space-y-6 max-w-5xl mx-auto p-4 sm:p-6 md:p-8">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Configurações</h1>
         <p className="text-gray-600 mt-2">
@@ -185,19 +185,19 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="perfil" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="perfil">Perfil & Integrações</TabsTrigger>
-          <TabsTrigger value="automacao">Automação</TabsTrigger>
-          <TabsTrigger value="aparencia">Aparência</TabsTrigger>
-          <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>
-          <TabsTrigger value="api">Documentação API</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <TabsTrigger value="perfil" className="text-center">Perfil & Integrações</TabsTrigger>
+          <TabsTrigger value="automacao" className="text-center">Automação</TabsTrigger>
+          <TabsTrigger value="aparencia" className="text-center">Aparência</TabsTrigger>
+          <TabsTrigger value="reconhecimento" className="text-center">Reconhecimento Facial</TabsTrigger>
+          <TabsTrigger value="api" className="text-center md:col-span-4">Documentação API</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="perfil" className="mt-6">
+        <TabsContent value="perfil" className="mt-6 space-y-6">
           <div className="space-y-6">
             <Card>
               <CardHeader><CardTitle>Chave de API</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
-              <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
+              <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex flex-col sm:flex-row sm:items-center sm:gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} className="flex-1" /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}>{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
             </Card>
             <Card>
               <CardHeader><CardTitle>Integrações</CardTitle><CardDescription>Configure seu webhook para automações de WhatsApp.</CardDescription></CardHeader>
@@ -206,7 +206,7 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="automacao" className="mt-6">
+        <TabsContent value="automacao" className="mt-6 space-y-6">
           <div className="space-y-6">
             <Card>
               <CardHeader><CardTitle>Automação de Mensagens</CardTitle><CardDescription>Escolha os templates para cada evento automático.</CardDescription></CardHeader>
@@ -268,7 +268,7 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="aparencia" className="mt-6">
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-md">
             <Card>
               <CardHeader><CardTitle>Estilo do Menu</CardTitle><CardDescription>Escolha como você prefere navegar pelo sistema.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
@@ -294,7 +294,7 @@ export default function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="reconhecimento" className="mt-6">
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-md">
             <Card>
               <CardHeader><CardTitle>Servidor de Reconhecimento (CompreFace)</CardTitle><CardDescription>Conecte seu servidor CompreFace auto-hospedado.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : <CompreFaceSettingsForm />}</CardContent>
