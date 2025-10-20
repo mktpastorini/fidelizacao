@@ -87,6 +87,9 @@ export default function MenuPublicoPage() {
     if (!isMesaOcupada) {
       throw new Error("A mesa não está ocupada. Não é possível adicionar pedidos.");
     }
+    if (produto.estoque_atual <= 0) {
+      throw new Error(`O produto "${produto.nome}" está indisponível no momento.`);
+    }
 
     const userId = mesaData.user_id;
 
@@ -190,7 +193,12 @@ export default function MenuPublicoPage() {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {filteredProdutos.length > 0 ? (
             filteredProdutos.map((produto) => (
-              <PublicMenuProductCard key={produto.id} produto={produto} onOrder={handleOrder} />
+              <PublicMenuProductCard 
+                key={produto.id} 
+                produto={produto} 
+                onOrder={handleOrder} 
+                disabled={produto.estoque_atual <= 0} 
+              />
             ))
           ) : (
             <p className="col-span-full text-center text-gray-400 py-10">Nenhum produto nesta categoria.</p>
@@ -201,7 +209,7 @@ export default function MenuPublicoPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 bg-gray-900 min-h-screen">
+    <div className="max-w-5xl mx-auto p-6 bg-gray-900 min-h-screen">
       <div className="flex justify-between items-center mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="text-white">
           <ArrowLeft className="w-4 h-4 mr-2" />

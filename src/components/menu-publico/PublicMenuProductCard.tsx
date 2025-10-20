@@ -12,11 +12,12 @@ import { Textarea } from "../ui/textarea";
 type PublicMenuProductCardProps = {
   produto: Produto;
   onOrder: (produto: Produto, quantidade: number) => Promise<void>;
+  disabled?: boolean;
 };
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCardProps) {
+export function PublicMenuProductCard({ produto, onOrder, disabled = false }: PublicMenuProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
@@ -24,6 +25,10 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
   const [observacoes, setObservacoes] = useState("");
 
   const handleOrderClick = () => {
+    if (disabled) {
+      showError("Produto indisponível no momento.");
+      return;
+    }
     setQuantidade(1); // Reset quantity on open
     setObservacoes(""); // Reset observations
     setIsConfirmOpen(true);
@@ -36,8 +41,6 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
     }
     setIsOrdering(true);
     try {
-      // NOTE: The current onOrder function does not accept observations. 
-      // For now, we proceed without sending it, but the UI field is present.
       await onOrder(produto, quantidade); 
       showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
       setIsConfirmOpen(false);
@@ -60,7 +63,8 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
       <div
         className={cn(
           "relative rounded-lg border border-gray-300 bg-white shadow-lg cursor-pointer overflow-hidden transition-all duration-300 h-40",
-          isHovered ? "scale-[1.02] shadow-xl" : "scale-100"
+          isHovered ? "scale-[1.02] shadow-xl" : "scale-100",
+          disabled && "opacity-50 cursor-not-allowed"
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -86,11 +90,12 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4 text-white">
                 <h3 className="text-xl font-bold text-center">{produto.nome}</h3>
                 <p className="text-lg font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
-                <p className="text-sm mt-2">Clique para Pedir</p>
+                {disabled && <p className="text-red-400 font-semibold mt-2">Indisponível</p>}
+                {!disabled && <p className="text-sm mt-2">Clique para Pedir</p>}
             </div>
         </div>
 
-        {/* Content Padrão (Visível quando não está em hover) */}
+        {/* Conteúdo Padrão (Visível quando não está em hover) */}
         <div className={cn(
           "p-3 flex items-center gap-3 transition-opacity duration-300 h-full",
           isHovered ? "opacity-0" : "opacity-100"
@@ -110,6 +115,7 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
             <h3 className="text-base font-semibold text-gray-900 truncate">{produto.nome}</h3>
             <p className="text-sm text-gray-600 truncate">{produto.descricao || 'Sem descrição'}</p>
             <p className="text-sm font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
+            {disabled && <p className="text-red-500 font-semibold mt-1">Indisponível</p>}
           </div>
         </div>
       </div>
@@ -209,7 +215,7 @@ export function PublicMenuProductCard({ produto, onOrder }: PublicMenuProductCar
             {/* Botão Adicionar (Azul) */}
             <Button 
               onClick={handleConfirmOrder} 
-              disabled={isOrdering}
+              disabled={isOrdering || disabled}
               className="bg-blue-500 hover:bg-blue-600 text-white"
             >
               {isOrdering ? "Adicionando..." : "Adicionar ao Pedido"}
