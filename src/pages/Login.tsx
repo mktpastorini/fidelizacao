@@ -16,11 +16,21 @@ const Login = () => {
     let savedUrl = localStorage.getItem('login_video_url');
     
     if (savedUrl) {
-      // Se for uma URL de localhost, remove apenas o prefixo /public/ se presente, mas mantém o protocolo e host.
-      if (savedUrl.includes('localhost') && savedUrl.includes('/public/')) {
-        savedUrl = savedUrl.replace('/public/', '/');
+      // Se for uma URL de localhost, extrai apenas o caminho relativo /ia.mp4
+      if (savedUrl.includes('localhost')) {
+        try {
+          // Usa URL API para extrair o pathname e remove o prefixo /public/ se existir
+          const urlPath = new URL(savedUrl).pathname.replace('/public/', '/');
+          setVideoUrl(urlPath);
+        } catch (e) {
+          // Se a URL for inválida, volta para a URL padrão
+          setVideoUrl(DEFAULT_VIDEO_URL);
+        }
+      } else if (savedUrl.startsWith('http')) {
+        setVideoUrl(savedUrl);
+      } else {
+        setVideoUrl(DEFAULT_VIDEO_URL);
       }
-      setVideoUrl(savedUrl);
     } else {
       setVideoUrl(DEFAULT_VIDEO_URL);
     }
@@ -38,8 +48,8 @@ const Login = () => {
     };
   }, [navigate]);
 
-  // Verifica se a URL é válida antes de renderizar o componente de vídeo
-  const isVideoUrlValid = videoUrl && (videoUrl.startsWith('http') || videoUrl.startsWith('/'));
+  // Se a URL for um caminho relativo (ex: /ia.mp4), ela não começa com 'http', mas é válida.
+  const isVideoUrlValid = !!videoUrl;
 
   return (
     <div className="relative flex items-center justify-center min-h-screen text-white">
