@@ -12,13 +12,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from "@/components/ui/label";
 import { showError, showSuccess } from "@/utils/toast";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Utensils, CheckCircle, XCircle } from "lucide-react";
+import { Trash2, Utensils, CheckCircle, XCircle, MoreHorizontal, Percent } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Separator } from "@/components/ui/separator";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
 import { Cliente } from "@/types/supabase";
+import {
+  Form, // Added this import
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
 
 const itemSchema = z.object({
   nome_produto: z.string().min(2, "O nome do produto é obrigatório."),
