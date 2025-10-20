@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { LoginForm } from "@/components/login/LoginForm";
 import { VideoBackground } from "@/components/login/VideoBackground";
+import { FullscreenToggle } from "@/components/login/FullscreenToggle";
 
 // Lista de URLs de vídeo padrão.
 // Se você adicionar vídeos à sua pasta 'public' (ex: public/videos/fundo1.mp4),
@@ -66,6 +67,7 @@ const Login = () => {
   return (
     <div className="relative flex items-center justify-center min-h-screen text-white">
       {isVideoUrlValid && <VideoBackground videoUrl={videoUrl} />}
+      <FullscreenToggle />
       <LoginForm />
     </div>
   );
