@@ -13,8 +13,13 @@ const Login = () => {
 
   useEffect(() => {
     // Tenta obter a URL salva no localStorage
-    const savedUrl = localStorage.getItem('login_video_url');
-    if (savedUrl && savedUrl.startsWith('http')) {
+    let savedUrl = localStorage.getItem('login_video_url');
+    
+    if (savedUrl) {
+      // Ajuste para URLs locais que podem ter sido salvas com o prefixo /public/
+      if (savedUrl.includes('localhost') && savedUrl.includes('/public/')) {
+        savedUrl = savedUrl.replace('/public/', '/');
+      }
       setVideoUrl(savedUrl);
     } else {
       setVideoUrl(DEFAULT_VIDEO_URL);
