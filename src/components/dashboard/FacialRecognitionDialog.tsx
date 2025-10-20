@@ -13,10 +13,10 @@ type FacialRecognitionDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onClientRecognized: (cliente: Cliente) => void;
-  onNewClient: () => void;
+  onNewClientRequested: () => void; // Renomeado para indicar que é uma requisição para abrir modal cadastro
 };
 
-export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecognized, onNewClient }: FacialRecognitionDialogProps) {
+export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecognized, onNewClientRequested }: FacialRecognitionDialogProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
   const [match, setMatch] = useState<Cliente | null>(null);
@@ -111,7 +111,7 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
   };
 
   const handleNewClient = () => {
-    onNewClient();
+    onNewClientRequested();
     onOpenChange(false);
   };
 
@@ -177,7 +177,6 @@ export function FacialRecognitionDialog({ isOpen, onOpenChange, onClientRecogniz
                onUserMediaError={(e) => {
                  console.error("Erro ao acessar a câmera:", e);
                  setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
-                 // Não fechar o modal, apenas mostrar o erro
                }} 
              />
             }

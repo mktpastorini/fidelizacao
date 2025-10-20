@@ -45,17 +45,17 @@ async function fetchHistoricoCliente(clienteId: string): Promise<PedidoComItens[
 }
 
 const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: React.ElementType, children: React.ReactNode }) => (
-  <div className="p-4 bg-background/50 rounded-lg">
-    <h4 className="flex items-center font-semibold text-foreground mb-2">
+  <div className="p-2 bg-background/50 rounded-lg"> {/* Diminuído padding de 4 para 2 */}
+    <h4 className="flex items-center font-semibold text-foreground mb-1"> {/* Diminuído margin-bottom de 2 para 1 */}
       <Icon className="w-5 h-5 mr-2 text-primary" />
       {title}
     </h4>
-    <div className="pl-7 text-muted-foreground space-y-1 text-sm">{children}</div>
+    <div className="pl-6 text-muted-foreground space-y-1 text-sm">{children}</div> {/* Diminuído padding-left de 7 para 6 */}
   </div>
 );
 
 const StatDisplay = ({ title, value, className, icon: Icon }: { title: string, value: string | number, className?: string, icon: React.ElementType }) => (
-  <div className={`p-3 rounded-lg text-center flex flex-col items-center justify-center ${className}`}>
+  <div className={`p-2 rounded-lg text-center flex flex-col items-center justify-center ${className}`}> {/* Diminuído padding de 3 para 2 */}
     <Icon className="w-5 h-5 mb-1 text-primary-foreground/80" />
     <p className="text-xs text-primary-foreground/80">{title}</p>
     <p className="text-xl font-bold text-primary-foreground">{value}</p>
