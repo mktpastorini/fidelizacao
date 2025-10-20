@@ -14,9 +14,10 @@ interface FormInputProps {
     value: string;
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     required?: boolean;
+    autocomplete?: string; // Adicionando autocomplete
 }
 
-const FormInput: React.FC<FormInputProps> = ({ icon, type, placeholder, value, onChange, required }) => {
+const FormInput: React.FC<FormInputProps> = ({ icon, type, placeholder, value, onChange, required, autocomplete }) => {
     return (
         <div className="relative">
             <div className="absolute left-3 top-1/2 -translate-y-1/2">
@@ -28,6 +29,7 @@ const FormInput: React.FC<FormInputProps> = ({ icon, type, placeholder, value, o
                 value={value}
                 onChange={onChange}
                 required={required}
+                autoComplete={autocomplete} // Usando autocomplete
                 className="w-full pl-10 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/60 focus:outline-none focus:border-purple-600/50 transition-colors"
             />
         </div>
@@ -150,14 +152,14 @@ export function LoginForm() {
                 <h2 className="text-3xl font-bold mb-2 relative group">
                     <span className="absolute -inset-1 bg-gradient-to-r from-orange-600/30 via-red-500/30 to-yellow-500/30 blur-xl opacity-75 group-hover:opacity-100 transition-all duration-500 animate-pulse"></span>
                     <span className="relative inline-block text-3xl font-bold mb-2 text-white">
-                        Fidelize
+                        Fidelize Gourmet
                     </span>
                     <span className="absolute -inset-0.5 bg-gradient-to-r from-orange-500/20 to-red-500/20 blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300"></span>
                 </h2>
-                <p className="text-white/80 flex flex-col items-center space-y-1">
+                <div className="text-white/80 flex flex-col items-center space-y-1">
                     <span className="relative group cursor-default">
                         <span className="absolute -inset-1 bg-gradient-to-r from-orange-600/20 to-red-600/20 blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500"></span>
-                        <span className="relative inline-block animate-pulse">Novo conceito de gestão.</span>
+                        <span className="relative inline-block animate-pulse">O portal para a gestão do seu restaurante</span>
                     </span>
                     <span className="text-xs text-white/50 animate-pulse">
                         [Pressione Entrar para servir a excelência]
@@ -167,7 +169,7 @@ export function LoginForm() {
                         <span className="animate-bounce">⭐</span>
                         <span className="animate-pulse">🥂</span>
                     </div>
-                </p>
+                </div>
             </div>
 
             <form onSubmit={handleEmailPasswordLogin} className="space-y-6">
@@ -178,6 +180,7 @@ export function LoginForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    autocomplete="email"
                 />
 
                 <div className="relative">
@@ -188,6 +191,7 @@ export function LoginForm() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
+                        autocomplete="current-password"
                     />
                     <button
                         type="button"
@@ -246,7 +250,7 @@ export function LoginForm() {
                 </div>
 
                 <div className="mt-6 grid grid-cols-3 gap-3">
-                    {/* Mantendo os ícones, mas o contexto é de acesso rápido */}
+                    {/* Note: Supabase supports Google, Twitter, and Steam providers. */}
                     <SocialButton icon={<Chrome size={18} />} provider="google" disabled={isSubmitting} onClick={handleSocialLogin} />
                     <SocialButton icon={<Twitter size={18} />} provider="twitter" disabled={isSubmitting} onClick={handleSocialLogin} />
                     <SocialButton icon={<Gamepad2 size={18} />} provider="steam" disabled={isSubmitting} onClick={handleSocialLogin} />
