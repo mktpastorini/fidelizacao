@@ -10,7 +10,7 @@ import { VideoBackground } from "@/components/login/VideoBackground";
 const DEFAULT_VIDEO_URLS = [
   "http://localhost:32100/ia.mp4",
   "http://localhost:32100/ia2.mp4",
-  ""
+  "http://localhost:32100/ia3.mp4"
   // Adicione seus vídeos locais aqui:
   // "/videos/fundo1.mp4",
   // "/videos/fundo2.mp4",
