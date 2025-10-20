@@ -8,7 +8,9 @@ import { VideoBackground } from "@/components/login/VideoBackground";
 // Se você adicionar vídeos à sua pasta 'public' (ex: public/videos/fundo1.mp4),
 // adicione o caminho relativo aqui (ex: "/videos/fundo1.mp4").
 const DEFAULT_VIDEO_URLS = [
-  "http://localhost:32100/ia.mp4",]
+  "http://localhost:32100/ia.mp4",
+  "http://localhost:32100/ia2.mp4",
+  ""
   // Adicione seus vídeos locais aqui:
   // "/videos/fundo1.mp4",
   // "/videos/fundo2.mp4",
