@@ -56,6 +56,7 @@ export type UserSettings = {
   preferred_camera_device_id?: string | null;
   compreface_url?: string | null;
   compreface_api_key?: string | null;
+  login_video_url?: string | null; // NOVO CAMPO
 };
 
 export type Pedido = {

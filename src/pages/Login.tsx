@@ -3,6 +3,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { LoginBackground } from "@/components/LoginBackground";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -22,17 +23,17 @@ const Login = () => {
   }, [navigate]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-background bg-gradient-radial">
-      <div className="w-full max-w-md p-8 space-y-8 bg-card rounded-lg border shadow-lg">
+    <LoginBackground>
+      <div className="w-full max-w-md p-8 space-y-8 bg-card/90 backdrop-blur-sm rounded-xl border shadow-2xl">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-card-foreground">Fidelize</h1>
-          <p className="mt-2 text-muted-foreground">Faça login para continuar</p>
+          <h1 className="text-4xl font-extrabold text-primary">Fidelize</h1>
+          <p className="mt-2 text-muted-foreground">Acesse sua conta</p>
         </div>
         <Auth
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
           providers={[]}
-          theme="light"
+          theme="dark" // Usando tema escuro para melhor contraste com o fundo
           localization={{
             variables: {
               sign_in: {
@@ -65,7 +66,7 @@ const Login = () => {
           }}
         />
       </div>
-    </div>
+    </LoginBackground>
   );
 };
 
