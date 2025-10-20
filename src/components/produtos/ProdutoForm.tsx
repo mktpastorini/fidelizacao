@@ -141,7 +141,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                 </FormControl>
                 <SelectContent>
                   <SelectItem value="venda">Alacarte (Vai para cozinha, sem estoque)</SelectItem>
-                  <SelectItem value="rodizio">Rodízio (Não vai para cozinha, sem estoque)</SelectItem>
+                  <SelectItem value="rodizio">Rodízio (Consumo Imediato, sem estoque)</SelectItem>
                   <SelectItem value="componente_rodizio">Item de Rodízio (Ex: Picanha, Coração)</SelectItem>
                 </SelectContent>
               </Select>
