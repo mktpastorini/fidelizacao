@@ -41,13 +41,11 @@ export function Dock() {
   };
 
   return (
-    // Esconde o dock em telas menores que md (768px)
-    <div className="fixed bottom-4 left-0 right-0 flex justify-center z-50 md:hidden">
+    <div className="fixed bottom-4 left-0 right-0 flex justify-center z-50">
       <motion.div
         onMouseMove={(e) => mouseX.set(e.pageX)}
         onMouseLeave={() => mouseX.set(Infinity)}
-        className="flex h-16 items-end gap-3 rounded-2xl bg-card/80 backdrop-blur-md px-4 pb-3 border overflow-x-auto no-scrollbar max-w-full"
-        style={{ maxWidth: "100vw" }}
+        className="flex h-16 items-end gap-3 rounded-2xl bg-card/80 backdrop-blur-md px-4 pb-3 border"
       >
         {navItems.map((item) => (
           <DockIcon key={item.to} mouseX={mouseX} item={item} />

@@ -62,10 +62,9 @@ export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa
           isOcupada ? "bg-card" : "bg-secondary/50",
           hasPendingItems && "border-accent ring-2 ring-accent/50"
         )}
-        onClick={onClick}
       >
         <CardHeader className="flex flex-row items-start justify-between pb-2">
-          <div>
+          <div onClick={onClick} className="flex-1">
             <CardTitle className="text-2xl font-bold">Mesa {mesa.numero}</CardTitle>
             <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
               <Users className="w-3 h-3" />
