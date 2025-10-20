@@ -8,9 +8,8 @@ import { VideoBackground } from "@/components/login/VideoBackground";
 // Nota: Para usar vídeos locais, eles devem estar na pasta 'public'.
 const DEFAULT_VIDEO_URLS = [
   "https://assets.mixkit.co/videos/preview/mixkit-restaurant-with-a-view-of-the-city-at-night-4416-large.mp4",
-  // Adicione caminhos relativos para vídeos na sua pasta public aqui, ex:
+  // Exemplo de como adicionar um vídeo local na pasta public:
   // "/videos/restaurant_scene_1.mp4",
-  // "/videos/restaurant_scene_2.mp4",
 ];
 
 // Função para selecionar uma URL de vídeo aleatória de uma lista (ou usar a única se for string)
@@ -40,21 +39,10 @@ const Login = () => {
     // Seleciona uma URL aleatória da lista salva ou da lista padrão
     const selectedUrl = selectRandomVideoUrl(savedUrlOrList);
     
-    // Se a URL for de localhost, ajusta o caminho para ser relativo (como antes)
-    let finalUrl = selectedUrl;
-    if (selectedUrl.includes('localhost')) {
-        try {
-          const urlPath = new URL(selectedUrl).pathname.replace('/public/', '/');
-          finalUrl = urlPath;
-          console.log("Login Video: Usando caminho local ajustado:", urlPath);
-        } catch (e) {
-          console.error("Login Video: URL local inválida, usando padrão.");
-          finalUrl = selectRandomVideoUrl(null); // Fallback to default list
-        }
-    }
-
-    setVideoUrl(finalUrl);
-    console.log("Login Video: URL selecionada para exibição:", finalUrl);
+    // Usa a URL selecionada diretamente. Se for um caminho relativo (ex: /video.mp4),
+    // o navegador o resolverá a partir da raiz do servidor (pasta public).
+    setVideoUrl(selectedUrl);
+    console.log("Login Video: URL selecionada para exibição:", selectedUrl);
 
 
     const {
@@ -70,7 +58,6 @@ const Login = () => {
     };
   }, [navigate]);
 
-  // Se a URL for um caminho relativo (ex: /ia.mp4), ela não começa com 'http', mas é válida.
   const isVideoUrlValid = !!videoUrl;
 
   return (
