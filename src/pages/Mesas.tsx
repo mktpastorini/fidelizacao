@@ -52,8 +52,14 @@ export default function MesasPage() {
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
   const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
 
-  const { data: mesas, isLoading, isError } = useQuery({ queryKey: ["mesas"], queryFn: fetchMesas });
-  const { data: clientes } = useQuery({ queryKey: ["clientes_list"], queryFn: fetchClientes });
+  const { data: mesas, isLoading, isError } = useQuery({
+    queryKey: ["mesas"],
+    queryFn: fetchMesas,
+  });
+  const { data: clientes } = useQuery({
+    queryKey: ["clientes_list"],
+    queryFn: fetchClientes,
+  });
 
   const handleFormOpen = (mesa: Mesa | null = null) => {
     setEditingMesa(mesa);
