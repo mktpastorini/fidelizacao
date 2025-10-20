@@ -152,7 +152,7 @@ export function LoginForm() {
                 <h2 className="text-3xl font-bold mb-2 relative group">
                     <span className="absolute -inset-1 bg-gradient-to-r from-orange-600/30 via-red-500/30 to-yellow-500/30 blur-xl opacity-75 group-hover:opacity-100 transition-all duration-500 animate-pulse"></span>
                     <span className="relative inline-block text-3xl font-bold mb-2 text-white">
-                        Fidelize Gourmet
+                        Fidelize
                     </span>
                     <span className="absolute -inset-0.5 bg-gradient-to-r from-orange-500/20 to-red-500/20 blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300"></span>
                 </h2>
