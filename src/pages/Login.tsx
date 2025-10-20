@@ -8,7 +8,7 @@ import { VideoBackground } from "@/components/login/VideoBackground";
 // Se você adicionar vídeos à sua pasta 'public' (ex: public/videos/fundo1.mp4),
 // adicione o caminho relativo aqui (ex: "/videos/fundo1.mp4").
 const DEFAULT_VIDEO_URLS = [
-  "https://assets.mixkit.co/videos/preview/mixkit-restaurant-with-a-view-of-the-city-at-night-4416-large.mp4",
+  "http://localhost:32100/ia.mp4",]
   // Adicione seus vídeos locais aqui:
   // "/videos/fundo1.mp4",
   // "/videos/fundo2.mp4",
