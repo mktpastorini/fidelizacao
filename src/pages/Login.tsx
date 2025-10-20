@@ -24,16 +24,45 @@ const Login = () => {
 
   return (
     <LoginBackground>
-      <div className="w-full max-w-md p-8 space-y-8 bg-card/90 backdrop-blur-sm rounded-xl border shadow-2xl">
+      <div className="w-full max-w-sm p-8 space-y-8 bg-card rounded-xl">
         <div className="text-center">
           <h1 className="text-4xl font-extrabold text-primary">Fidelize</h1>
           <p className="mt-2 text-muted-foreground">Acesse sua conta</p>
         </div>
         <Auth
           supabaseClient={supabase}
-          appearance={{ theme: ThemeSupa }}
+          appearance={{
+            theme: ThemeSupa,
+            variables: {
+              default: {
+                colors: {
+                  brand: 'hsl(var(--primary))',
+                  brandAccent: 'hsl(var(--primary-foreground))',
+                  // Estilos para replicar o visual futurista
+                  inputBackground: 'hsl(var(--secondary))',
+                  inputBorder: 'hsl(var(--border))',
+                  inputBorderHover: 'hsl(var(--primary))',
+                  inputBorderFocus: 'hsl(var(--primary))',
+                  inputLabelText: 'hsl(var(--foreground))',
+                  inputText: 'hsl(var(--foreground))',
+                  defaultButtonBackground: 'hsl(var(--primary))',
+                  defaultButtonBackgroundHover: 'hsl(var(--primary) / 0.9)',
+                  defaultButtonText: 'hsl(var(--primary-foreground))',
+                  anchorText: 'hsl(var(--primary))',
+                  anchorTextHover: 'hsl(var(--primary) / 0.8)',
+                },
+                borderWidths: {
+                  inputBorderWidth: '2px',
+                },
+                radii: {
+                  borderRadiusButton: '0.5rem',
+                  inputBorderRadius: '0.5rem',
+                },
+              },
+            },
+          }}
           providers={[]}
-          theme="dark" // Usando tema escuro para melhor contraste com o fundo
+          theme="dark"
           localization={{
             variables: {
               sign_in: {
