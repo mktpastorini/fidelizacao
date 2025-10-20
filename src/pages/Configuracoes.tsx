@@ -281,11 +281,11 @@ export default function ConfiguracoesPage() {
                     <Label htmlFor="login-video-url">URL do Vídeo (MP4)</Label>
                     <Input
                       id="login-video-url"
-                      placeholder="https://seu-servidor.com/video.mp4"
+                      placeholder="https://seu-servidor.com/video.mp4, /videos/local.mp4"
                       defaultValue={settings?.login_video_url || ""}
                       onBlur={(e) => updateSettingsMutation.mutate({ login_video_url: e.target.value })}
                     />
-                    <p className="text-xs text-muted-foreground">Se vazio, será usado o vídeo padrão.</p>
+                    <p className="text-xs text-muted-foreground">Se vazio, será usado o vídeo padrão. Você pode inserir múltiplas URLs separadas por vírgula para que o sistema escolha uma aleatoriamente.</p>
                   </div>
                 )}
               </CardContent>
