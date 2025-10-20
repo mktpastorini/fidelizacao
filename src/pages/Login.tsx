@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { LoginForm } from "@/components/login/LoginForm";
 import { VideoBackground } from "@/components/login/VideoBackground";
 
-// URL padrão do vídeo de fundo.
-const DEFAULT_VIDEO_URL = "https://hgqcmpuihoflkkobtyfa.supabase.co/storage/v1/object/public/assets/login_video.mp4";
+// URL padrão do vídeo de fundo (usando um placeholder público funcional).
+const DEFAULT_VIDEO_URL = "https://cdn.videvo.net/videvo_files/video/free/2019-09/large_watermarked/190828_01_Restaurant_4k_001_preview.mp4";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -22,17 +22,21 @@ const Login = () => {
           // Usa URL API para extrair o pathname e remove o prefixo /public/ se existir
           const urlPath = new URL(savedUrl).pathname.replace('/public/', '/');
           setVideoUrl(urlPath);
+          console.log("Login Video: Usando caminho local:", urlPath);
         } catch (e) {
-          // Se a URL for inválida, volta para a URL padrão
           setVideoUrl(DEFAULT_VIDEO_URL);
+          console.error("Login Video: URL local inválida, usando padrão.");
         }
       } else if (savedUrl.startsWith('http')) {
         setVideoUrl(savedUrl);
+        console.log("Login Video: Usando URL remota salva:", savedUrl);
       } else {
         setVideoUrl(DEFAULT_VIDEO_URL);
+        console.log("Login Video: URL salva inválida, usando padrão.");
       }
     } else {
       setVideoUrl(DEFAULT_VIDEO_URL);
+      console.log("Login Video: Nenhuma URL salva, usando padrão.");
     }
 
     const {
