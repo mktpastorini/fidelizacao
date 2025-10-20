@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import type { Session } from "@supabase/supabase-js";
 import { showError } from "@/utils/toast";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export function AuthLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { settings, isLoading: isLoadingSettings } = useSettings(); // Usar useSettings para obter a URL
 
   useEffect(() => {
     const setupSessionAndProfile = async () => {
@@ -43,6 +45,7 @@ export function AuthLayout() {
       (_event, session) => {
         setSession(session);
         if (!session) {
+          // Se deslogado, redireciona para login
           navigate("/login");
         }
       }
@@ -55,11 +58,17 @@ export function AuthLayout() {
 
   useEffect(() => {
     if (!loading && !session) {
+      // Antes de redirecionar para /login, salva a URL do vídeo se estiver disponível
+      if (settings?.login_video_url) {
+        localStorage.setItem('login_video_url', settings.login_video_url);
+      } else {
+        localStorage.removeItem('login_video_url');
+      }
       navigate("/login");
     }
-  }, [session, loading, navigate]);
+  }, [session, loading, navigate, settings]);
 
-  if (loading) {
+  if (loading || isLoadingSettings) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         Carregando...
