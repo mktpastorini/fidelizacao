@@ -224,13 +224,15 @@ export default function ClientesPage() {
               Adicione várias fotos para melhorar a precisão do reconhecimento facial.
             </DialogDescription>
           </DialogHeader>
-          <ClienteForm 
-            onSubmit={handleSubmit} 
-            isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} 
-            defaultValues={editingCliente || undefined}
-            clientes={clientes || []}
-            isEditing={!!editingCliente}
-          />
+          <div className="p-4 max-h-[80vh] overflow-y-auto">
+            <ClienteForm 
+              onSubmit={handleSubmit} 
+              isSubmitting={addClienteMutation.isPending || editClienteMutation.isPending} 
+              defaultValues={editingCliente || undefined}
+              clientes={clientes || []}
+              isEditing={!!editingCliente}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
