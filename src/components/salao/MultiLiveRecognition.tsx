@@ -3,7 +3,7 @@ import Webcam from 'react-webcam';
 import { useMultiFaceRecognition, FaceMatch } from '@/hooks/useMultiFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card'; // Removido CardHeader e CardTitle
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Video, VideoOff, Users } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -48,6 +48,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     ctx.strokeRect(x, y, width, height);
   };
 
+  // A função drawClientInfo não será mais chamada, mas a mantemos aqui caso precise ser reativada no futuro.
   const drawClientInfo = (
     ctx: CanvasRenderingContext2D,
     client: FaceMatch['client'],
@@ -161,7 +162,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
     if (results.length > 0) {
       results.forEach(match => {
-        const { box, client } = match;
+        const { box } = match; // Não precisamos do 'client' aqui para desenhar info
         // Escalar as coordenadas da caixa para o tamanho do vídeo
         const scaleX = canvas.width / video.videoWidth;
         const scaleY = canvas.height / video.videoHeight;
@@ -175,7 +176,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         const x_mirrored = canvas.width - (x_original + width_original);
 
         drawRect(ctx, x_mirrored, y_original, width_original, height_original, '#4CAF50'); // Verde para reconhecido
-        drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width); // Desenha as informações do cliente
+        // drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width); // REMOVIDO: Não desenha mais as informações do cliente
       });
     }
   }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, settings, allocatedClientIds]);
