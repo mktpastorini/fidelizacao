@@ -10,6 +10,7 @@ import { PublicMenuProductCard } from "@/components/menu-publico/PublicMenuProdu
 import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { showError } from "@/utils/toast"; // Importando showError
 
 type MesaData = Mesa & { user_id: string };
 
@@ -69,7 +70,10 @@ export default function MenuPublicoPage() {
         setMenuData(menuData);
         setMesaData(mesaData);
       })
-      .catch(console.error)
+      .catch(error => {
+        console.error("Erro ao carregar dados do menu:", error);
+        showError("Erro ao carregar dados do menu. Verifique o QR Code.");
+      })
       .finally(() => setIsLoading(false));
   }, [mesaId]);
 
@@ -82,58 +86,66 @@ export default function MenuPublicoPage() {
 
   const handleOrder = async (produto: Produto, quantidade: number) => {
     if (!mesaId || !mesaData || !mesaData.user_id) {
-      throw new Error("Mesa ou dados do estabelecimento não identificados.");
+      showError("Mesa ou dados do estabelecimento não identificados.");
+      return;
     }
     if (!isMesaOcupada) {
-      throw new Error("A mesa não está ocupada. Não é possível adicionar pedidos.");
+      showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
+      return;
     }
     if (produto.estoque_atual <= 0) {
-      throw new Error(`O produto "${produto.nome}" está indisponível no momento.`);
+      showError(`O produto "${produto.nome}" está indisponível no momento.`);
+      return;
     }
 
     const userId = mesaData.user_id;
 
-    // 1. Verifica se já existe pedido aberto para a mesa
-    let pedidoId: string | null = null;
-    const { data: pedidoAberto, error: pedidoError } = await supabase
-      .from("pedidos")
-      .select("id")
-      .eq("mesa_id", mesaId)
-      .eq("status", "aberto")
-      .single();
-
-    if (pedidoError && pedidoError.code !== "PGRST116") throw pedidoError;
-
-    if (pedidoAberto) {
-      pedidoId = pedidoAberto.id;
-    } else {
-      // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
-      const { data: novoPedido, error: novoPedidoError } = await supabase
+    try {
+      // 1. Verifica se já existe pedido aberto para a mesa
+      let pedidoId: string | null = null;
+      const { data: pedidoAberto, error: pedidoError } = await supabase
         .from("pedidos")
-        .insert({ 
-          mesa_id: mesaId, 
-          status: "aberto", 
-          user_id: userId,
-          cliente_id: mesaData.cliente_id,
-        })
         .select("id")
+        .eq("mesa_id", mesaId)
+        .eq("status", "aberto")
         .single();
-      if (novoPedidoError) throw novoPedidoError;
-      pedidoId = novoPedido.id;
-    }
 
-    // 3. Insere o item no pedido
-    const { error: itemError } = await supabase.from("itens_pedido").insert({
-      pedido_id: pedidoId,
-      nome_produto: produto.nome,
-      quantidade: quantidade,
-      preco: produto.preco,
-      status: "pendente",
-      requer_preparo: produto.requer_preparo,
-      user_id: userId,
-      consumido_por_cliente_id: null,
-    });
-    if (itemError) throw itemError;
+      if (pedidoError && pedidoError.code !== "PGRST116") throw pedidoError;
+
+      if (pedidoAberto) {
+        pedidoId = pedidoAberto.id;
+      } else {
+        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
+        const { data: novoPedido, error: novoPedidoError } = await supabase
+          .from("pedidos")
+          .insert({ 
+            mesa_id: mesaId, 
+            status: "aberto", 
+            user_id: userId,
+            cliente_id: mesaData.cliente_id,
+          })
+          .select("id")
+          .single();
+        if (novoPedidoError) throw novoPedidoError;
+        pedidoId = novoPedido.id;
+      }
+
+      // 3. Insere o item no pedido
+      const { error: itemError } = await supabase.from("itens_pedido").insert({
+        pedido_id: pedidoId,
+        nome_produto: produto.nome,
+        quantidade: quantidade,
+        preco: produto.preco,
+        status: "pendente",
+        requer_preparo: produto.requer_preparo,
+        user_id: userId, // Garante que o user_id do estabelecimento está aqui
+        consumido_por_cliente_id: null,
+      });
+      if (itemError) throw itemError;
+    } catch (error: any) {
+      console.error("Erro ao adicionar pedido:", error);
+      showError(error.message || "Erro ao adicionar pedido. Verifique as permissões.");
+    }
   };
 
   const renderContent = () => {
