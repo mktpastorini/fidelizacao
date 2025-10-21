@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Cliente, Produto, ItemPedido } from "@/types/supabase";
+import { Cliente, Produto } from "@/types/supabase";
 import {
   Dialog,
   DialogContent,
@@ -102,8 +102,6 @@ export function ResgatePontosDialog({
       }
 
       // 2. Inserir o item de resgate (preço original, com desconto de 100%)
-      const status: ItemPedido['status'] = selectedProduto.requer_preparo ? 'pendente' : 'entregue'; 
-
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         user_id: user.id,
@@ -113,7 +111,7 @@ export function ResgatePontosDialog({
         consumido_por_cliente_id: clienteResgatando.id,
         desconto_percentual: 100,
         desconto_motivo: `Resgate de ${pontosNecessarios} pontos`,
-        status: status,
+        status: "pendente",
         requer_preparo: selectedProduto.requer_preparo,
       });
       if (itemError) throw itemError;
@@ -125,10 +123,9 @@ export function ResgatePontosDialog({
       if (pointsError) throw pointsError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesaId] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida notificações
       showSuccess(`Resgate de ${quantidade}x ${selectedProduto?.nome} realizado com sucesso!`);
       setSelectedProduto(null);
       setQuantidade(1);

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Produto, Mesa, Categoria, ItemPedido } from "@/types/supabase";
+import { Produto, Mesa, Categoria } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -147,15 +147,12 @@ export default function MenuPublicoPage() {
       }
 
       // 3. Insere o item no pedido
-      // Lógica de correção: Se não requer preparo, o status inicial é 'entregue'
-      const status: ItemPedido['status'] = produto.requer_preparo ? 'pendente' : 'entregue'; 
-
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         nome_produto: produto.nome + (observacoes ? ` (${observacoes})` : ''),
         quantidade: quantidade,
         preco: produto.preco,
-        status: status,
+        status: "pendente",
         requer_preparo: produto.requer_preparo,
         user_id: userId,
         consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
