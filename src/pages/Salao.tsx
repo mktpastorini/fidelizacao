@@ -18,9 +18,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import { useEffect, useMemo } from "react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"; // Importando componentes de redimensionamento
+import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
+import { useEffect } from "react"; // Importando useEffect
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -71,7 +71,7 @@ async function fetchSalaoData(): Promise<SalaoData> {
 
 export default function SalaoPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions();
+  const { setPageActions } = usePageActions(); // Usando o contexto
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -181,7 +181,7 @@ export default function SalaoPage() {
         body: { clientId: cliente.id, userId: user.id },
       });
       if (functionError) {
-        showError(`Mesa alocada, mas falha ao enviar webhook: ${functionError.message}`);
+        showError(`Mesa alocada, mas falha ao enviar mensagem: ${functionError.message}`);
       }
     },
     onSuccess: () => {
@@ -258,7 +258,7 @@ export default function SalaoPage() {
         .eq("status", "aberto")
         .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
         .limit(1) // Limita a 1 resultado
-        .maybeSingle();
+        .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
 
       if (existingPedidoError) throw existingPedidoError;
 
@@ -314,12 +314,10 @@ export default function SalaoPage() {
     onError: (err: Error) => showError(err.message),
   });
 
-  const mesasComPedidos = useMemo(() => {
-    return data?.mesas.map(mesa => {
-      const pedido = data.pedidosAbertos.find(p => p.mesa_id === mesa.id);
-      return { ...mesa, pedido };
-    });
-  }, [data]);
+  const mesasComPedidos = data?.mesas.map(mesa => {
+    const pedido = data.pedidosAbertos.find(p => p.mesa_id === mesa.id);
+    return { ...mesa, pedido };
+  });
 
   const mesasLivres = data?.mesas.filter(m => !m.cliente_id) || [];
 
@@ -431,7 +429,7 @@ export default function SalaoPage() {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
       {isClosed && (
         <Alert variant="destructive">
           <Lock className="h-4 w-4" />
