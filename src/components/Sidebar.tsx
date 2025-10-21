@@ -3,7 +3,7 @@ import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, C
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
+import { useSettings } from "@/contexts/SettingsContext";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha'] },
@@ -18,7 +18,7 @@ const navItems = [
 
 export function Sidebar() {
   const navigate = useNavigate();
-  const { userRole, isLoading } = useSettings(); // Usando useSettings
+  const { userRole, isLoading } = useSettings();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -26,7 +26,7 @@ export function Sidebar() {
   };
 
   if (isLoading) {
-    // Não renderiza nada enquanto carrega o perfil/função
+    // Renderiza um placeholder ou null enquanto carrega o perfil/função
     return null;
   }
 

@@ -11,16 +11,17 @@ import { ShieldAlert, User, Trash2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState } from "react";
+import { UserRole } from "@/types/supabase";
 
 type UserProfile = {
   id: string;
   email: string;
-  role: 'superadmin' | 'admin' | 'gerente' | 'balcao' | 'garcom' | 'cozinha';
+  role: UserRole;
   first_name: string | null;
   last_name: string | null;
 };
 
-const ROLES = [
+const ROLES: { value: UserRole, label: string }[] = [
   { value: 'superadmin', label: 'Super Admin' },
   { value: 'admin', label: 'Admin' },
   { value: 'gerente', label: 'Gerente' },
@@ -47,7 +48,7 @@ async function fetchAllUsers(): Promise<UserProfile[]> {
   const usersWithEmails = profiles.map(p => ({
     id: p.id,
     email: `user_${p.id.substring(0, 4)}@example.com`, // Placeholder
-    role: p.role as UserProfile['role'],
+    role: p.role as UserRole,
     first_name: p.first_name,
     last_name: p.last_name,
   }));
@@ -67,7 +68,7 @@ export default function UsuariosPage() {
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole }: { userId: string; newRole: UserProfile['role'] }) => {
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: UserRole }) => {
       const { error } = await supabase
         .from("profiles")
         .update({ role: newRole })
@@ -115,7 +116,7 @@ export default function UsuariosPage() {
         <ShieldAlert className="h-4 w-4" />
         <AlertTitle>Acesso Negado</AlertTitle>
         <AlertDescription>
-          Você não tem permissão para acessar o gerenciamento de usuários.
+          Sua função atual ({userRole}) não tem permissão para acessar esta página.
         </AlertDescription>
       </Alert>
     );
@@ -152,7 +153,7 @@ export default function UsuariosPage() {
                   <TableCell>
                     <Select
                       value={user.role}
-                      onValueChange={(newRole) => updateRoleMutation.mutate({ userId: user.id, newRole: newRole as UserProfile['role'] })}
+                      onValueChange={(newRole) => updateRoleMutation.mutate({ userId: user.id, newRole: newRole as UserRole })}
                       disabled={updateRoleMutation.isPending || user.id === supabase.auth.getUser().id} // Não permite mudar a própria função
                     >
                       <SelectTrigger className={cn("w-[180px]", user.role === 'superadmin' && 'bg-primary/10')}>
