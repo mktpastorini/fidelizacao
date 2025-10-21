@@ -14,7 +14,7 @@ const allNavItems = [
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
-  { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] }, // Adicionado aqui
+  { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
 ];
 
 export function Sidebar() {
@@ -43,7 +43,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === "/" || item.to === "/dashboard"}
+            end={item.to === "/" && userRole !== 'cozinha'} // Se for Cozinha, a rota principal deve ser /cozinha, mas como não temos redirecionamento automático, mantemos a lógica de rota
             className={({ isActive }) =>
               cn(
                 "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
