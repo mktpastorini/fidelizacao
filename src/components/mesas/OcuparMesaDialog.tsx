@@ -38,7 +38,7 @@ type OcuparMesaDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
   mesa: Mesa | null;
   clientes: Cliente[];
-  onSubmit: (clientePrincipalId: string, acompanhanteIds: string[]) => void;
+  onSubmit: (clientePrincipalId: string, acompanhanteIds: string[], currentOccupantIds: string[]) => void;
   isSubmitting: boolean;
 };
 
@@ -68,13 +68,19 @@ export function OcuparMesaDialog({
   const { data: ocupantesAtuais, isLoading: isLoadingOcupantes } = useQuery({
     queryKey: ["ocupantes", mesa?.id],
     queryFn: () => fetchOcupantes(mesa!.id),
-    enabled: isOpen && !!mesa?.cliente_id,
+    enabled: isOpen && !!mesa?.id, // Enable if dialog is open and mesa exists
+    initialData: [], // Provide initial data to avoid undefined during first render
   });
 
   useEffect(() => {
-    if (isOpen && mesa?.cliente_id && ocupantesAtuais) {
+    if (isOpen && mesa?.cliente_id) {
       setClientePrincipalId(mesa.cliente_id);
+      // Filter out the main client from acompanhantes if it's already in ocupantesAtuais
       setAcompanhanteIds(ocupantesAtuais.filter(id => id !== mesa.cliente_id));
+    } else if (isOpen && !mesa?.cliente_id) {
+      // If mesa is free, reset selections
+      setClientePrincipalId(null);
+      setAcompanhanteIds([]);
     }
   }, [isOpen, mesa, ocupantesAtuais]);
 
@@ -112,7 +118,7 @@ export function OcuparMesaDialog({
 
   const handleSubmit = () => {
     if (clientePrincipalId) {
-      onSubmit(clientePrincipalId, acompanhanteIds);
+      onSubmit(clientePrincipalId, acompanhanteIds, ocupantesAtuais || []); // Pass currentOccupantIds
     }
   };
 

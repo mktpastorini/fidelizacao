@@ -111,38 +111,72 @@ export default function MesasPage() {
   });
 
   const ocuparMesaMutation = useMutation({
-    mutationFn: async ({ clientePrincipalId, acompanhanteIds }: { clientePrincipalId: string, acompanhanteIds: string[] }) => {
+    mutationFn: async ({ clientePrincipalId, acompanhanteIds, currentOccupantIds }: { clientePrincipalId: string, acompanhanteIds: string[], currentOccupantIds: string[] }) => {
       if (!selectedMesa) throw new Error("Nenhuma mesa selecionada");
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
   
-      const todosOcupantesIds = [clientePrincipalId, ...acompanhanteIds];
-      const todosOcupantes = clientes?.filter(c => todosOcupantesIds.includes(c.id)) || [];
+      const todosNovosOcupantesIds = [clientePrincipalId, ...acompanhanteIds];
+      const todosOcupantes = clientes?.filter(c => todosNovosOcupantesIds.includes(c.id)) || [];
       const acompanhantesJson = todosOcupantes.map(c => ({ id: c.id, nome: c.nome }));
   
-      // Atualiza a mesa com o cliente principal
+      // 1. Find or create the open pedido
+      let pedidoId: string | null = null;
+      const { data: existingPedido, error: existingPedidoError } = await supabase
+        .from("pedidos")
+        .select("id")
+        .eq("mesa_id", selectedMesa.id)
+        .eq("status", "aberto")
+        .maybeSingle();
+
+      if (existingPedidoError) throw existingPedidoError;
+
+      if (existingPedido) {
+        pedidoId = existingPedido.id;
+        // Update existing pedido's cliente_id and acompanhantes if necessary
+        await supabase.from("pedidos").update({
+          cliente_id: clientePrincipalId,
+          acompanhantes: acompanhantesJson,
+        }).eq("id", pedidoId);
+      } else {
+        // Create new pedido if none exists
+        const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
+          mesa_id: selectedMesa.id,
+          cliente_id: clientePrincipalId,
+          user_id: user.id,
+          status: "aberto",
+          acompanhantes: acompanhantesJson,
+        }).select("id").single();
+        if (newPedidoError) throw newPedidoError;
+        pedidoId = newPedido.id;
+      }
+
+      // 2. Update the mesa's main client
       await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
   
-      // Cria o pedido aberto, já salvando a lista completa de acompanhantes
-      await supabase.from("pedidos").insert({
-        mesa_id: selectedMesa.id,
-        cliente_id: clientePrincipalId,
-        user_id: user.id,
-        status: "aberto",
-        acompanhantes: acompanhantesJson,
-      });
-  
-      // Limpa ocupantes antigos e insere os novos
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id);
-      const ocupantesData = todosOcupantesIds.map(clienteId => ({
-        mesa_id: selectedMesa.id,
-        cliente_id: clienteId,
-        user_id: user.id,
-      }));
-      await supabase.from("mesa_ocupantes").insert(ocupantesData);
+      // 3. Manage mesa_ocupantes to trigger only for new additions
+      const currentOccupantSet = new Set(currentOccupantIds);
+      const newOccupantSet = new Set(todosNovosOcupantesIds);
+
+      const occupantsToRemove = currentOccupantIds.filter(id => !newOccupantSet.has(id));
+      const occupantsToAdd = todosNovosOcupantesIds.filter(id => !currentOccupantSet.has(id));
+
+      if (occupantsToRemove.length > 0) {
+        await supabase.from("mesa_ocupantes").delete().eq("mesa_id", selectedMesa.id).in("cliente_id", occupantsToRemove);
+      }
+
+      if (occupantsToAdd.length > 0) {
+        const ocupantesDataToInsert = occupantsToAdd.map(clienteId => ({
+          mesa_id: selectedMesa.id,
+          cliente_id: clienteId,
+          user_id: user.id,
+        }));
+        await supabase.from("mesa_ocupantes").insert(ocupantesDataToInsert);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
       showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
     },
@@ -167,6 +201,7 @@ export default function MesasPage() {
     },
     onSuccess: ({ orderWasCancelled }) => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
       if (orderWasCancelled) {
         showSuccess("Mesa liberada e pedido cancelado!");
       } else {
@@ -237,7 +272,7 @@ export default function MesasPage() {
         onOpenChange={setIsOcuparMesaOpen}
         mesa={selectedMesa}
         clientes={clientes || []}
-        onSubmit={(clientePrincipalId, acompanhanteIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds })}
+        onSubmit={(clientePrincipalId, acompanhanteIds, currentOccupantIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds, currentOccupantIds })}
         isSubmitting={ocuparMesaMutation.isPending}
       />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
