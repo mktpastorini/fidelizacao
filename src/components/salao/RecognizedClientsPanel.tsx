@@ -2,7 +2,7 @@ import { Cliente } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Phone, Heart, DoorOpen, Users } from "lucide-react"; // Importações adicionadas
+import { User, Phone, Heart, DoorOpen, Users } from "lucide-react";
 import { formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -46,7 +46,12 @@ export function RecognizedClientsPanel({ clients }: RecognizedClientsPanelProps)
         <ScrollArea className="h-full pr-4">
           <div className="space-y-4 p-6 pt-0">
             {clients.map(({ client }) => {
-              const tempoCliente = formatDistanceToNowStrict(new Date(client.cliente_desde), { locale: ptBR });
+              // Verifica se a data é válida antes de tentar formatar
+              const isValidDate = client.cliente_desde && !isNaN(new Date(client.cliente_desde).getTime());
+              const tempoCliente = isValidDate
+                ? formatDistanceToNowStrict(new Date(client.cliente_desde), { locale: ptBR })
+                : "Data não informada"; // Fallback para datas inválidas
+
               const preferences = client.gostos ? Object.entries(client.gostos).filter(([_, value]) => value) : [];
 
               return (
