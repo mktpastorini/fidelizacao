@@ -26,6 +26,41 @@ type ClientIdentificationModalProps = {
   onOrderConfirmed: (clienteId: string | null) => void; // null se for Mesa (Geral)
 };
 
+// Hook useFaceRecognition modificado para aceitar mesaId
+function useFaceRecognitionForMenu() {
+  const [isReady, setIsReady] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const recognize = useCallback(async (imageSrc: string, mesaId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
+        body: { image_url: imageSrc, mesa_id: mesaId }, // Passando mesa_id
+      });
+
+      if (functionError) throw functionError;
+
+      setIsLoading(false);
+      if (data.match) {
+        return { client: data.match as Cliente, distance: data.distance };
+      }
+      return null;
+
+    } catch (err: any) {
+      console.error("Erro ao invocar a função de reconhecimento:", err);
+      const errorMessage = err.context?.error_message || err.message || "Falha na comunicação com o serviço de reconhecimento.";
+      setError(errorMessage);
+      setIsLoading(false);
+      return null;
+    }
+  }, []);
+
+  return { isReady, isLoading, error, recognize };
+}
+
+
 export function ClientIdentificationModal({
   isOpen,
   onOpenChange,
@@ -36,7 +71,7 @@ export function ClientIdentificationModal({
 }: ClientIdentificationModalProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
-  const { isReady, isLoading: isScanning, error: recognitionError, recognize } = useFaceRecognition();
+  const { isReady, isLoading: isScanning, error: recognitionError, recognize } = useFaceRecognitionForMenu(); // Usando o hook modificado
   
   const [step, setStep] = useState<'capture' | 'identifying' | 'match' | 'no_match' | 'quick_register'>('capture');
   const [match, setMatch] = useState<Cliente | null>(null);
@@ -79,7 +114,8 @@ export function ClientIdentificationModal({
     if (!isReady || !recognize) return;
 
     setStep('identifying');
-    const result = await recognize(imageSrc);
+    // Passando mesaId para o Edge Function
+    const result = await recognize(imageSrc, mesaId); 
     
     if (result) {
       setMatch(result.client);
@@ -88,7 +124,7 @@ export function ClientIdentificationModal({
       setMatch(null);
       setStep('no_match');
     }
-  }, [isReady, recognize]);
+  }, [isReady, recognize, mesaId]);
 
   const handleCapture = useCallback(() => {
     if (mediaError) {

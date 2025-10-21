@@ -15,10 +15,10 @@ serve(async (req) => {
   }
 
   try {
-    console.log("[recognize-face] 1/6: Parsing body da requisição...");
-    const { image_url } = await req.json();
+    console.log("[recognize-face] 1/7: Parsing body da requisição...");
+    const { image_url, mesa_id } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
-    console.log("[recognize-face] 1/6: Body recebido.");
+    console.log(`[recognize-face] 1/7: Body recebido. Mesa ID: ${mesa_id}`);
 
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
@@ -26,39 +26,56 @@ serve(async (req) => {
       console.log("[recognize-face] Prefixo data:image removido do base64.");
     }
 
-    console.log("[recognize-face] 2/6: Autenticando usuário...");
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-      throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
-    }
-    console.log(`[recognize-face] 2/6: Usuário autenticado: ${user.id}`);
-
-    console.log("[recognize-face] 3/6: Buscando configurações do CompreFace...");
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    let userId: string | null = null;
+
+    // 2. Determinar o ID do usuário (dono do estabelecimento)
+    const authHeader = req.headers.get('Authorization');
+    if (authHeader && authHeader !== `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`) {
+      // Se houver um token de usuário logado (ex: do painel admin)
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+      if (userError || !user) throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
+      userId = user.id;
+      console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin): ${userId}`);
+    } else if (mesa_id) {
+      // Se for requisição anônima do menu público, buscar o user_id pela mesa
+      const { data: mesa, error: mesaError } = await supabaseAdmin
+        .from('mesas')
+        .select('user_id')
+        .eq('id', mesa_id)
+        .single();
+      
+      if (mesaError || !mesa?.user_id) {
+        throw new Error(`Mesa ID inválido ou usuário da mesa não encontrado: ${mesaError?.message}`);
+      }
+      userId = mesa.user_id;
+      console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID: ${userId}`);
+    } else {
+      throw new Error("ID do usuário ou da mesa é obrigatório para o reconhecimento.");
+    }
+
+    // 3. Buscando configurações do CompreFace
+    console.log("[recognize-face] 3/7: Buscando configurações do CompreFace...");
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('compreface_url, compreface_api_key')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     if (settingsError) {
       throw new Error(`Não foi possível recuperar as configurações do CompreFace: ${settingsError.message}`);
     }
     if (!settings?.compreface_url || !settings?.compreface_api_key) {
-      throw new Error("URL ou Chave de API do CompreFace não configuradas.");
+      throw new Error("URL ou Chave de API do CompreFace não configuradas para este estabelecimento.");
     }
-    console.log("[recognize-face] 3/6: Configurações carregadas.");
+    console.log("[recognize-face] 3/7: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[recognize-face] 4/6: Enviando para CompreFace para reconhecimento...");
+    console.log("[recognize-face] 4/7: Enviando para CompreFace para reconhecimento...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
@@ -68,7 +85,7 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[recognize-face] 5/6: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[recognize-face] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
     if (!response.ok) {
       const errorBody = await response.json().catch(() => response.text());
       if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
@@ -82,12 +99,16 @@ serve(async (req) => {
     const bestMatch = data.result?.[0]?.subjects?.[0];
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
-      console.log(`[recognize-face] 6/6: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      
+      // 7. Buscar dados do cliente (usando o ID do cliente e o ID do usuário dono da mesa para RLS)
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
+        .eq('user_id', userId) // Adiciona filtro de segurança
         .single();
+        
       if (clientError) {
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
@@ -95,7 +116,7 @@ serve(async (req) => {
       return new Response(JSON.stringify({ match: client, distance: 1 - bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    console.log("[recognize-face] 6/6: Nenhum match encontrado com similaridade suficiente.");
+    console.log("[recognize-face] 6/7: Nenhum match encontrado com similaridade suficiente.");
     return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
