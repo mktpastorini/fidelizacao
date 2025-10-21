@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
@@ -44,7 +44,16 @@ const itemSchema = z.object({
 
 async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
   if (!mesaId) return null;
-  const { data, error } = await supabase.from("pedidos").select("*, itens_pedido(*)").eq("mesa_id", mesaId).eq("status", "aberto").order("created_at", { foreignTable: "itens_pedido", ascending: true }).maybeSingle();
+  // Ajustado para pegar o pedido mais recente se houver múltiplos abertos (inconsistência)
+  const { data, error } = await supabase
+    .from("pedidos")
+    .select("*, itens_pedido(*)")
+    .eq("mesa_id", mesaId)
+    .eq("status", "aberto")
+    .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
+    .limit(1) // Limita a 1 resultado
+    .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
+
   if (error) throw new Error(error.message);
   return data;
 }
@@ -83,7 +92,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
   });
 
-  const { data: pedido, isLoading } = useQuery({
+  const { data: pedido, isLoading, isError: isPedidoError, error: pedidoError } = useQuery({
     queryKey: ["pedidoAberto", mesa?.id],
     queryFn: () => fetchPedidoAberto(mesa!.id),
     enabled: !!mesa && isOpen,
@@ -250,119 +259,134 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
-            <div className="space-y-4 overflow-y-auto pr-2">
-              <h3 className="font-semibold">Itens do Pedido</h3>
-              {isLoading ? <p>Carregando...</p> : Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => (
-                (itens.length > 0) && (
-                  <div key={cliente.id} className="p-3 border rounded-lg">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-semibold">{cliente.nome}</h4>
-                      {cliente.id !== 'mesa' && (
-                        <Button size="sm" variant="outline" onClick={() => setClientePagando(cliente as Cliente)}>
-                          <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
-                        </Button>
-                      )}
-                    </div>
-                    <ul className="space-y-2">
-                      {itens.map((item) => {
-                        const precoOriginal = (item.preco || 0) * item.quantidade;
-                        const precoFinal = calcularPrecoComDesconto(item);
-                        return (
-                          <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
-                            <div>
-                              <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
-                              {item.desconto_percentual && item.desconto_percentual > 0 && (
-                                <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <div className="text-right">
-                                {item.desconto_percentual && item.desconto_percentual > 0 ? (
-                                  <>
-                                    <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
-                                    <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
-                                  </>
-                                ) : (
-                                  <p>R$ {precoOriginal.toFixed(2)}</p>
+          {isPedidoError ? (
+            <div className="flex flex-col items-center justify-center p-8 text-destructive">
+              <AlertTriangle className="w-12 h-12 mb-4" />
+              <p className="text-lg font-semibold">Erro ao carregar o pedido!</p>
+              <p className="text-sm text-center">
+                {pedidoError?.message || "Houve um problema ao buscar os detalhes do pedido. Por favor, tente novamente."}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Se o problema persistir, pode haver múltiplos pedidos abertos para esta mesa.
+              </p>
+            </div>
+          ) : isLoading ? (
+            <p>Carregando...</p>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
+              <div className="space-y-4 overflow-y-auto pr-2">
+                <h3 className="font-semibold">Itens do Pedido</h3>
+                {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => (
+                  (itens.length > 0) && (
+                    <div key={cliente.id} className="p-3 border rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-semibold">{cliente.nome}</h4>
+                        {cliente.id !== 'mesa' && (
+                          <Button size="sm" variant="outline" onClick={() => setClientePagando(cliente as Cliente)}>
+                            <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
+                          </Button>
+                        )}
+                      </div>
+                      <ul className="space-y-2">
+                        {itens.map((item) => {
+                          const precoOriginal = (item.preco || 0) * item.quantidade;
+                          const precoFinal = calcularPrecoComDesconto(item);
+                          return (
+                            <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                              <div>
+                                <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                                {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                  <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
                                 )}
                               </div>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
-                                    <Tag className="h-4 w-4 mr-2" />
-                                    <span>Aplicar Desconto</span>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    <span>Remover Item</span>
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                    <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
-                  </div>
-                )
-              ))}
-            </div>
+                              <div className="flex items-center gap-1">
+                                <div className="text-right">
+                                  {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                    <>
+                                      <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                      <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                    </>
+                                  ) : (
+                                    <p>R$ {precoOriginal.toFixed(2)}</p>
+                                  )}
+                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                      <Tag className="h-4 w-4 mr-2" />
+                                      <span>Aplicar Desconto</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      <span>Remover Item</span>
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
+                    </div>
+                  )
+                ))}
+              </div>
 
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField control={form.control} name="nome_produto" render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Produto</FormLabel>
-                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
-                              {field.value ? produtos?.find(p => p.nome === field.value)?.nome : "Selecione um produto"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar produto..." /><CommandList><CommandEmpty>Nenhum produto encontrado.</CommandEmpty><CommandGroup>
-                          {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {
-                            const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
-                            form.setValue("nome_produto", produto.nome);
-                            form.setValue("preco", preco);
-                            setPopoverOpen(false);
-                          }}>
-                            <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
-                        </CommandGroup></CommandList></Command></PopoverContent>
-                      </Popover>
-                      <FormMessage />
-                    </FormItem>
-                  )}/>
-                  <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Quantidade</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)}/>
-                  <FormField control={form.control} name="consumido_por_cliente_id" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Consumido por</FormLabel>
-                      <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} value={field.value ?? 'null'}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                          <SelectItem value="null">Mesa (Geral)</SelectItem>
-                          {ocupantes?.map(ocupante => (<SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}/>
-                  <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
-                </form>
-              </Form>
+              <div className="p-4 border rounded-lg">
+                <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField control={form.control} name="nome_produto" render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Produto</FormLabel>
+                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
+                                {field.value ? produtos?.find(p => p.nome === field.value)?.nome : "Selecione um produto"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar produto..." /><CommandList><CommandEmpty>Nenhum produto encontrado.</CommandEmpty><CommandGroup>
+                            {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {
+                              const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
+                              form.setValue("nome_produto", produto.nome);
+                              form.setValue("preco", preco);
+                              setPopoverOpen(false);
+                            }}>
+                              <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
+                          </CommandGroup></CommandList></Command></PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                    <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Quantidade</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={form.control} name="consumido_por_cliente_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consumido por</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} value={field.value ?? 'null'}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="null">Mesa (Geral)</SelectItem>
+                            {ocupantes?.map(ocupante => (<SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                    <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
+                  </form>
+                </Form>
+              </div>
             </div>
-          </div>
+          )}
           <div className="mt-6 pt-4 border-t">
             <div className="flex justify-between items-center text-lg font-bold">
               <span>Total Restante na Mesa:</span>
