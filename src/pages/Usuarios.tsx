@@ -35,7 +35,7 @@ async function fetchAllUsers(): Promise<UserProfile[]> {
   // Usamos o RLS para garantir que apenas Superadmins possam ler todos os perfis.
   const { data: profiles, error } = await supabase
     .from("profiles")
-    .select("id, role, first_name, last_name, user_settings(id)"); // user_settings(id) para garantir que o join funcione
+    .select("id, role, first_name, last_name"); // Removido o join com user_settings(id)
   
   if (error) throw new Error(error.message);
 
