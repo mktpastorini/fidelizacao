@@ -98,6 +98,10 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      boxShadow: {
+        // Sombra personalizada para o dock: mais espalhada e com um toque de cor primária
+        'dock': '0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(var(--primary-rgb), 0.3)',
+      }
     },
   },
   plugins: [require("tailwindcss-animate")],

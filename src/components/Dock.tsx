@@ -45,7 +45,7 @@ export function Dock() {
       <motion.div
         onMouseMove={(e) => mouseX.set(e.pageX)}
         onMouseLeave={() => mouseX.set(Infinity)}
-        className="flex h-16 items-end gap-3 rounded-2xl bg-card/80 backdrop-blur-md px-4 pb-3 border shadow-2xl"
+        className="flex h-16 items-end gap-3 rounded-2xl bg-card/80 backdrop-blur-md px-4 pb-3 border shadow-dock"
       >
         {navItems.map((item) => (
           <DockIcon key={item.to} mouseX={mouseX} item={item} />
