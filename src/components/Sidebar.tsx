@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useSettings } from "@/contexts/SettingsContext";
 
-const navItems = [
+const allNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha'] },
   { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
@@ -14,6 +14,7 @@ const navItems = [
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
+  { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] }, // Adicionado aqui
 ];
 
 export function Sidebar() {
@@ -26,9 +27,10 @@ export function Sidebar() {
   };
 
   if (isLoading) {
-    // Renderiza um placeholder ou null enquanto carrega o perfil/função
     return null;
   }
+
+  const filteredNavItems = allNavItems.filter(item => item.roles.includes(userRole!));
 
   return (
     <aside className="w-64 bg-card border-r flex flex-col text-foreground shrink-0">
@@ -37,33 +39,24 @@ export function Sidebar() {
         <h1 className="text-2xl font-bold text-center ml-2">Fidelize</h1>
       </div>
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
-          // Renderiza apenas se a função do usuário estiver na lista de funções permitidas
-          item.roles.includes(userRole!) && (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/" || item.to === "/dashboard"}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
-                  isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-                )
-              }
-            >
-              <div className="flex items-center">
-                <item.icon className="w-5 h-5 mr-3" />
-                <span>{item.label}</span>
-              </div>
-            </NavLink>
-          )
-        ))}
-        {/* Link de Gerenciamento de Usuários (Apenas Superadmin) */}
-        {userRole === 'superadmin' && (
-          <NavLink to="/usuarios" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
-              <div className="flex items-center"><UserCog className="w-5 h-5 mr-3" /><span>Gerenciar Usuários</span></div>
+        {filteredNavItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === "/" || item.to === "/dashboard"}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
+                isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+              )
+            }
+          >
+            <div className="flex items-center">
+              <item.icon className="w-5 h-5 mr-3" />
+              <span>{item.label}</span>
+            </div>
           </NavLink>
-        )}
+        ))}
       </nav>
       <div className="p-2 border-t border-border">
         <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>

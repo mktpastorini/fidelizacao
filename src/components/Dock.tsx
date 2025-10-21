@@ -14,31 +14,45 @@ import {
   MessageSquare,
   Settings,
   LogOut,
+  UserCog,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
 
-const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/", icon: Home, label: "Salão" },
-  { to: "/clientes", icon: Users, label: "Clientes" },
-  { to: "/produtos", icon: ClipboardList, label: "Cardápio" },
-  { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas" },
-  { to: "/cozinha", icon: ChefHat, label: "Cozinha" },
-  { to: "/historico", icon: History, label: "Pedidos Fechados" },
-  { to: "/mensagens", icon: MessageSquare, label: "Mensagens" },
-  { to: "/configuracoes", icon: Settings, label: "Configurações" },
+const allNavItems = [
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha'] },
+  { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
+  { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] },
+  { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
+  { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
+  { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha'] },
+  { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
 ];
 
 export function Dock() {
   const mouseX = useMotionValue(Infinity);
   const navigate = useNavigate();
+  const { userRole, isLoading } = useSettings();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
+
+  // Filtra os itens de navegação com base na função do usuário
+  const navItems = React.useMemo(() => {
+    if (isLoading || !userRole) return [];
+    return allNavItems.filter(item => item.roles.includes(userRole));
+  }, [userRole, isLoading]);
+
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <div className="fixed bottom-4 left-0 right-0 flex justify-center z-50">
