@@ -3,7 +3,7 @@ import Webcam from 'react-webcam';
 import { useMultiFaceRecognition, FaceMatch } from '@/hooks/useMultiFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Adicionado Card aqui
 import { Loader2, Video, VideoOff, Users, PlusCircle, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -288,11 +288,11 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
               <Loader2 className="w-8 h-8 animate-spin mx-auto" />
               <p>Analisando múltiplos rostos...</p>
             </div>
-          ) : persistentRecognizedClients.length > 0 ? ( {/* CORRIGIDO AQUI */}
+          ) : persistentRecognizedClients.length > 0 ? (
             <div className="text-center space-y-2 animate-in fade-in">
               <p className="text-sm text-muted-foreground">Rostos detectados:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {persistentRecognizedClients.map(face => ( {/* CORRIGIDO AQUI */}
+                {persistentRecognizedClients.map(face => (
                   <Badge key={face.client.id} className="flex items-center gap-1 bg-primary text-primary-foreground">
                     <Users className="w-3 h-3" /> {face.client.nome}
                   </Badge>
