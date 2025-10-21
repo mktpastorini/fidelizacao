@@ -47,6 +47,66 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
     ctx.strokeRect(x, y, width, height);
   };
 
+  const drawClientInfo = (
+    ctx: CanvasRenderingContext2D,
+    client: FaceMatch['client'],
+    box: FaceMatch['box'],
+    scaleX: number,
+    scaleY: number,
+    canvasWidth: number
+  ) => {
+    // Coordenadas originais da caixa
+    const x_original = box.x_min * scaleX;
+    const y_original = box.y_min * scaleY;
+    const width_original = (box.x_max - box.x_min) * scaleX;
+    // const height_original = (box.y_max - box.y_min) * scaleY; // Não usado diretamente para o texto
+
+    // Ajustar para a exibição espelhada da webcam
+    const x_mirrored = canvasWidth - (x_original + width_original);
+    const y_text_start = y_original; // Começa a desenhar o texto acima da caixa
+
+    const infoLines: string[] = [];
+    infoLines.push(client.nome);
+    if (client.casado_com) {
+      infoLines.push(`Cônjuge: ${client.casado_com}`);
+    }
+    if (client.gostos) {
+      const preferences = Object.entries(client.gostos)
+        .filter(([, value]) => value)
+        .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`);
+      if (preferences.length > 0) {
+        infoLines.push(...preferences);
+      }
+    }
+    infoLines.push(`Visitas: ${client.visitas || 0}`);
+
+    const lineHeight = 20;
+    const padding = 5;
+    
+    ctx.font = '16px Arial';
+    let maxWidth = 0;
+    infoLines.forEach(line => {
+      const textWidth = ctx.measureText(line).width;
+      if (textWidth > maxWidth) maxWidth = textWidth;
+    });
+
+    const boxHeight = (infoLines.length * lineHeight) + (2 * padding);
+    const boxWidth = maxWidth + (2 * padding);
+    
+    // Posição do fundo do texto (acima da caixa do rosto)
+    const backgroundY = y_text_start - boxHeight - padding;
+    
+    // Desenhar fundo do texto
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Fundo escuro semi-transparente
+    ctx.fillRect(x_mirrored, backgroundY, boxWidth, boxHeight);
+
+    // Desenhar cada linha de texto
+    ctx.fillStyle = 'white';
+    infoLines.forEach((line, index) => {
+      ctx.fillText(line, x_mirrored + padding, backgroundY + padding + (index * lineHeight) + (lineHeight * 0.75));
+    });
+  };
+
   const handleRecognition = useCallback(async () => {
     if (isScanning || !isCameraOn || !webcamRef.current || !canvasRef.current) return;
 
@@ -96,7 +156,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
 
     if (results.length > 0) {
       results.forEach(match => {
-        const { box } = match;
+        const { box, client } = match;
         // Escalar as coordenadas da caixa para o tamanho do vídeo
         const scaleX = canvas.width / video.videoWidth;
         const scaleY = canvas.height / video.videoHeight;
@@ -110,6 +170,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
         const x_mirrored = canvas.width - (x_original + width_original);
 
         drawRect(ctx, x_mirrored, y_original, width_original, height_original, '#4CAF50'); // Verde para reconhecido
+        drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width); // Desenha as informações do cliente
       });
     }
   }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, settings]);

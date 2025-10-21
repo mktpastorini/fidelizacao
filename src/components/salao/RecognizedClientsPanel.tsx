@@ -2,7 +2,7 @@ import { Cliente } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Phone, Heart, DoorOpen } from "lucide-react";
+import { User, Phone, Heart, DoorOpen, Users } from "lucide-react"; // Importações adicionadas
 import { formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
