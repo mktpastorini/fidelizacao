@@ -44,10 +44,11 @@ export function ClientIdentificationModal({
   const [isSubmittingNewClient, setIsSubmittingNewClient] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null); // Novo estado para erro de mídia
 
+  // REMOVENDO deviceId: settings?.preferred_camera_device_id
   const videoConstraints = {
     width: 400,
     height: 400,
-    deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
+    // deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
 
   const resetState = useCallback(() => {
