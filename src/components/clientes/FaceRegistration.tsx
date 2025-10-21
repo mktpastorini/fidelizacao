@@ -27,7 +27,6 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
         const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
         setDevices(videoDevices);
 
-        // Prioriza a câmera salva nas configurações
         const savedCameraId = settings?.preferred_camera_device_id;
         const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
 
