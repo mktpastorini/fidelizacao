@@ -1,10 +1,11 @@
 import { ItemPedido } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, User, Utensils, CheckCircle } from "lucide-react";
+import { Clock, User, Utensils, CheckCircle, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext"; // Importado
 
 type KanbanCardProps = {
   item: ItemPedido & {
@@ -24,6 +25,7 @@ function getBrazilTime() {
 }
 
 export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
+  const { userRole } = useSettings();
   const now = getBrazilTime();
   const createdAt = new Date(item.created_at);
   const tempoDesdePedido = formatDistanceToNow(createdAt, { locale: ptBR });
@@ -32,6 +34,9 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
   const isOverdue = minutesSinceCreation > 5 && item.status === 'pendente';
 
   const isNonPrepItem = !item.requer_preparo;
+  
+  // Apenas Cozinha, Superadmin, Admin e Gerente podem iniciar o preparo
+  const canStartPreparation = userRole && ['cozinha', 'superadmin', 'admin', 'gerente'].includes(userRole);
 
   return (
     <Card className="mb-4 bg-background shadow-md">
@@ -53,22 +58,40 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
         <div className="pt-2">
           {item.status === 'pendente' && (
             isNonPrepItem ? (
-              // Item sem preparo: Garçom pode marcar como entregue
+              // Item sem preparo: Garçom/Balcão pode marcar como entregue (Permissão RLS já adicionada)
               <Button size="sm" variant="outline" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => onStatusChange(item.id, 'entregue')}>
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Entregar (Sem Preparo)
               </Button>
             ) : (
-              // Item com preparo: Cozinha marca como preparando
-              <Button size="sm" className="w-full" onClick={() => onStatusChange(item.id, 'preparando')}>
-                <Utensils className="w-4 h-4 mr-2" />
-                Preparar
-              </Button>
+              // Item com preparo: Ação restrita à Cozinha/Gerência
+              <>
+                <Button 
+                  size="sm" 
+                  className="w-full" 
+                  onClick={() => onStatusChange(item.id, 'preparando')}
+                  disabled={!canStartPreparation}
+                >
+                  <Utensils className="w-4 h-4 mr-2" />
+                  Preparar
+                </Button>
+                {!canStartPreparation && (
+                  <div className="mt-2 text-xs text-warning-foreground bg-warning/10 p-2 rounded-md flex items-center">
+                    <AlertTriangle className="w-3 h-3 mr-1 shrink-0" />
+                    Apenas a Cozinha/Gerência pode iniciar o preparo.
+                  </div>
+                )}
+              </>
             )
           )}
           {item.status === 'preparando' && (
             // Item em preparo: Cozinha marca como pronto
-            <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" onClick={() => onStatusChange(item.id, 'entregue')}>
+            <Button 
+              size="sm" 
+              className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" 
+              onClick={() => onStatusChange(item.id, 'entregue')}
+              disabled={!canStartPreparation} // Também restringe a finalização do preparo
+            >
               <CheckCircle className="w-4 h-4 mr-2" />
               Pronto
             </Button>
