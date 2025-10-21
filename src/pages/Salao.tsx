@@ -396,7 +396,7 @@ export default function SalaoPage() {
                 )}
               </Tooltip>
             </TooltipProvider>
-          </Button>
+          </>
         )}
         <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
         <Button 
@@ -440,7 +440,7 @@ export default function SalaoPage() {
           <h1 className="text-3xl font-bold">Visão do Salão</h1>
           <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
         </div>
-        {/* BOTÕES REMOVIDOS DAQUI E MOVIDOS PARA O HEADER VIA usePageActions */}
+        {/* BOTÕES DE AÇÃO MOVIDOS PARA O HEADER */}
       </div>
 
       {isMultiDetectionMode ? (
