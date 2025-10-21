@@ -19,6 +19,8 @@ import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"; // Importando componentes de redimensionamento
+import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
+import { useEffect } from "react"; // Importando useEffect
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -69,6 +71,7 @@ async function fetchSalaoData(): Promise<SalaoData> {
 
 export default function SalaoPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions(); // Usando o contexto
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -353,58 +356,36 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
-  if (isLoading) {
-    return <Skeleton className="h-screen w-full" />;
-  }
-  
-  if (data?.clientes.length === 0) {
-    return <WelcomeCard />;
-  }
-
-  return (
-    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
-      {isClosed && (
-        <Alert variant="destructive">
-          <Lock className="h-4 w-4" />
-          <AlertTitle>Estabelecimento Fechado</AlertTitle>
-          <AlertDescription>
-            Nenhuma nova alocação de mesa ou pedido pode ser feito. Para reabrir, clique em "Abrir Dia".
-          </AlertDescription>
-        </Alert>
-      )}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-bold">Visão do Salão</h1>
-          <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isClosed ? (
-            <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
-              <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
-            </Button>
-          ) : (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div tabIndex={0}>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
-                          <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
+  // --- Configuração dos Page Actions ---
+  useEffect(() => {
+    const pageButtons = (
+      <>
+        {isClosed ? (
+          <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
+            <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
+          </Button>
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div tabIndex={0}>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
+                        <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                      </AlertDialogFooter>
                     </AlertDialog>
                   </div>
                 </TooltipTrigger>
@@ -425,7 +406,38 @@ export default function SalaoPage() {
             {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
             {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
           </Button>
-        </div>
+      </>
+    );
+    setPageActions(pageButtons);
+
+    return () => setPageActions(null);
+  }, [isClosed, isCloseDayReady, isMultiDetectionMode, openDayMutation, closeDayMutation, setPageActions]);
+  // --- Fim Configuração dos Page Actions ---
+
+
+  if (isLoading) {
+    return <Skeleton className="h-screen w-full" />;
+  }
+  
+  if (data?.clientes.length === 0) {
+    return <WelcomeCard />;
+  }
+
+  return (
+    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
+      {isClosed && (
+        <Alert variant="destructive">
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Estabelecimento Fechado</AlertTitle>
+          <AlertDescription>
+            Nenhuma nova alocação de mesa ou pedido pode ser feito. Para reabrir, clique em "Abrir Dia".
+          </AlertDescription>
+        </Alert>
+      )}
+      {/* Removido o div de botões que estava aqui */}
+      <div className="shrink-0">
+        <h1 className="text-3xl font-bold">Visão do Salão</h1>
+        <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
       </div>
 
       {isMultiDetectionMode ? (

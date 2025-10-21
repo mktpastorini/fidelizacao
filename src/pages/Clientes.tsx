@@ -26,6 +26,7 @@ import { ClienteDetalhesModal } from "@/components/clientes/ClienteDetalhesModal
 import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
+import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
@@ -48,6 +49,7 @@ async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
 
 export default function ClientesPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions(); // Usando o contexto
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetalhesOpen, setIsDetalhesOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
@@ -181,21 +183,31 @@ export default function ClientesPage() {
     }
   };
 
+  // --- Configuração dos Page Actions ---
+  useEffect(() => {
+    const pageButtons = (
+      <>
+        <div className="relative w-full max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+        </div>
+        <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cliente</Button>
+      </>
+    );
+    setPageActions(pageButtons);
+
+    return () => setPageActions(null);
+  }, [setPageActions, searchTerm]);
+  // --- Fim Configuração dos Page Actions ---
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Clientes</h1>
-          <p className="text-muted-foreground mt-1">Gerencie as informações dos seus clientes aqui.</p>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="relative w-full max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar cliente..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
-            </div>
-            <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cliente</Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Clientes</h1>
+        <p className="text-muted-foreground mt-1">Gerencie as informações dos seus clientes aqui.</p>
       </div>
+
+      {/* Removido o div de botões e busca que estava aqui */}
 
       {isLoading ? <p>Carregando clientes...</p> : isError ? <p className="text-red-500">Erro ao carregar clientes.</p> : clientes && clientes.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

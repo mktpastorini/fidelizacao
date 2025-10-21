@@ -17,6 +17,8 @@ import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
+import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
+import { useEffect } from "react"; // Importando useEffect
 
 type UserData = {
   templates: MessageTemplate[];
@@ -101,7 +103,14 @@ function CompreFaceSettingsForm() {
 
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions(); // Usando o contexto
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
+
+  // Limpa os botões de ação ao montar
+  useEffect(() => {
+    setPageActions(null);
+    return () => setPageActions(null);
+  }, [setPageActions]);
 
   const { data, isLoading: isLoadingPage, isError } = useQuery({
     queryKey: ["configPageData"],
