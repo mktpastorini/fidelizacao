@@ -3,12 +3,13 @@ import Webcam from 'react-webcam';
 import { useMultiFaceRecognition, FaceMatch } from '@/hooks/useMultiFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card'; // Adicionado Card aqui
+import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Video, VideoOff, Users, PlusCircle, Trash2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Importado ScrollArea e ScrollBar
 
 type RecognizedClientDisplay = {
   client: FaceMatch['client'];
@@ -210,77 +211,80 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
         {displayError && <Alert variant="destructive"><AlertTitle>Erro Global</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
-        <div className="grid grid-cols-1 gap-4 overflow-y-auto flex-1 pr-2">
-          {cameraInstances.length === 0 && allVideoDevices.length > 0 && (
-            <div className="text-center text-muted-foreground p-4">
-              <p>Clique em "Adicionar Câmera" para começar.</p>
-            </div>
-          )}
-          {cameraInstances.map((cam, index) => (
-            <div key={cam.id} className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
-              {cam.isCameraOn && !cam.mediaError ? (
-                <>
-                  <Webcam
-                    audio={false}
-                    ref={cam.webcamRef}
-                    screenshotFormat="image/jpeg"
-                    videoConstraints={{ deviceId: cam.deviceId ? { exact: cam.deviceId } : undefined, width: 1280, height: 720 }}
-                    className="w-full h-full object-cover"
-                    mirrored={true}
-                    onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false })}
-                  />
-                  {/* O canvas ainda é necessário para limpar a tela, mesmo que não desenhemos nada */}
-                  <canvas ref={cam.canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
-                  {/* Botão de ativar/desativar a câmera sobreposto */}
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={() => updateCameraInstance(cam.id, { isCameraOn: !cam.isCameraOn })} 
-                    disabled={!!cam.mediaError}
-                    className="absolute top-2 right-2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                  >
-                    {cam.isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                  </Button>
-                </>
-              ) : (
-                <div className="flex flex-col items-center text-muted-foreground p-4">
-                  <VideoOff className="w-12 h-12 mb-2" />
-                  <p>{cam.isCameraOn ? (cam.mediaError || "Câmera indisponível") : "Câmera desligada"}</p>
-                  <Button 
-                    size="sm" 
-                    className="mt-2" 
-                    onClick={() => updateCameraInstance(cam.id, { isCameraOn: true, mediaError: null })}
-                    disabled={!cam.deviceId}
-                  >
-                    Ligar Câmera
-                  </Button>
-                </div>
-              )}
-              <div className="absolute bottom-2 left-2 right-2 flex items-center gap-2 bg-black/50 p-2 rounded-md">
-                <Select 
-                  value={cam.deviceId || ''} 
-                  onValueChange={(value) => updateCameraInstance(cam.id, { deviceId: value, isCameraOn: true, mediaError: null })}
-                >
-                  <SelectTrigger className="w-full bg-white/10 text-white border-none">
-                    <SelectValue placeholder="Selecione uma câmera" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAvailableDevices(cam.deviceId).map((device) => (
-                      <SelectItem key={device.deviceId} value={device.deviceId}>
-                        {device.label || `Câmera ${allVideoDevices.indexOf(device) + 1}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {cameraInstances.length > 1 && (
-                  <Button variant="destructive" size="icon" onClick={() => removeCameraInstance(cam.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
+        <ScrollArea className="flex-1"> {/* Adicionado ScrollArea aqui */}
+          <div className="grid grid-cols-1 gap-4 pr-2"> {/* Removido overflow-y-auto e flex-1 daqui */}
+            {cameraInstances.length === 0 && allVideoDevices.length > 0 && (
+              <div className="text-center text-muted-foreground p-4">
+                <p>Clique em "Adicionar Câmera" para começar.</p>
               </div>
-            </div>
-          ))}
-        </div>
+            )}
+            {cameraInstances.map((cam, index) => (
+              <div key={cam.id} className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
+                {cam.isCameraOn && !cam.mediaError ? (
+                  <>
+                    <Webcam
+                      audio={false}
+                      ref={cam.webcamRef}
+                      screenshotFormat="image/jpeg"
+                      videoConstraints={{ deviceId: cam.deviceId ? { exact: cam.deviceId } : undefined, width: 1280, height: 720 }}
+                      className="w-full h-full object-cover"
+                      mirrored={true}
+                      onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false })}
+                    />
+                    {/* O canvas ainda é necessário para limpar a tela, mesmo que não desenhemos nada */}
+                    <canvas ref={cam.canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
+                    {/* Botão de ativar/desativar a câmera sobreposto */}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => updateCameraInstance(cam.id, { isCameraOn: !cam.isCameraOn })} 
+                      disabled={!!cam.mediaError}
+                      className="absolute top-2 right-2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                    >
+                      {cam.isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+                    </Button>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center text-muted-foreground p-4">
+                    <VideoOff className="w-12 h-12 mb-2" />
+                    <p>{cam.isCameraOn ? (cam.mediaError || "Câmera indisponível") : "Câmera desligada"}</p>
+                    <Button 
+                      size="sm" 
+                      className="mt-2" 
+                      onClick={() => updateCameraInstance(cam.id, { isCameraOn: true, mediaError: null })}
+                      disabled={!cam.deviceId}
+                    >
+                      Ligar Câmera
+                    </Button>
+                  </div>
+                )}
+                <div className="absolute bottom-2 left-2 right-2 flex items-center gap-2 bg-black/50 p-2 rounded-md">
+                  <Select 
+                    value={cam.deviceId || ''} 
+                    onValueChange={(value) => updateCameraInstance(cam.id, { deviceId: value, isCameraOn: true, mediaError: null })}
+                  >
+                    <SelectTrigger className="w-full bg-white/10 text-white border-none">
+                      <SelectValue placeholder="Selecione uma câmera" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {getAvailableDevices(cam.deviceId).map((device) => (
+                        <SelectItem key={device.deviceId} value={device.deviceId}>
+                          {device.label || `Câmera ${allVideoDevices.indexOf(device) + 1}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {cameraInstances.length > 1 && (
+                    <Button variant="destructive" size="icon" onClick={() => removeCameraInstance(cam.id)}>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <ScrollBar orientation="vertical" /> {/* Adicionado ScrollBar vertical */}
+        </ScrollArea>
         
         <div className="w-full h-24 flex items-center justify-center shrink-0">
           {isRecognitionLoading ? (
