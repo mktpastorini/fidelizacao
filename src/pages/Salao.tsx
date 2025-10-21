@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"; // Importando componentes de redimensionamento
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -428,21 +429,25 @@ export default function SalaoPage() {
       </div>
 
       {isMultiDetectionMode ? (
-        <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0"> {/* flex-1 e min-h-0 para ocupar espaço restante */}
-          {/* Seção da Câmera e Painel de Clientes (fixa) */}
-          <div className="flex flex-col gap-8 lg:w-2/3 h-full"> {/* h-full para preencher a altura disponível */}
+        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+          <ResizablePanel defaultSize={33} minSize={20}>
             <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} allocatedClientIds={allocatedClientIds} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={33} minSize={20}>
             <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
-          </div>
-          {/* Seção das Mesas (rolagem independente) */}
-          <div className="flex-1 overflow-y-auto lg:w-1/3 h-full"> {/* flex-1 e overflow-y-auto para rolagem */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {mesasComPedidos?.map(mesa => (
-                <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
-              ))}
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={34} minSize={20}>
+            <div className="h-full overflow-y-auto p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {mesasComPedidos?.map(mesa => (
+                  <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       ) : (
         <div className="grid lg:grid-cols-3 gap-8 items-start">
           <div className="lg:col-span-1">

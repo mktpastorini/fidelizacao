@@ -3,7 +3,7 @@ import Webcam from 'react-webcam';
 import { useMultiFaceRecognition, FaceMatch } from '@/hooks/useMultiFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Removido CardHeader e CardTitle
 import { Loader2, Video, VideoOff, Users } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -236,12 +236,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
   return (
     <Card className="sticky top-6 h-full flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between shrink-0">
-        <CardTitle>Multi-Reconhecimento Facial</CardTitle>
-        <Button variant="ghost" size="icon" onClick={() => setIsCameraOn(prev => !prev)} disabled={!!mediaError}>
-          {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-        </Button>
-      </CardHeader>
+      {/* Removido CardHeader e CardTitle */}
       <CardContent className="flex-1 flex flex-col items-center gap-4 p-4 pt-0">
         <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
           {isCameraOn && !displayError ? (
@@ -256,6 +251,16 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                 onUserMediaError={handleMediaError}
               />
               <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
+              {/* Botão de ativar/desativar a câmera sobreposto */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsCameraOn(prev => !prev)} 
+                disabled={!!mediaError}
+                className="absolute top-2 right-2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              >
+                {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+              </Button>
             </>
           ) : (
             <div className="flex flex-col items-center text-muted-foreground p-4">
