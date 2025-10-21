@@ -14,8 +14,6 @@ import { Button } from "@/components/ui/button";
 import { DetalhesPedidoModal } from "@/components/historico/DetalhesPedidoModal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
-import { useEffect } from "react"; // Importando useEffect
 
 type PedidoComClienteEItens = Pedido & {
   cliente: { nome: string } | null;
@@ -34,15 +32,8 @@ async function fetchPedidosPagos(): Promise<PedidoComClienteEItens[]> {
 }
 
 export default function HistoricoPage() {
-  const { setPageActions } = usePageActions(); // Usando o contexto
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<PedidoComClienteEItens | null>(null);
-
-  // Limpa os botões de ação ao montar
-  useEffect(() => {
-    setPageActions(null);
-    return () => setPageActions(null);
-  }, [setPageActions]);
 
   const { data: pedidos, isLoading, isError } = useQuery({
     queryKey: ["pedidosPagos"],

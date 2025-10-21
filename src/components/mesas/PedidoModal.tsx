@@ -19,12 +19,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
-import { ResgatePontosDialog } from "./ResgatePontosDialog"; // IMPORTADO
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -72,8 +71,7 @@ async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
   const ids = ocupanteIds.map(o => o.cliente_id);
   if (ids.length === 0) return [];
   
-  // Adicionado 'pontos' na seleção de clientes
-  const { data: clientes, error: clientesError } = await supabase.from("clientes").select("id, nome, pontos").in("id", ids);
+  const { data: clientes, error: clientesError } = await supabase.from("clientes").select("id, nome").in("id", ids);
   if (clientesError) throw clientesError;
   return clientes;
 }
@@ -89,8 +87,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [clientePagando, setClientePagando] = useState<Cliente | null>(null);
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
-  const [isResgateOpen, setIsResgateOpen] = useState(false); // NOVO ESTADO
-  
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
     defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
@@ -113,9 +109,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     queryFn: () => fetchOcupantes(mesa!.id),
     enabled: !!mesa && isOpen,
   });
-
-  const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
-  const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
 
   const { itensAgrupados, totalPedido } = useMemo(() => {
     if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0 };
@@ -242,8 +235,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["historicoCliente"] }); // Invalida histórico para mostrar o ponto
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para mostrar o ponto
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
@@ -266,12 +257,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             <DialogDescription className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
-              {clientePrincipal && (
-                <Badge variant="secondary" className="ml-4 flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                  {clientePrincipal.pontos} pontos
-                </Badge>
-              )}
             </DialogDescription>
           </DialogHeader>
           {isPedidoError ? (
@@ -397,14 +382,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                       </FormItem>
                     )}/>
                     <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
-                    
-                    {/* NOVO BOTÃO DE RESGATE */}
-                    {clientePrincipal && produtosResgatáveis.length > 0 && (
-                      <Button type="button" variant="secondary" className="w-full mt-2" onClick={() => setIsResgateOpen(true)}>
-                        <Star className="w-4 h-4 mr-2 fill-yellow-500 text-yellow-500" />
-                        Resgatar Prêmios ({clientePrincipal.pontos} pts)
-                      </Button>
-                    )}
                   </form>
                 </Form>
               </div>
@@ -443,14 +420,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             updateItemMutation.mutate({ itemId: itemParaDesconto.id, ...values });
           }
         }}
-      />
-      {/* NOVO MODAL DE RESGATE */}
-      <ResgatePontosDialog
-        isOpen={isResgateOpen}
-        onOpenChange={setIsResgateOpen}
-        clientePrincipal={clientePrincipal}
-        mesaId={mesa?.id || null}
-        produtosResgatáveis={produtosResgatáveis}
       />
     </>
   );
