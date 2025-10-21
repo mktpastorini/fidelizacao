@@ -18,7 +18,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"; // Importando componentes de redimensionamento
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { usePageActions } from "@/contexts/PageActionsContext";
+import { useEffect, useMemo } from "react";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -69,6 +71,7 @@ async function fetchSalaoData(): Promise<SalaoData> {
 
 export default function SalaoPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions();
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -178,7 +181,7 @@ export default function SalaoPage() {
         body: { clientId: cliente.id, userId: user.id },
       });
       if (functionError) {
-        showError(`Mesa alocada, mas falha ao enviar mensagem: ${functionError.message}`);
+        showError(`Mesa alocada, mas falha ao enviar webhook: ${functionError.message}`);
       }
     },
     onSuccess: () => {
@@ -255,7 +258,7 @@ export default function SalaoPage() {
         .eq("status", "aberto")
         .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
         .limit(1) // Limita a 1 resultado
-        .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
+        .maybeSingle();
 
       if (existingPedidoError) throw existingPedidoError;
 
@@ -311,10 +314,12 @@ export default function SalaoPage() {
     onError: (err: Error) => showError(err.message),
   });
 
-  const mesasComPedidos = data?.mesas.map(mesa => {
-    const pedido = data.pedidosAbertos.find(p => p.mesa_id === mesa.id);
-    return { ...mesa, pedido };
-  });
+  const mesasComPedidos = useMemo(() => {
+    return data?.mesas.map(mesa => {
+      const pedido = data.pedidosAbertos.find(p => p.mesa_id === mesa.id);
+      return { ...mesa, pedido };
+    });
+  }, [data]);
 
   const mesasLivres = data?.mesas.filter(m => !m.cliente_id) || [];
 
@@ -353,6 +358,70 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
+  // --- Configuração dos Page Actions ---
+  useEffect(() => {
+    const closeDayButton = (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div tabIndex={0}>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
+                    <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </TooltipTrigger>
+          {!isCloseDayReady && (
+            <TooltipContent>
+              <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
+    );
+
+    const openDayButton = (
+      <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
+        <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
+      </Button>
+    );
+
+    const pageButtons = (
+      <>
+        {isClosed ? openDayButton : closeDayButton}
+        <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
+        <Button 
+          variant="outline" 
+          onClick={() => setIsMultiDetectionMode(prev => !prev)} 
+          disabled={isClosed}
+        >
+          {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+          {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
+        </Button>
+      </>
+    );
+    setPageActions(pageButtons);
+
+    return () => setPageActions(null);
+  }, [isClosed, isCloseDayReady, isMultiDetectionMode, openDayMutation, closeDayMutation, setPageActions]);
+  // --- Fim Configuração dos Page Actions ---
+
+
   if (isLoading) {
     return <Skeleton className="h-screen w-full" />;
   }
@@ -362,7 +431,7 @@ export default function SalaoPage() {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
+    <div className="space-y-6 h-full flex flex-col">
       {isClosed && (
         <Alert variant="destructive">
           <Lock className="h-4 w-4" />
@@ -372,60 +441,11 @@ export default function SalaoPage() {
           </AlertDescription>
         </Alert>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
-        <div>
-          <h1 className="text-3xl font-bold">Visão do Salão</h1>
-          <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isClosed ? (
-            <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
-              <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
-            </Button>
-          ) : (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div tabIndex={0}>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
-                          <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </TooltipTrigger>
-                {!isCloseDayReady && (
-                  <TooltipContent>
-                    <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsMultiDetectionMode(prev => !prev)} 
-            disabled={isClosed}
-          >
-            {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
-            {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
-          </Button>
-        </div>
+      
+      {/* Título e descrição da página */}
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Visão do Salão</h1>
+        <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
       </div>
 
       {isMultiDetectionMode ? (
