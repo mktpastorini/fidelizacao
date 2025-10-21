@@ -129,7 +129,9 @@ export default function MesasPage() {
         .select("id")
         .eq("mesa_id", selectedMesa.id)
         .eq("status", "aberto")
-        .maybeSingle();
+        .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
+        .limit(1) // Limita a 1 resultado
+        .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
 
       if (existingPedidoError) throw existingPedidoError;
 
@@ -179,6 +181,7 @@ export default function MesasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
+      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
       showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
     },
@@ -204,6 +207,7 @@ export default function MesasPage() {
     onSuccess: ({ orderWasCancelled }) => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
+      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
       if (orderWasCancelled) {
         showSuccess("Mesa liberada e pedido cancelado!");
       } else {

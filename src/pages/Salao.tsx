@@ -178,11 +178,12 @@ export default function SalaoPage() {
         body: { clientId: cliente.id, userId: user.id },
       });
       if (functionError) {
-        showError(`Mesa alocada, mas falha ao enviar mensagem: ${functionError.message}`);
+        showError(`Mesa alocada, mas falha ao enviar webhook: ${functionError.message}`);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
       showSuccess("Cliente alocado à mesa com sucesso!");
       setIsArrivalOpen(false);
       setRecognizedClient(null);
@@ -305,6 +306,7 @@ export default function SalaoPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
+      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
       showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
     },
