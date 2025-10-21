@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
-import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel"; // Importando o novo componente
+import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -317,6 +317,11 @@ export default function SalaoPage() {
 
   const mesasLivres = data?.mesas.filter(m => !m.cliente_id) || [];
 
+  // IDs de todos os clientes atualmente alocados em qualquer mesa
+  const allocatedClientIds = data?.mesas
+    .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
+    .filter((value, index, self) => self.indexOf(value) === index) || []; // Remove duplicatas
+
   const handleMesaClick = (mesa: Mesa) => {
     if (isClosed && !mesa.cliente_id) {
       showError("O estabelecimento está fechado. Não é possível ocupar novas mesas.");
@@ -337,6 +342,16 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
+  // Função para alocar cliente a partir do painel de multi-detecção
+  const handleAllocateClientFromPanel = (client: Cliente) => {
+    if (isClosed) {
+      showError("O estabelecimento está fechado. Não é possível alocar clientes.");
+      return;
+    }
+    setRecognizedClient(client);
+    setIsArrivalOpen(true);
+  };
+
   if (isLoading) {
     return <Skeleton className="h-screen w-full" />;
   }
@@ -346,7 +361,7 @@ export default function SalaoPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 h-full flex flex-col">
       {isClosed && (
         <Alert variant="destructive">
           <Lock className="h-4 w-4" />
@@ -356,7 +371,7 @@ export default function SalaoPage() {
           </AlertDescription>
         </Alert>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-3xl font-bold">Visão do Salão</h1>
           <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
@@ -412,23 +427,34 @@ export default function SalaoPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8 items-start">
-        <div className={isMultiDetectionMode ? 'lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8' : 'lg:col-span-1'}>
-          {isMultiDetectionMode ? (
-            <>
-              <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} />
-              <RecognizedClientsPanel clients={currentRecognizedClients} />
-            </>
-          ) : (
+      {isMultiDetectionMode ? (
+        <div className="flex flex-col lg:flex-row gap-8 flex-1 min-h-0"> {/* flex-1 e min-h-0 para ocupar espaço restante */}
+          {/* Seção da Câmera e Painel de Clientes (fixa) */}
+          <div className="flex flex-col gap-8 lg:w-2/3 h-full"> {/* h-full para preencher a altura disponível */}
+            <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} allocatedClientIds={allocatedClientIds} />
+            <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
+          </div>
+          {/* Seção das Mesas (rolagem independente) */}
+          <div className="flex-1 overflow-y-auto lg:w-1/3 h-full"> {/* flex-1 e overflow-y-auto para rolagem */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {mesasComPedidos?.map(mesa => (
+                <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-8 items-start">
+          <div className="lg:col-span-1">
             <LiveRecognition onClientRecognized={handleClientRecognized} />
-          )}
+          </div>
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {mesasComPedidos?.map(mesa => (
+              <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+            ))}
+          </div>
         </div>
-        <div className={isMultiDetectionMode ? 'lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 gap-4' : 'lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'}>
-          {mesasComPedidos?.map(mesa => (
-            <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
-          ))}
-        </div>
-      </div>
+      )}
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
       <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />

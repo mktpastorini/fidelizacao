@@ -16,11 +16,12 @@ type RecognizedClientDisplay = {
 
 type MultiLiveRecognitionProps = {
   onRecognizedFacesUpdate: (clients: RecognizedClientDisplay[]) => void;
+  allocatedClientIds: string[]; // Nova prop
 };
 
 const PERSISTENCE_DURATION_MS = 30 * 1000; // 30 segundos
 
-export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecognitionProps) {
+export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientIds }: MultiLiveRecognitionProps) {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { settings } = useSettings();
@@ -59,11 +60,10 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
     const x_original = box.x_min * scaleX;
     const y_original = box.y_min * scaleY;
     const width_original = (box.x_max - box.x_min) * scaleX;
-    // const height_original = (box.y_max - box.y_min) * scaleY; // Não usado diretamente para o texto
 
     // Ajustar para a exibição espelhada da webcam
     const x_mirrored = canvasWidth - (x_original + width_original);
-    const y_text_start = y_original; // Começa a desenhar o texto acima da caixa
+    const y_text_start = y_original;
 
     const infoLines: string[] = [];
     infoLines.push(client.nome);
@@ -134,24 +134,29 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
     const results = await recognizeMultiple(imageSrc);
     setRecognizedFaces(results); // Atualiza para desenhar as caixas
 
-    // Atualiza a lista persistente
+    // Atualiza a lista persistente, filtrando clientes já alocados
     setPersistentRecognizedClients(prevClients => {
       const updatedClients = [...prevClients];
       const currentClientIds = new Set(prevClients.map(c => c.client.id));
+      const allocatedSet = new Set(allocatedClientIds); // Clientes já alocados
 
       results.forEach(match => {
-        if (currentClientIds.has(match.client.id)) {
-          // Atualiza o timestamp se o cliente já existe
-          const index = updatedClients.findIndex(c => c.client.id === match.client.id);
-          if (index !== -1) {
-            updatedClients[index].timestamp = now;
+        // Só adiciona/atualiza se o cliente NÃO estiver alocado
+        if (!allocatedSet.has(match.client.id)) {
+          if (currentClientIds.has(match.client.id)) {
+            // Atualiza o timestamp se o cliente já existe
+            const index = updatedClients.findIndex(c => c.client.id === match.client.id);
+            if (index !== -1) {
+              updatedClients[index].timestamp = now;
+            }
+          } else {
+            // Adiciona novo cliente
+            updatedClients.push({ client: match.client, timestamp: now });
           }
-        } else {
-          // Adiciona novo cliente
-          updatedClients.push({ client: match.client, timestamp: now });
         }
       });
-      return updatedClients;
+      // Filtra clientes que foram alocados enquanto estavam na lista persistente
+      return updatedClients.filter(c => !allocatedSet.has(c.client.id));
     });
 
     if (results.length > 0) {
@@ -173,7 +178,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
         drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width); // Desenha as informações do cliente
       });
     }
-  }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, settings]);
+  }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, settings, allocatedClientIds]);
 
   useEffect(() => {
     if (isCameraOn) {
@@ -181,7 +186,9 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
       cleanupIntervalRef.current = setInterval(() => {
         setPersistentRecognizedClients(prevClients => {
           const now = Date.now();
-          return prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS);
+          // Remove clientes que expiraram ou foram alocados
+          const allocatedSet = new Set(allocatedClientIds);
+          return prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
         });
       }, 5000); // Limpa a cada 5 segundos
     } else {
@@ -207,7 +214,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecog
         clearInterval(cleanupIntervalRef.current);
       }
     };
-  }, [isCameraOn, handleRecognition]);
+  }, [isCameraOn, handleRecognition, allocatedClientIds]); // Adicionado allocatedClientIds como dependência
 
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);

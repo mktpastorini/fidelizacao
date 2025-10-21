@@ -2,9 +2,11 @@ import { Cliente } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { User, Phone, Heart, DoorOpen, Users } from "lucide-react";
+import { User, Phone, Heart, DoorOpen, Users, Table } from "lucide-react"; // Adicionado Table icon
 import { formatDistanceToNowStrict } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge"; // Importado Badge
 
 type RecognizedClientDisplay = {
   client: Cliente;
@@ -13,6 +15,8 @@ type RecognizedClientDisplay = {
 
 type RecognizedClientsPanelProps = {
   clients: RecognizedClientDisplay[];
+  onAllocateClient: (client: Cliente) => void; // Nova prop
+  allocatedClientIds: string[]; // Nova prop
 };
 
 const InfoLine = ({ icon: Icon, text }: { icon: React.ElementType, text: string | number }) => (
@@ -22,7 +26,7 @@ const InfoLine = ({ icon: Icon, text }: { icon: React.ElementType, text: string 
   </div>
 );
 
-export function RecognizedClientsPanel({ clients }: RecognizedClientsPanelProps) {
+export function RecognizedClientsPanel({ clients, onAllocateClient, allocatedClientIds }: RecognizedClientsPanelProps) {
   if (clients.length === 0) {
     return (
       <Card className="h-full flex items-center justify-center">
@@ -35,6 +39,8 @@ export function RecognizedClientsPanel({ clients }: RecognizedClientsPanelProps)
     );
   }
 
+  const allocatedSet = new Set(allocatedClientIds);
+
   return (
     <Card className="h-full flex flex-col">
       <CardHeader>
@@ -46,25 +52,39 @@ export function RecognizedClientsPanel({ clients }: RecognizedClientsPanelProps)
         <ScrollArea className="h-full pr-4">
           <div className="space-y-4 p-6 pt-0">
             {clients.map(({ client }) => {
-              // Verifica se a data é válida antes de tentar formatar
               const isValidDate = client.cliente_desde && !isNaN(new Date(client.cliente_desde).getTime());
               const tempoCliente = isValidDate
                 ? formatDistanceToNowStrict(new Date(client.cliente_desde), { locale: ptBR })
-                : "Data não informada"; // Fallback para datas inválidas
+                : "Data não informada";
 
               const preferences = client.gostos ? Object.entries(client.gostos).filter(([_, value]) => value) : [];
+              const isAllocated = allocatedSet.has(client.id);
 
               return (
-                <div key={client.id} className="flex items-start gap-4 p-3 border rounded-lg bg-secondary/50">
-                  <Avatar className="h-12 w-12 shrink-0">
-                    <AvatarImage src={client.avatar_url || undefined} />
-                    <AvatarFallback>
-                      <User className="h-6 w-6 text-muted-foreground" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-1">
-                    <h3 className="font-bold text-primary">{client.nome}</h3>
-                    <p className="text-xs text-muted-foreground">Cliente há {tempoCliente}</p>
+                <div 
+                  key={client.id} 
+                  className="flex flex-col items-start gap-3 p-3 border rounded-lg bg-secondary/50 hover:bg-secondary transition-colors cursor-pointer"
+                  onClick={() => !isAllocated && onAllocateClient(client)} // Clicável apenas se não estiver alocado
+                >
+                  <div className="flex items-center gap-4 w-full">
+                    <Avatar className="h-12 w-12 shrink-0">
+                      <AvatarImage src={client.avatar_url || undefined} />
+                      <AvatarFallback>
+                        <User className="h-6 w-6 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 space-y-1">
+                      <h3 className="font-bold text-primary">{client.nome}</h3>
+                      <p className="text-xs text-muted-foreground">Cliente há {tempoCliente}</p>
+                    </div>
+                    {isAllocated && (
+                      <Badge variant="default" className="bg-green-500 hover:bg-green-600 text-primary-foreground flex items-center gap-1">
+                        <Table className="w-3 h-3" /> Alocado
+                      </Badge>
+                    )}
+                  </div>
+                  
+                  <div className="w-full space-y-1 text-sm border-t pt-3">
                     {client.casado_com && <InfoLine icon={Heart} text={`Cônjuge: ${client.casado_com}`} />}
                     {client.whatsapp && <InfoLine icon={Phone} text={client.whatsapp} />}
                     <InfoLine icon={DoorOpen} text={`${client.visitas || 0} visita(s)`} />
@@ -74,6 +94,11 @@ export function RecognizedClientsPanel({ clients }: RecognizedClientsPanelProps)
                       </div>
                     )}
                   </div>
+                  {!isAllocated && (
+                    <Button size="sm" className="w-full mt-2" onClick={(e) => { e.stopPropagation(); onAllocateClient(client); }}>
+                      Alocar à Mesa
+                    </Button>
+                  )}
                 </div>
               );
             })}
