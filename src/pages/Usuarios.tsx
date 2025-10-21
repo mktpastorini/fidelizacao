@@ -7,11 +7,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { showError, showSuccess } from "@/utils/toast";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { ShieldAlert, User, Trash2, Loader2 } from "lucide-react";
+import { ShieldAlert, User, Trash2, Loader2, PlusCircle, Edit } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { UserRole } from "@/types/supabase";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { UserForm } from "@/components/usuarios/UserForm";
 
 type UserProfile = {
   id: string;
@@ -31,41 +33,42 @@ const ROLES: { value: UserRole, label: string }[] = [
 ];
 
 async function fetchAllUsers(): Promise<UserProfile[]> {
-  // Esta função deve ser chamada apenas por Superadmins.
-  // Usamos o RLS para garantir que apenas Superadmins possam ler todos os perfis.
-  const { data: profiles, error } = await supabase
-    .from("profiles")
-    .select("id, role, first_name, last_name"); // Removido o join com user_settings(id)
-  
+  const { data, error } = await supabase.functions.invoke('get-all-users');
   if (error) throw new Error(error.message);
-
-  // Para obter o email, precisamos de uma função de admin ou de um Edge Function.
-  // Como não temos uma função de admin exposta, vamos simular a busca de emails
-  // (Em um ambiente real, isso exigiria uma Edge Function com Service Role Key).
-  // Por enquanto, vamos usar apenas os dados do perfil.
+  if (!data.success) throw new Error(data.error || "Falha ao buscar usuários.");
   
-  // Simulação de dados de autenticação (apenas para fins de demonstração no frontend)
-  const usersWithEmails = profiles.map(p => ({
-    id: p.id,
-    email: `user_${p.id.substring(0, 4)}@example.com`, // Placeholder
-    role: p.role as UserRole,
-    first_name: p.first_name,
-    last_name: p.last_name,
+  return data.users.map((u: any) => ({
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    first_name: u.first_name,
+    last_name: u.last_name,
   }));
-
-  return usersWithEmails;
 }
 
 export default function UsuariosPage() {
   const queryClient = useQueryClient();
   const { userRole, isLoading: isLoadingSettings } = useSettings();
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
 
   const { data: users, isLoading: isLoadingUsers, isError } = useQuery({
     queryKey: ["allUsers"],
     queryFn: fetchAllUsers,
     enabled: userRole === 'superadmin',
+    refetchInterval: 60000, // Atualiza a cada minuto
   });
+
+  const handleFormOpen = (user: UserProfile | null = null) => {
+    setEditingUser(user);
+    setIsFormOpen(true);
+  };
+
+  const handleFormClose = () => {
+    setEditingUser(null);
+    setIsFormOpen(false);
+  };
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, newRole }: { userId: string; newRole: UserRole }) => {
@@ -82,21 +85,65 @@ export default function UsuariosPage() {
     onError: (error: Error) => showError(error.message),
   });
 
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      // 1. Deletar o perfil (RLS garante que apenas superadmin pode fazer isso)
-      const { error: profileError } = await supabase.from("profiles").delete().eq("id", userId);
+  const updateProfileMutation = useMutation({
+    mutationFn: async (values: { id: string; first_name: string; last_name: string; role: UserRole }) => {
+      const { id, first_name, last_name, role } = values;
+      
+      // 1. Atualiza o perfil (nome e função)
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ first_name, last_name, role })
+        .eq("id", id);
       if (profileError) throw profileError;
       
-      // 2. Deletar o usuário da tabela auth.users (requer Service Role Key, o que é feito via Edge Function)
-      // Como não podemos usar o Service Role Key diretamente no cliente,
-      // em um ambiente real, você chamaria uma Edge Function aqui.
-      // Por enquanto, vamos apenas deletar o perfil e assumir que o Superadmin fará a limpeza manual no Supabase Auth.
-      // Para simulação, vamos apenas mostrar o sucesso.
+      // 2. Atualiza o metadata do usuário auth (para consistência)
+      // Isso requer uma Edge Function com Service Role Key, mas como não temos uma para UPDATE,
+      // vamos confiar que a atualização do perfil é suficiente para o frontend.
+      // Em um ambiente real, você chamaria uma função aqui.
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      showSuccess("Perfil do usuário atualizado!");
+      handleFormClose();
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (values: { email: string; password: string; first_name: string; last_name: string; role: UserRole }) => {
+      const { email, password, first_name, last_name, role } = values;
       
-      // Simulação de chamada de Edge Function para deletar o usuário auth
-      // const { error: authError } = await supabase.functions.invoke('delete-auth-user', { body: { userId } });
-      // if (authError) throw authError;
+      // 1. Cria o usuário auth via Edge Function
+      const { data, error } = await supabase.functions.invoke('manage-auth-user', {
+        body: { action: 'CREATE', email, password, first_name, last_name },
+      });
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.error || "Falha ao criar usuário auth.");
+      
+      const newUserId = data.userId;
+
+      // 2. Atualiza o perfil com a função correta (o trigger cria o perfil com 'garcom' por padrão)
+      const { error: roleError } = await supabaseAdmin
+        .from("profiles")
+        .update({ role: role })
+        .eq("id", newUserId);
+      if (roleError) throw roleError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["allUsers"] });
+      showSuccess("Novo usuário criado com sucesso!");
+      handleFormClose();
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data, error } = await supabase.functions.invoke('manage-auth-user', {
+        body: { action: 'DELETE', user_id: userId },
+      });
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.error || "Falha ao deletar usuário.");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allUsers"] });
@@ -124,20 +171,23 @@ export default function UsuariosPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Gerenciamento de Usuários</h1>
-        <p className="text-muted-foreground mt-1">Defina as funções e gerencie o acesso dos colaboradores.</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Gerenciamento de Usuários</h1>
+          <p className="text-muted-foreground mt-1">Defina as funções e gerencie o acesso dos colaboradores.</p>
+        </div>
+        <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Usuário</Button>
       </div>
 
       <div className="bg-card p-6 rounded-lg border">
         {isError ? (
-          <p className="text-destructive">Erro ao carregar usuários. Verifique as políticas RLS.</p>
+          <p className="text-destructive">Erro ao carregar usuários. Verifique as configurações do Edge Function.</p>
         ) : users && users.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
-                <TableHead>Email (Placeholder)</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Função</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -147,7 +197,7 @@ export default function UsuariosPage() {
                 <TableRow key={user.id}>
                   <TableCell className="font-medium flex items-center">
                     <User className="w-4 h-4 mr-2 text-muted-foreground" />
-                    {user.first_name || user.email.split('@')[0]}
+                    {user.first_name} {user.last_name}
                   </TableCell>
                   <TableCell>{user.email}</TableCell>
                   <TableCell>
@@ -169,6 +219,15 @@ export default function UsuariosPage() {
                     </Select>
                   </TableCell>
                   <TableCell className="text-right">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="mr-2"
+                      onClick={() => handleFormOpen(user)}
+                      disabled={updateProfileMutation.isPending}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
                     <Button 
                       variant="destructive" 
                       size="icon" 
@@ -211,6 +270,21 @@ export default function UsuariosPage() {
           </AlertDialogContent>
         </AlertDialog>
       )}
+
+      {/* Diálogo de Adição/Edição de Usuário */}
+      <Dialog open={isFormOpen} onOpenChange={handleFormClose}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>{editingUser ? "Editar Usuário" : "Adicionar Novo Usuário"}</DialogTitle>
+          </DialogHeader>
+          <UserForm
+            onSubmit={editingUser ? updateProfileMutation.mutate : createUserMutation.mutate}
+            isSubmitting={updateProfileMutation.isPending || createUserMutation.isPending}
+            defaultValues={editingUser || undefined}
+            isEditing={!!editingUser}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
