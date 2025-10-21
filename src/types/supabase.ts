@@ -19,7 +19,6 @@ export type Cliente = {
   indicado_por?: { nome: string } | null;
   visitas: number;
   data_nascimento?: string | null;
-  pontos: number; // NOVO CAMPO
 };
 
 export type Mesa = {
@@ -107,6 +106,5 @@ export type Produto = {
   estoque_atual: number;
   alerta_estoque_baixo: number;
   valor_compra: number | null;
-  mostrar_no_menu?: boolean;
-  pontos_resgate: number | null; // NOVO CAMPO
+  mostrar_no_menu?: boolean; // Novo campo para controle de exibição no menu público
 };
