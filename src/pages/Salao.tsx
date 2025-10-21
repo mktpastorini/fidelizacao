@@ -8,7 +8,7 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { UserPlus, Lock, Unlock, ScanFace, Users } from "lucide-react"; // Adicionado ScanFace e Users
+import { UserPlus, Lock, Unlock, ScanFace, Users } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
@@ -16,7 +16,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
-import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition"; // Importando o novo componente
+import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
+import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel"; // Importando o novo componente
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -73,7 +74,10 @@ export default function SalaoPage() {
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
-  const [isMultiDetectionMode, setIsMultiDetectionMode] = useState(false); // Novo estado para alternar o modo
+  const [isMultiDetectionMode, setIsMultiDetectionMode] = useState(false);
+  const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
+    { client: Cliente; timestamp: number }[]
+  >([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["salaoData"],
@@ -408,15 +412,18 @@ export default function SalaoPage() {
         </div>
       </div>
 
-      <div className={`grid gap-8 items-start ${isMultiDetectionMode ? 'lg:grid-cols-1' : 'lg:grid-cols-3'}`}>
-        <div className={isMultiDetectionMode ? 'lg:col-span-1' : 'lg:col-span-1'}>
+      <div className="grid lg:grid-cols-3 gap-8 items-start">
+        <div className={isMultiDetectionMode ? 'lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-8' : 'lg:col-span-1'}>
           {isMultiDetectionMode ? (
-            <MultiLiveRecognition />
+            <>
+              <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} />
+              <RecognizedClientsPanel clients={currentRecognizedClients} />
+            </>
           ) : (
             <LiveRecognition onClientRecognized={handleClientRecognized} />
           )}
         </div>
-        <div className={isMultiDetectionMode ? 'lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'}>
+        <div className={isMultiDetectionMode ? 'lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 gap-4' : 'lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'}>
           {mesasComPedidos?.map(mesa => (
             <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
           ))}

@@ -7,13 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Video, VideoOff, Users } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge'; // Importação adicionada
+import { Badge } from '@/components/ui/badge';
 
-type MultiLiveRecognitionProps = {
-  onClientRecognized?: (cliente: FaceMatch['client']) => void; // Opcional, para quando um cliente é reconhecido
+type RecognizedClientDisplay = {
+  client: FaceMatch['client'];
+  timestamp: number;
 };
 
-export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitionProps) {
+type MultiLiveRecognitionProps = {
+  onRecognizedFacesUpdate: (clients: RecognizedClientDisplay[]) => void;
+};
+
+const PERSISTENCE_DURATION_MS = 30 * 1000; // 30 segundos
+
+export function MultiLiveRecognition({ onRecognizedFacesUpdate }: MultiLiveRecognitionProps) {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { settings } = useSettings();
@@ -21,15 +28,16 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
   
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [recognizedFaces, setRecognizedFaces] = useState<FaceMatch[]>([]);
+  const [recognizedFaces, setRecognizedFaces] = useState<FaceMatch[]>([]); // Para desenhar caixas
+  const [persistentRecognizedClients, setPersistentRecognizedClients] = useState<RecognizedClientDisplay[]>([]); // Para o painel
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Restrições de vídeo mais flexíveis para evitar OverconstrainedError
   const videoConstraints = {
-    width: { ideal: 1280, min: 640 }, // Preferir 1280px, mas aceitar até 640px
-    height: { ideal: 720, min: 480 }, // Preferir 720px, mas aceitar até 480px
-    facingMode: "user", // Preferir câmera frontal, se disponível
+    width: { ideal: 1280, min: 640 },
+    height: { ideal: 720, min: 480 },
+    facingMode: "user",
     deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
 
@@ -37,66 +45,6 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.strokeRect(x, y, width, height);
-  };
-
-  const drawClientInfo = (
-    ctx: CanvasRenderingContext2D,
-    client: FaceMatch['client'],
-    box: FaceMatch['box'],
-    scaleX: number,
-    scaleY: number,
-    canvasWidth: number
-  ) => {
-    // Coordenadas originais da caixa
-    const x_original = box.x_min * scaleX;
-    const y_original = box.y_min * scaleY;
-    const width_original = (box.x_max - box.x_min) * scaleX;
-    // const height_original = (box.y_max - box.y_min) * scaleY; // Não usado diretamente para o texto
-
-    // Ajustar para a exibição espelhada da webcam
-    const x_mirrored = canvasWidth - (x_original + width_original);
-    const y_text_start = y_original; // Começa a desenhar o texto acima da caixa
-
-    const infoLines: string[] = [];
-    infoLines.push(client.nome);
-    if (client.casado_com) {
-      infoLines.push(`Cônjuge: ${client.casado_com}`);
-    }
-    if (client.gostos) {
-      const preferences = Object.entries(client.gostos)
-        .filter(([, value]) => value)
-        .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`);
-      if (preferences.length > 0) {
-        infoLines.push(...preferences);
-      }
-    }
-    infoLines.push(`Visitas: ${client.visitas || 0}`);
-
-    const lineHeight = 20;
-    const padding = 5;
-    
-    ctx.font = '16px Arial';
-    let maxWidth = 0;
-    infoLines.forEach(line => {
-      const textWidth = ctx.measureText(line).width;
-      if (textWidth > maxWidth) maxWidth = textWidth;
-    });
-
-    const boxHeight = (infoLines.length * lineHeight) + (2 * padding);
-    const boxWidth = maxWidth + (2 * padding);
-    
-    // Posição do fundo do texto (acima da caixa do rosto)
-    const backgroundY = y_text_start - boxHeight - padding;
-    
-    // Desenhar fundo do texto
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Fundo escuro semi-transparente
-    ctx.fillRect(x_mirrored, backgroundY, boxWidth, boxHeight);
-
-    // Desenhar cada linha de texto
-    ctx.fillStyle = 'white';
-    infoLines.forEach((line, index) => {
-      ctx.fillText(line, x_mirrored + padding, backgroundY + padding + (index * lineHeight) + (lineHeight * 0.75));
-    });
   };
 
   const handleRecognition = useCallback(async () => {
@@ -124,11 +72,31 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const results = await recognizeMultiple(imageSrc);
-    setRecognizedFaces(results);
+    setRecognizedFaces(results); // Atualiza para desenhar as caixas
+
+    // Atualiza a lista persistente
+    setPersistentRecognizedClients(prevClients => {
+      const updatedClients = [...prevClients];
+      const currentClientIds = new Set(prevClients.map(c => c.client.id));
+
+      results.forEach(match => {
+        if (currentClientIds.has(match.client.id)) {
+          // Atualiza o timestamp se o cliente já existe
+          const index = updatedClients.findIndex(c => c.client.id === match.client.id);
+          if (index !== -1) {
+            updatedClients[index].timestamp = now;
+          }
+        } else {
+          // Adiciona novo cliente
+          updatedClients.push({ client: match.client, timestamp: now });
+        }
+      });
+      return updatedClients;
+    });
 
     if (results.length > 0) {
       results.forEach(match => {
-        const { box, client } = match;
+        const { box } = match;
         // Escalar as coordenadas da caixa para o tamanho do vídeo
         const scaleX = canvas.width / video.videoWidth;
         const scaleY = canvas.height / video.videoHeight;
@@ -142,24 +110,28 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
         const x_mirrored = canvas.width - (x_original + width_original);
 
         drawRect(ctx, x_mirrored, y_original, width_original, height_original, '#4CAF50'); // Verde para reconhecido
-        drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width);
-
-        // Opcional: Chamar onClientRecognized para o primeiro cliente reconhecido
-        if (onClientRecognized) {
-          onClientRecognized(client);
-        }
       });
     }
-  }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, onClientRecognized, settings]);
+  }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, settings]);
 
   useEffect(() => {
     if (isCameraOn) {
       recognitionIntervalRef.current = setInterval(handleRecognition, 1000); // Tenta reconhecer a cada 1 segundo
+      cleanupIntervalRef.current = setInterval(() => {
+        setPersistentRecognizedClients(prevClients => {
+          const now = Date.now();
+          return prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS);
+        });
+      }, 5000); // Limpa a cada 5 segundos
     } else {
       if (recognitionIntervalRef.current) {
         clearInterval(recognitionIntervalRef.current);
       }
-      setRecognizedFaces([]); // Limpa os rostos reconhecidos quando a câmera é desligada
+      if (cleanupIntervalRef.current) {
+        clearInterval(cleanupIntervalRef.current);
+      }
+      setRecognizedFaces([]);
+      setPersistentRecognizedClients([]);
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext('2d');
         if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
@@ -170,8 +142,15 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
       if (recognitionIntervalRef.current) {
         clearInterval(recognitionIntervalRef.current);
       }
+      if (cleanupIntervalRef.current) {
+        clearInterval(cleanupIntervalRef.current);
+      }
     };
   }, [isCameraOn, handleRecognition]);
+
+  useEffect(() => {
+    onRecognizedFacesUpdate(persistentRecognizedClients);
+  }, [persistentRecognizedClients, onRecognizedFacesUpdate]);
 
   const handleMediaError = (err: any) => {
     console.error("Erro ao acessar a câmera no MultiLiveRecognition:", err);
@@ -188,14 +167,14 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
   const displayError = recognitionError || mediaError;
 
   return (
-    <Card className="sticky top-6">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="sticky top-6 h-full flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between shrink-0">
         <CardTitle>Multi-Reconhecimento Facial</CardTitle>
         <Button variant="ghost" size="icon" onClick={() => setIsCameraOn(prev => !prev)} disabled={!!mediaError}>
           {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
         </Button>
       </CardHeader>
-      <CardContent className="flex flex-col items-center gap-4">
+      <CardContent className="flex-1 flex flex-col items-center gap-4 p-4 pt-0">
         <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
           {isCameraOn && !displayError ? (
             <>
@@ -219,7 +198,7 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
         </div>
         {displayError && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
-        <div className="w-full h-24 flex items-center justify-center">
+        <div className="w-full h-24 flex items-center justify-center shrink-0">
           {isScanning ? (
             <div className="text-center space-y-2">
               <Loader2 className="w-8 h-8 animate-spin mx-auto" />
@@ -227,7 +206,7 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
             </div>
           ) : recognizedFaces.length > 0 ? (
             <div className="text-center space-y-2 animate-in fade-in">
-              <p className="text-sm text-muted-foreground">Clientes reconhecidos:</p>
+              <p className="text-sm text-muted-foreground">Rostos detectados:</p>
               <div className="flex flex-wrap justify-center gap-2">
                 {recognizedFaces.map(face => (
                   <Badge key={face.client.id} className="flex items-center gap-1 bg-primary text-primary-foreground">
