@@ -21,8 +21,6 @@ import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
-import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
-import { useEffect } from "react"; // Importando useEffect
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -47,7 +45,6 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MesasPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions(); // Usando o contexto
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -132,8 +129,6 @@ export default function MesasPage() {
         .select("id")
         .eq("mesa_id", selectedMesa.id)
         .eq("status", "aberto")
-        .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
-        .limit(1) // Limita a 1 resultado
         .maybeSingle();
 
       if (existingPedidoError) throw existingPedidoError;
@@ -235,25 +230,17 @@ export default function MesasPage() {
     }
   };
 
-  // --- Configuração dos Page Actions ---
-  useEffect(() => {
-    const pageButtons = (
-      <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null);
-  }, [setPageActions]);
-  // --- Fim Configuração dos Page Actions ---
-
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Painel de Mesas</h1>
-        <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Painel de Mesas</h1>
+          <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
+        </div>
       </div>
-
-      {/* Removido o div de botões que estava aqui */}
 
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-destructive">Erro ao carregar mesas.</p> : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">

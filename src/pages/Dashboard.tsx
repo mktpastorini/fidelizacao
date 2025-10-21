@@ -13,8 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth } from "date-fns";
-import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
-import { useEffect } from "react"; // Importando useEffect
 
 type DailyStats = {
   revenue_today: number;
@@ -82,14 +80,6 @@ async function fetchRangeStats(dateRange: DateRange): Promise<RangeStats> {
 }
 
 export default function DashboardPage() {
-  const { setPageActions } = usePageActions(); // Usando o contexto
-  
-  // Limpa os botões de ação ao montar
-  useEffect(() => {
-    setPageActions(null);
-    return () => setPageActions(null);
-  }, [setPageActions]);
-
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(getBrazilTime()),
     to: endOfMonth(getBrazilTime()),

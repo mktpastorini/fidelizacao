@@ -17,8 +17,6 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
-import { useEffect } from "react"; // Importando useEffect
 
 async function fetchMessageTemplates(): Promise<MessageTemplate[]> {
   const { data, error } = await supabase.from("message_templates").select("*").order("created_at", { ascending: false });
@@ -43,7 +41,6 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MensagensPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions(); // Usando o contexto
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
@@ -162,39 +159,29 @@ export default function MensagensPage() {
     }
   };
 
-  // --- Configuração dos Page Actions ---
-  useEffect(() => {
-    const pageButtons = (
-      <>
-        <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingTemplates || isLoadingClientes}>
-          <Send className="w-4 h-4 mr-2" />
-          Enviar Mensagem
-        </Button>
-        <Dialog open={isTemplateDialogOpen} onOpenChange={handleTemplateDialogChange}>
-          <DialogTrigger asChild>
-            <Button><PlusCircle className="w-4 h-4 mr-2" />Adicionar Template</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl">
-            <DialogHeader><DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle></DialogHeader>
-            <MessageTemplateForm onSubmit={handleTemplateSubmit} isSubmitting={addTemplateMutation.isPending || editTemplateMutation.isPending} defaultValues={editingTemplate || undefined} />
-          </DialogContent>
-        </Dialog>
-      </>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null);
-  }, [setPageActions, isLoadingTemplates, isLoadingClientes, isTemplateDialogOpen, editingTemplate, addTemplateMutation.isPending, editTemplateMutation.isPending]);
-  // --- Fim Configuração dos Page Actions ---
-
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Mensagens</h1>
-        <p className="text-muted-foreground mt-2">Crie templates e acompanhe o histórico de envios.</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Mensagens</h1>
+          <p className="text-muted-foreground mt-2">Crie templates e acompanhe o histórico de envios.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingTemplates || isLoadingClientes}>
+            <Send className="w-4 h-4 mr-2" />
+            Enviar Mensagem
+          </Button>
+          <Dialog open={isTemplateDialogOpen} onOpenChange={handleTemplateDialogChange}>
+            <DialogTrigger asChild>
+              <Button><PlusCircle className="w-4 h-4 mr-2" />Adicionar Template</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-4xl">
+              <DialogHeader><DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle></DialogHeader>
+              <MessageTemplateForm onSubmit={handleTemplateSubmit} isSubmitting={addTemplateMutation.isPending || editTemplateMutation.isPending} defaultValues={editingTemplate || undefined} />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
-
-      {/* Removido o div de botões que estava aqui */}
 
       <Tabs defaultValue="templates">
         <TabsList className="grid w-full grid-cols-2">

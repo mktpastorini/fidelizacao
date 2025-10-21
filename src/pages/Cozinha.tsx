@@ -4,8 +4,6 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
-import { useEffect } from "react"; // Importando useEffect
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -34,13 +32,6 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions(); // Usando o contexto
-
-  // Limpa os botões de ação ao montar
-  useEffect(() => {
-    setPageActions(null);
-    return () => setPageActions(null);
-  }, [setPageActions]);
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
