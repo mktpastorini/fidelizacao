@@ -24,8 +24,8 @@ import { Switch } from "@/components/ui/switch";
 import { Produto, Categoria } from "@/types/supabase";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useEffect } from "react";
 
-// Função auxiliar para transformar string vazia em null antes da coerção
 const emptyStringToNull = z.literal("").transform(() => null);
 
 const numericOrNull = z.union([z.coerce.number().min(0, "O valor não pode ser negativo."), emptyStringToNull]);
@@ -38,7 +38,6 @@ const formSchema = z.object({
   requer_preparo: z.boolean().default(true),
   imagem_url: z.string().nullable().optional(),
   categoria_id: z.string().uuid().nullable().optional().or(z.literal("none")).transform(val => val === "none" ? null : val),
-  // Inventory fields
   estoque_atual: z.coerce.number().int().min(0, "O estoque atual não pode ser negativo.").default(0),
   alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
   valor_compra: numericOrNull.nullable().optional(),
@@ -63,13 +62,28 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       requer_preparo: defaultValues?.requer_preparo ?? true,
       imagem_url: defaultValues?.imagem_url || null,
       categoria_id: defaultValues?.categoria_id || "none",
-      // Inventory defaults
       estoque_atual: defaultValues?.estoque_atual || 0,
       alerta_estoque_baixo: defaultValues?.alerta_estoque_baixo || 0,
       valor_compra: defaultValues?.valor_compra || undefined,
       mostrar_no_menu: defaultValues?.mostrar_no_menu || false,
     },
   });
+
+  const tipoProduto = form.watch("tipo");
+
+  useEffect(() => {
+    if (tipoProduto === "rodizio") {
+      form.setValue("requer_preparo", false);
+      form.setValue("estoque_atual", 0);
+      form.setValue("alerta_estoque_baixo", 0);
+    } else if (tipoProduto === "venda") {
+      form.setValue("estoque_atual", 0);
+      form.setValue("alerta_estoque_baixo", 0);
+    }
+  }, [tipoProduto, form]);
+
+  const isStockDisabled = tipoProduto === "venda" || tipoProduto === "rodizio";
+  const isRequerPreparoDisabled = tipoProduto === "rodizio";
 
   return (
     <Form {...form}>
@@ -143,8 +157,8 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="venda">Venda Direta (Ex: Bebida, Sobremesa)</SelectItem>
-                  <SelectItem value="rodizio">Pacote Rodízio (Ex: Rodízio Completo)</SelectItem>
+                  <SelectItem value="venda">Alacarte (Vai para cozinha, sem estoque)</SelectItem>
+                  <SelectItem value="rodizio">Rodízio (Consumo Imediato, sem estoque)</SelectItem>
                   <SelectItem value="componente_rodizio">Item de Rodízio (Ex: Picanha, Coração)</SelectItem>
                 </SelectContent>
               </Select>
@@ -198,7 +212,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                   <FormItem>
                     <FormLabel>Estoque Atual</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" {...field} disabled={isStockDisabled} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -211,7 +225,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                   <FormItem>
                     <FormLabel>Alerta de Estoque Baixo (Quantidade)</FormLabel>
                     <FormControl>
-                      <Input type="number" {...field} />
+                      <Input type="number" {...field} disabled={isStockDisabled} />
                     </FormControl>
                     <FormDescription>Receba um alerta visual quando o estoque atingir ou cair abaixo desta quantidade.</FormDescription>
                     <FormMessage />
@@ -221,6 +235,28 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
             </AccordionContent>
           </AccordionItem>
         </Accordion>
+
+        <FormField
+          control={form.control}
+          name="requer_preparo"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+              <div className="space-y-0.5">
+                <FormLabel>Requer Preparo na Cozinha</FormLabel>
+                <FormDescription>
+                  Ative se este item precisa ser enviado para a cozinha para preparo.
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={isRequerPreparoDisabled}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}
