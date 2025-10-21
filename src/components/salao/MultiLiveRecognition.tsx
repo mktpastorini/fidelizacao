@@ -137,7 +137,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           const results = await recognizeMultiple(imageSrc);
-          updateCameraInstance(cam.id, { recognizedFaces: results });
+          updateCameraInstance(cam.id, { recognizedFaces: results }); // Atualiza recognizedFaces para esta instância (não usado para desenhar)
 
           // Update global persistent list
           setPersistentRecognizedClients(prevClients => {
@@ -229,7 +229,9 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                     mirrored={true}
                     onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false })}
                   />
+                  {/* O canvas ainda é necessário para limpar a tela, mesmo que não desenhemos nada */}
                   <canvas ref={cam.canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
+                  {/* Botão de ativar/desativar a câmera sobreposto */}
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -286,11 +288,11 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
               <Loader2 className="w-8 h-8 animate-spin mx-auto" />
               <p>Analisando múltiplos rostos...</p>
             </div>
-          ) : recognizedFaces.length > 0 ? (
+          ) : persistentRecognizedClients.length > 0 ? ( {/* CORRIGIDO AQUI */}
             <div className="text-center space-y-2 animate-in fade-in">
               <p className="text-sm text-muted-foreground">Rostos detectados:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                {recognizedFaces.map(face => (
+                {persistentRecognizedClients.map(face => ( {/* CORRIGIDO AQUI */}
                   <Badge key={face.client.id} className="flex items-center gap-1 bg-primary text-primary-foreground">
                     <Users className="w-3 h-3" /> {face.client.nome}
                   </Badge>
