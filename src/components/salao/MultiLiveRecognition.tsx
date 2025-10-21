@@ -212,7 +212,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         {displayError && <Alert variant="destructive"><AlertTitle>Erro Global</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
         <ScrollArea className="flex-1"> {/* Adicionado ScrollArea aqui */}
-          <div className="grid grid-cols-1 gap-4 pr-2"> {/* Removido overflow-y-auto e flex-1 daqui */}
+          <div className="grid grid-cols-1 gap-4"> {/* Removido pr-2 daqui */}
             {cameraInstances.length === 0 && allVideoDevices.length > 0 && (
               <div className="text-center text-muted-foreground p-4">
                 <p>Clique em "Adicionar Câmera" para começar.</p>
