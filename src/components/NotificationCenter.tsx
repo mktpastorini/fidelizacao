@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { ApprovalRequestCard } from "./Notification/ApprovalRequestCard";
 import { useSettings } from "@/contexts/SettingsContext";
 import { showError, showSuccess } from "@/utils/toast";
+import { useState } from "react"; // Importando useState
 
 type BirthdayClient = {
   nome: string;
