@@ -86,10 +86,8 @@ export default function UsuariosPage() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (values: { id?: string; first_name: string; last_name: string; role: UserRole }) => {
+    mutationFn: async (values: { id: string; first_name: string; last_name: string; role: UserRole }) => {
       const { id, first_name, last_name, role } = values;
-      
-      if (!id) throw new Error("ID do usuário ausente para edição.");
       
       // 1. Atualiza o perfil (nome e função)
       const { error: profileError } = await supabase
@@ -125,10 +123,7 @@ export default function UsuariosPage() {
       const newUserId = data.userId;
 
       // 2. Atualiza o perfil com a função correta (o trigger cria o perfil com 'garcom' por padrão)
-      // Nota: Esta atualização deve ser feita com o cliente admin (Service Role Key)
-      // Como estamos no cliente, vamos usar o cliente normal e confiar que o RLS permite
-      // que o Superadmin atualize perfis.
-      const { error: roleError } = await supabase
+      const { error: roleError } = await supabaseAdmin
         .from("profiles")
         .update({ role: role })
         .eq("id", newUserId);

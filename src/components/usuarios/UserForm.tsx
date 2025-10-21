@@ -67,9 +67,9 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
 
   const handleSubmit = (values: UserFormValues) => {
     if (isEditing) {
-      // Para edição, garantimos que o ID do defaultValues seja incluído
+      // Para edição, enviamos apenas os campos editáveis + ID
       onSubmit({
-        id: defaultValues?.id, // Usamos o ID original dos defaultValues
+        id: values.id,
         first_name: values.first_name,
         last_name: values.last_name,
         role: values.role,
