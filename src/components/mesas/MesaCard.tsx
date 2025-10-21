@@ -31,10 +31,11 @@ type MesaCardProps = {
   onEditMesa: () => void;
   onFreeMesa: () => void;
   onEditOcupantes: () => void;
+  onDelete: () => void; // Adicionado prop onDelete
   children?: React.ReactNode;
 };
 
-export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa, onEditOcupantes, children }: MesaCardProps) {
+export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa, onEditOcupantes, onDelete, children }: MesaCardProps) {
   const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
 
   const isOcupada = !!mesa.cliente;
@@ -103,7 +104,7 @@ export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa
                 <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onEditMesa(); }}>
                   <Edit className="w-4 h-4 mr-2" /> Editar Mesa
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); onFreeMesa(); }}>
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={(e) => { e.preventDefault(); onDelete(); }}>
                   <Trash2 className="w-4 h-4 mr-2" /> Excluir Mesa
                 </DropdownMenuItem>
               </DropdownMenuContent>

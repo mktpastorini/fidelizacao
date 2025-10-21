@@ -51,6 +51,7 @@ export default function MesasPage() {
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
   const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
+  const [mesaToDelete, setMesaToDelete] = useState<Mesa | null>(null); // Novo estado para a mesa a ser excluída
 
   const { data: mesas, isLoading, isError } = useQuery({ queryKey: ["mesas"], queryFn: fetchMesas });
   const { data: clientes } = useQuery({ queryKey: ["clientes_list"], queryFn: fetchClientes });
@@ -106,6 +107,7 @@ export default function MesasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Mesa excluída!");
+      setMesaToDelete(null); // Limpa o estado após a exclusão
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -251,6 +253,7 @@ export default function MesasPage() {
               onEditMesa={() => handleFormOpen(mesa)}
               onFreeMesa={() => setMesaToFree(mesa)}
               onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
+              onDelete={() => setMesaToDelete(mesa)} // Passando a função para definir a mesa a ser excluída
             />
           ))}
         </div>
@@ -292,6 +295,26 @@ export default function MesasPage() {
               setMesaToFree(null);
             }}>
               Sim, Liberar Mesa
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Novo AlertDialog para confirmar a exclusão da mesa */}
+      <AlertDialog open={!!mesaToDelete} onOpenChange={() => setMesaToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão da Mesa {mesaToDelete?.numero}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a Mesa {mesaToDelete?.numero}? Esta ação é irreversível e removerá todos os dados associados a ela, incluindo pedidos e ocupantes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (mesaToDelete) deleteMesaMutation.mutate(mesaToDelete.id);
+            }} disabled={deleteMesaMutation.isPending}>
+              {deleteMesaMutation.isPending ? "Excluindo..." : "Sim, Excluir Mesa"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
