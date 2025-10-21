@@ -1,34 +1,37 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Produto, ItemPedido } from "@/types/supabase";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { supabase } from "@/integrations/supabase/client";
+import { Mesa, Pedido, ItemPedido, Produto, Cliente } from "@/types/supabase";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Utensils, CheckCircle, XCircle, MoreHorizontal, Percent } from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Separator } from "@/components/ui/separator";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal } from "lucide-react";
+import { useMemo, useState } from "react";
+import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
-import { Cliente } from "@/types/supabase";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+type PedidoModalProps = {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  mesa: Mesa | null;
+};
 
 const itemSchema = z.object({
   nome_produto: z.string().min(2, "O nome do produto é obrigatório."),
@@ -39,63 +42,52 @@ const itemSchema = z.object({
   requer_preparo: z.boolean(),
 });
 
-type PedidoModalProps = {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  mesa: any; // TODO: Use a more specific type for mesa
-};
-
-type PedidoComItensEClientes = {
-  id: string;
-  cliente_id: string | null;
-  status: string;
-  created_at: string;
-  acompanhantes: Cliente[];
-  itens_pedido: (ItemPedido & { cliente: { nome: string } | null })[];
-};
+async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
+  if (!mesaId) return null;
+  const { data, error } = await supabase.from("pedidos").select("*, itens_pedido(*)").eq("mesa_id", mesaId).eq("status", "aberto").order("created_at", { foreignTable: "itens_pedido", ascending: true }).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
 
 async function fetchProdutos(): Promise<Produto[]> {
-  const { data, error } = await supabase.from("produtos").select("*");
+  const { data, error } = await supabase.from("produtos").select("*").order("nome");
   if (error) throw new Error(error.message);
   return data || [];
 }
 
-async function fetchPedidoAberto(mesaId: string): Promise<PedidoComItensEClientes | null> {
-  const { data, error } = await supabase
-    .from("pedidos")
-    .select(`
-      id,
-      cliente_id,
-      status,
-      created_at,
-      acompanhantes,
-      itens_pedido(*, cliente:clientes(nome))
-    `)
-    .eq("mesa_id", mesaId)
-    .eq("status", "aberto")
-    .order("created_at", { foreignTable: "itens_pedido", ascending: true })
-    .single();
+async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
+  const { data: ocupanteIds, error: idsError } = await supabase.from("mesa_ocupantes").select("cliente_id").eq("mesa_id", mesaId);
+  if (idsError) throw idsError;
 
-  if (error && error.code !== 'PGRST116') throw new Error(error.message);
-  return data as PedidoComItensEClientes | null;
+  const ids = ocupanteIds.map(o => o.cliente_id);
+  if (ids.length === 0) return [];
+  
+  const { data: clientes, error: clientesError } = await supabase.from("clientes").select("id, nome").in("id", ids);
+  if (clientesError) throw clientesError;
+  return clientes;
 }
 
-async function fetchClientesDaMesa(mesaId: string): Promise<Cliente[]> {
-  const { data, error } = await supabase
-    .from("mesa_ocupantes")
-    .select("cliente:clientes(id, nome)")
-    .eq("mesa_id", mesaId);
-  if (error) throw error;
-  return data.map(o => o.cliente).filter(Boolean) as Cliente[];
-}
+const calcularPrecoComDesconto = (item: ItemPedido) => {
+  const precoTotal = (item.preco || 0) * item.quantidade;
+  const desconto = precoTotal * ((item.desconto_percentual || 0) / 100);
+  return precoTotal - desconto;
+};
 
 export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const queryClient = useQueryClient();
-  const [isFinalizarParcialOpen, setIsFinalizarParcialOpen] = useState(false);
+  const [popoverOpen, setPopoverOpen] = useState(false);
   const [clientePagando, setClientePagando] = useState<Cliente | null>(null);
-  const [itensDoClientePagando, setItensDoClientePagando] = useState<ItemPedido[]>([]);
-  const [isDescontoOpen, setIsDescontoOpen] = useState(false);
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
+  const form = useForm<z.infer<typeof itemSchema>>({
+    resolver: zodResolver(itemSchema),
+    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
+  });
+
+  const { data: pedido, isLoading } = useQuery({
+    queryKey: ["pedidoAberto", mesa?.id],
+    queryFn: () => fetchPedidoAberto(mesa!.id),
+    enabled: !!mesa && isOpen,
+  });
 
   const { data: produtos } = useQuery({
     queryKey: ["produtos"],
@@ -103,52 +95,74 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     enabled: isOpen,
   });
 
-  const { data: pedidoAberto, isLoading: isLoadingPedido } = useQuery({
-    queryKey: ["pedidoAberto", mesa?.id],
-    queryFn: () => fetchPedidoAberto(mesa!.id),
-    enabled: isOpen && !!mesa?.id,
-    refetchInterval: 10000, // Refetch every 10 seconds
+  const { data: ocupantes } = useQuery({
+    queryKey: ["ocupantes", mesa?.id],
+    queryFn: () => fetchOcupantes(mesa!.id),
+    enabled: !!mesa && isOpen,
   });
 
-  const { data: clientesNaMesa } = useQuery({
-    queryKey: ["clientesNaMesa", mesa?.id],
-    queryFn: () => fetchClientesDaMesa(mesa!.id),
-    enabled: isOpen && !!mesa?.id,
-  });
+  const { itensAgrupados, totalPedido } = useMemo(() => {
+    if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0 };
+    
+    const total = pedido.itens_pedido.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
+    
+    const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: 'Mesa' }; itens: ItemPedido[]; subtotal: number }>();
+    
+    ocupantes.forEach(o => agrupados.set(o.id, { cliente: o, itens: [], subtotal: 0 }));
+    agrupados.set('mesa', { cliente: { id: 'mesa', nome: 'Mesa (Geral)' }, itens: [], subtotal: 0 });
+
+    pedido.itens_pedido.forEach(item => {
+      const key = item.consumido_por_cliente_id || 'mesa';
+      const grupo = agrupados.get(key);
+      if (grupo) {
+        grupo.itens.push(item);
+        grupo.subtotal += calcularPrecoComDesconto(item);
+      }
+    });
+
+    return { itensAgrupados: agrupados, totalPedido: total };
+  }, [pedido, ocupantes]);
 
   const addItemMutation = useMutation({
-    mutationFn: async (item: Omit<ItemPedido, 'id' | 'created_at' | 'updated_at' | 'pedido_id' | 'user_id'>) => {
-      if (!mesa?.id || !pedidoAberto?.id) throw new Error("Mesa ou pedido não identificados.");
+    mutationFn: async (novoItem: z.infer<typeof itemSchema>) => {
+      if (!mesa || !mesa.cliente_id) throw new Error("Mesa ou cliente não selecionado.");
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
+      if (!user?.id) throw new Error("Usuário não autenticado.");
 
-      const { error } = await supabase.from("itens_pedido").insert({
-        ...item,
-        pedido_id: pedidoAberto.id,
-        user_id: user.id,
-      });
-      if (error) throw new Error(error.message);
+      let pedidoId = pedido?.id;
+      if (!pedidoId) {
+        const { data: novoPedido, error: pedidoError } = await supabase.from("pedidos").insert({ mesa_id: mesa.id, cliente_id: mesa.cliente_id, user_id: user.id, status: "aberto" }).select("id").single();
+        if (pedidoError) throw new Error(pedidoError.message);
+        pedidoId = novoPedido.id;
+      }
+
+      const { error: itemError } = await supabase.from("itens_pedido").insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
+      if (itemError) throw new Error(itemError.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      showSuccess("Item adicionado ao pedido!");
-      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: "pendente", requer_preparo: true });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      showSuccess("Item adicionado com sucesso!");
+      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
     },
-    onError: (err: Error) => showError(err.message),
+    onError: (error: Error) => showError(error.message),
   });
 
-  const updateItemStatusMutation = useMutation({
-    mutationFn: async ({ itemId, newStatus }: { itemId: string; newStatus: 'pendente' | 'preparando' | 'entregue' }) => {
-      const { error } = await supabase.from("itens_pedido").update({ status: newStatus }).eq("id", itemId);
+  const updateItemMutation = useMutation({
+    mutationFn: async (values: { itemId: string; desconto_percentual: number; desconto_motivo?: string }) => {
+      const { itemId, ...updateData } = values;
+      const { error } = await supabase.from("itens_pedido").update(updateData).eq("id", itemId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      showSuccess("Status do item atualizado!");
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      showSuccess("Desconto aplicado com sucesso!");
+      setItemParaDesconto(null);
     },
-    onError: (err: Error) => showError(err.message),
+    onError: (error: Error) => showError(error.message),
   });
 
   const deleteItemMutation = useMutation({
@@ -158,366 +172,231 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      showSuccess("Item removido do pedido!");
-    },
-    onError: (err: Error) => showError(err.message),
-  });
-
-  const finalizarPedidoMutation = useMutation({
-    mutationFn: async () => {
-      if (!pedidoAberto?.id) throw new Error("Nenhum pedido aberto para finalizar.");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
-
-      const { error } = await supabase
-        .from("pedidos")
-        .update({ status: "pago", closed_at: new Date().toISOString() })
-        .eq("id", pedidoAberto.id);
-      if (error) throw new Error(error.message);
-
-      // Enviar mensagem de pagamento se configurado
-      if (pedidoAberto.cliente_id) {
-        const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', {
-          body: { clientId: pedidoAberto.cliente_id, userId: user.id },
-        });
-        if (functionError) {
-          showError(`Pedido finalizado, mas falha ao enviar mensagem de pagamento: ${functionError.message}`);
-        }
-      }
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
-      queryClient.invalidateQueries({ queryKey: ["pedidosPagos"] });
-      showSuccess("Pedido finalizado com sucesso!");
-      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      showSuccess("Item removido com sucesso!");
     },
-    onError: (err: Error) => showError(err.message),
+    onError: (error: Error) => showError(error.message),
   });
 
-  const finalizarPagamentoParcialMutation = useMutation({
-    mutationFn: async () => {
-      if (!pedidoAberto?.id || !clientePagando?.id) throw new Error("Pedido ou cliente não identificados para pagamento parcial.");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
-
-      const { error: rpcError } = await supabase.rpc('finalizar_pagamento_parcial', {
-        p_pedido_id: pedidoAberto.id,
-        p_cliente_id_pagando: clientePagando.id,
+  const closePartialOrderMutation = useMutation({
+    mutationFn: async (clienteId: string) => {
+      if (!pedido) throw new Error("Pedido não encontrado.");
+      const { error } = await supabase.rpc('finalizar_pagamento_parcial', {
+        p_pedido_id: pedido.id,
+        p_cliente_id_pagando: clienteId,
       });
-      if (rpcError) throw new Error(rpcError.message);
-
-      // Enviar mensagem de pagamento se configurado
-      const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', {
-        body: { clientId: clientePagando.id, userId: user.id },
-      });
-      if (functionError) {
-        showError(`Pagamento parcial finalizado, mas falha ao enviar mensagem de pagamento: ${functionError.message}`);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
-      queryClient.invalidateQueries({ queryKey: ["pedidosPagos"] });
-      showSuccess(`Pagamento de ${clientePagando?.nome} finalizado com sucesso!`);
-      setIsFinalizarParcialOpen(false);
-      setClientePagando(null);
-      setItensDoClientePagando([]);
-    },
-    onError: (err: Error) => showError(err.message),
-  });
-
-  const aplicarDescontoMutation = useMutation({
-    mutationFn: async ({ itemId, percentual, motivo }: { itemId: string; percentual: number; motivo?: string }) => {
-      const { error } = await supabase
-        .from("itens_pedido")
-        .update({ desconto_percentual: percentual, desconto_motivo: motivo })
-        .eq("id", itemId);
       if (error) throw error;
     },
+    onSuccess: (_, clienteId) => {
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["ocupantes", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      const cliente = ocupantes?.find(o => o.id === clienteId);
+      showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
+      setClientePagando(null);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const closeOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!pedido || !mesa || !ocupantes) throw new Error("Pedido, mesa ou ocupantes não encontrados.");
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado.");
+
+      const acompanhantesData = ocupantes.map(o => ({ id: o.id, nome: o.nome }));
+
+      await supabase.from("pedidos").update({ 
+        status: "pago", 
+        closed_at: new Date().toISOString(),
+        acompanhantes: acompanhantesData,
+      }).eq("id", pedido.id);
+
+      await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesa.id);
+      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa.id);
+
+      if (mesa.cliente_id) {
+        const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { body: { clientId: mesa.cliente_id, userId: user.id } });
+        if (functionError) showError(`Conta fechada, mas falha ao enviar webhook: ${functionError.message}`);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      showSuccess("Desconto aplicado com sucesso!");
-      setIsDescontoOpen(false);
-      setItemParaDesconto(null);
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      showSuccess("Conta fechada com sucesso!");
+      onOpenChange(false);
     },
-    onError: (err: Error) => showError(err.message),
+    onError: (error: Error) => showError(error.message),
   });
-
-  const form = useForm<z.infer<typeof itemSchema>>({
-    resolver: zodResolver(itemSchema),
-    defaultValues: {
-      nome_produto: "",
-      quantidade: 1,
-      preco: 0,
-      consumido_por_cliente_id: null,
-      status: "pendente",
-      requer_preparo: true,
-    },
-  });
-
-  const selectedProduto = produtos?.find(p => p.nome === form.watch("nome_produto"));
-
-  const handleProductSelect = (productName: string) => {
-    form.setValue("nome_produto", productName);
-    const prod = produtos?.find(p => p.nome === productName);
-    if (prod) {
-      form.setValue("preco", prod.preco);
-      form.setValue("requer_preparo", prod.requer_preparo);
-      // Determine initial status based on product type
-      if (prod.tipo === 'rodizio') {
-        form.setValue("status", "entregue"); // Rodizio items are immediately delivered
-      } else {
-        form.setValue("status", "pendente"); // Other items need prep
-      }
-    }
-  };
 
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
-    addItemMutation.mutate(values);
-  };
-
-  const totalPedido = pedidoAberto?.itens_pedido.reduce((acc, item) => {
-    const precoTotal = (item.preco || 0) * item.quantidade;
-    const desconto = precoTotal * ((item.desconto_percentual || 0) / 100);
-    return acc + (precoTotal - desconto);
-  }, 0) || 0;
-
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-  const handleFinalizarParcialClick = (cliente: Cliente) => {
-    setClientePagando(cliente);
-    const itensDoCliente = pedidoAberto?.itens_pedido.filter(item => item.consumido_por_cliente_id === cliente.id) || [];
-    setItensDoClientePagando(itensDoCliente);
-    setIsFinalizarParcialOpen(true);
-  };
-
-  const handleAplicarDescontoClick = (item: ItemPedido) => {
-    setItemParaDesconto(item);
-    setIsDescontoOpen(true);
+    const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
+    const requerPreparo = produtoSelecionado?.requer_preparo ?? true;
+    const status = 'pendente';
+    addItemMutation.mutate({ ...values, status, requer_preparo: requerPreparo });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
-          <DialogDescription>
-            Gerencie os itens do pedido e finalize a conta.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto py-4 pr-2 space-y-6">
-          {isLoadingPedido ? (
-            <p>Carregando pedido...</p>
-          ) : !pedidoAberto ? (
-            <p className="text-center text-muted-foreground">Nenhum pedido aberto para esta mesa.</p>
-          ) : (
-            <>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <p>Iniciado em: {format(new Date(pedidoAberto.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</p>
-                <p>Cliente Principal: {clientesNaMesa?.find(c => c.id === pedidoAberto.cliente_id)?.nome || "N/A"}</p>
-              </div>
-
-              {pedidoAberto.acompanhantes && pedidoAberto.acompanhantes.length > 1 && (
-                <div className="space-y-2">
-                  <h3 className="font-semibold">Acompanhantes:</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {pedidoAberto.acompanhantes.map(acomp => (
-                      <Button
-                        key={acomp.id}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleFinalizarParcialClick(acomp)}
-                      >
-                        {acomp.nome}
-                      </Button>
-                    ))}
+    <>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
+            <DialogDescription className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
+            <div className="space-y-4 overflow-y-auto pr-2">
+              <h3 className="font-semibold">Itens do Pedido</h3>
+              {isLoading ? <p>Carregando...</p> : Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => (
+                (itens.length > 0) && (
+                  <div key={cliente.id} className="p-3 border rounded-lg">
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="font-semibold">{cliente.nome}</h4>
+                      {cliente.id !== 'mesa' && (
+                        <Button size="sm" variant="outline" onClick={() => setClientePagando(cliente as Cliente)}>
+                          <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
+                        </Button>
+                      )}
+                    </div>
+                    <ul className="space-y-2">
+                      {itens.map((item) => {
+                        const precoOriginal = (item.preco || 0) * item.quantidade;
+                        const precoFinal = calcularPrecoComDesconto(item);
+                        return (
+                          <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                            <div>
+                              <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                              {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <div className="text-right">
+                                {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                  <>
+                                    <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                    <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                  </>
+                                ) : (
+                                  <p>R$ {precoOriginal.toFixed(2)}</p>
+                                )}
+                              </div>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                    <Tag className="h-4 w-4 mr-2" />
+                                    <span>Aplicar Desconto</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    <span>Remover Item</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
                   </div>
-                </div>
-              )}
+                )
+              ))}
+            </div>
 
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produto</TableHead>
-                    <TableHead className="text-center">Qtd</TableHead>
-                    <TableHead>Consumido Por</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Preço Unit.</TableHead>
-                    <TableHead className="text-right">Desconto</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pedidoAberto.itens_pedido.map((item) => {
-                    const subtotal = (item.preco || 0) * item.quantidade;
-                    const descontoValor = subtotal * ((item.desconto_percentual || 0) / 100);
-                    const totalItem = subtotal - descontoValor;
-                    const consumidorNome = clientesNaMesa?.find(c => c.id === item.consumido_por_cliente_id)?.nome || "Mesa (Geral)";
-
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.nome_produto}</TableCell>
-                        <TableCell className="text-center">{item.quantidade}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{consumidorNome}</TableCell>
-                        <TableCell>
-                          {item.status === 'pendente' && <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Pendente</Badge>}
-                          {item.status === 'preparando' && <Badge variant="outline" className="bg-blue-100 text-blue-800">Preparando</Badge>}
-                          {item.status === 'entregue' && <Badge variant="outline" className="bg-green-100 text-green-800">Entregue</Badge>}
-                        </TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.preco || 0)}</TableCell>
-                        <TableCell className="text-right">
-                          {item.desconto_percentual ? `${item.desconto_percentual}%` : '0%'}
-                          {item.desconto_motivo && <span className="block text-xs text-muted-foreground">({item.desconto_motivo})</span>}
-                        </TableCell>
-                        <TableCell className="text-right font-semibold">{formatCurrency(totalItem)}</TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreHorizontal className="w-4 h-4" /></Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              {item.status !== 'entregue' && item.requer_preparo && (
-                                <DropdownMenuItem onClick={() => updateItemStatusMutation.mutate({ itemId: item.id, newStatus: 'preparando' })}>
-                                  <Utensils className="w-4 h-4 mr-2" /> Marcar como Preparando
-                                </DropdownMenuItem>
-                              )}
-                              {item.status !== 'entregue' && (
-                                <DropdownMenuItem onClick={() => updateItemStatusMutation.mutate({ itemId: item.id, newStatus: 'entregue' })}>
-                                  <CheckCircle className="w-4 h-4 mr-2" /> Marcar como Entregue
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={() => handleAplicarDescontoClick(item)}>
-                                <Percent className="w-4 h-4 mr-2" /> Aplicar Desconto
-                              </DropdownMenuItem>
-                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
-                                <Trash2 className="w-4 h-4 mr-2" /> Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              <Separator />
-
-              <div className="flex justify-between items-center text-xl font-bold">
-                <span>Total do Pedido:</span>
-                <span>{formatCurrency(totalPedido)}</span>
-              </div>
-            </>
-          )}
-
-          <Separator />
-
-          <h3 className="text-lg font-semibold mb-4">Adicionar Novo Item</h3>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <FormField
-                control={form.control}
-                name="nome_produto"
-                render={({ field }) => (
-                  <FormItem className="md:col-span-2">
-                    <FormLabel>Produto</FormLabel>
-                    <Select onValueChange={handleProductSelect} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um produto" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {produtos?.map(prod => (
-                          <SelectItem key={prod.id} value={prod.nome} disabled={prod.estoque_atual !== undefined && prod.estoque_atual <= 0 && prod.tipo === 'componente_rodizio'}>
-                            {prod.nome} {prod.estoque_atual !== undefined && prod.tipo === 'componente_rodizio' && prod.estoque_atual <= 0 && "(Esgotado)"}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="quantidade"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantidade</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="1" min={1} {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="consumido_por_cliente_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Consumido Por</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Mesa (Geral)" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">Mesa (Geral)</SelectItem>
-                        {clientesNaMesa?.map(cliente => (
-                          <SelectItem key={cliente.id} value={cliente.id}>{cliente.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" disabled={addItemMutation.isPending || !selectedProduto} className="md:col-span-4">
-                {addItemMutation.isPending ? "Adicionando..." : "Adicionar Item"}
-              </Button>
-            </form>
-          </Form>
-        </div>
-
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
-          <Button onClick={() => finalizarPedidoMutation.mutate()} disabled={finalizarPedidoMutation.isPending || !pedidoAberto || pedidoAberto.itens_pedido.length === 0}>
-            {finalizarPedidoMutation.isPending ? "Finalizando..." : "Finalizar Pedido"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-
+            <div className="p-4 border rounded-lg">
+              <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField control={form.control} name="nome_produto" render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Produto</FormLabel>
+                      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
+                              {field.value ? produtos?.find(p => p.nome === field.value)?.nome : "Selecione um produto"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar produto..." /><CommandList><CommandEmpty>Nenhum produto encontrado.</CommandEmpty><CommandGroup>
+                          {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {
+                            const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
+                            form.setValue("nome_produto", produto.nome);
+                            form.setValue("preco", preco);
+                            setPopoverOpen(false);
+                          }}>
+                            <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
+                        </CommandGroup></CommandList></Command></PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}/>
+                  <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Quantidade</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                  <FormField control={form.control} name="consumido_por_cliente_id" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Consumido por</FormLabel>
+                      <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} value={field.value ?? 'null'}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          <SelectItem value="null">Mesa (Geral)</SelectItem>
+                          {ocupantes?.map(ocupante => (<SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}/>
+                  <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
+                </form>
+              </Form>
+            </div>
+          </div>
+          <div className="mt-6 pt-4 border-t">
+            <div className="flex justify-between items-center text-lg font-bold">
+              <span>Total Restante na Mesa:</span>
+              <span>R$ {totalPedido.toFixed(2).replace('.', ',')}</span>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button onClick={() => closeOrderMutation.mutate()} disabled={!pedido || pedido.itens_pedido.length === 0 || closeOrderMutation.isPending}>
+              <CreditCard className="w-4 h-4 mr-2" />
+              {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar Conta Total"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <FinalizarContaParcialDialog
-        isOpen={isFinalizarParcialOpen}
-        onOpenChange={setIsFinalizarParcialOpen}
+        isOpen={!!clientePagando}
+        onOpenChange={() => setClientePagando(null)}
         cliente={clientePagando}
-        itens={itensDoClientePagando}
-        onConfirm={() => finalizarPagamentoParcialMutation.mutate()}
-        isSubmitting={finalizarPagamentoParcialMutation.isPending}
+        itens={itensAgrupados.get(clientePagando?.id || '')?.itens || []}
+        onConfirm={() => clientePagando && closePartialOrderMutation.mutate(clientePagando.id)}
+        isSubmitting={closePartialOrderMutation.isPending}
       />
-
       <AplicarDescontoDialog
-        isOpen={isDescontoOpen}
-        onOpenChange={setIsDescontoOpen}
+        isOpen={!!itemParaDesconto}
+        onOpenChange={() => setItemParaDesconto(null)}
         item={itemParaDesconto}
-        onSubmit={(values) => aplicarDescontoMutation.mutate({
-          itemId: itemParaDesconto!.id,
-          percentual: values.desconto_percentual,
-          motivo: values.desconto_motivo,
-        })}
-        isSubmitting={aplicarDescontoMutation.isPending}
+        isSubmitting={updateItemMutation.isPending}
+        onSubmit={(values) => {
+          if (itemParaDesconto) {
+            updateItemMutation.mutate({ itemId: itemParaDesconto.id, ...values });
+          }
+        }}
       />
-    </Dialog>
+    </>
   );
 }
