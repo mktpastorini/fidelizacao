@@ -8,7 +8,7 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { UserPlus, Lock, Unlock } from "lucide-react";
+import { UserPlus, Lock, Unlock, ScanFace, Users } from "lucide-react"; // Adicionado ScanFace e Users
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
@@ -16,6 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
+import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition"; // Importando o novo componente
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -72,6 +73,7 @@ export default function SalaoPage() {
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
+  const [isMultiDetectionMode, setIsMultiDetectionMode] = useState(false); // Novo estado para alternar o modo
 
   const { data, isLoading } = useQuery({
     queryKey: ["salaoData"],
@@ -395,12 +397,24 @@ export default function SalaoPage() {
             </TooltipProvider>
           )}
           <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsMultiDetectionMode(prev => !prev)} 
+            disabled={isClosed}
+          >
+            {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+            {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
+          </Button>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8 items-start">
         <div className="lg:col-span-1">
-          <LiveRecognition onClientRecognized={handleClientRecognized} />
+          {isMultiDetectionMode ? (
+            <MultiLiveRecognition />
+          ) : (
+            <LiveRecognition onClientRecognized={handleClientRecognized} />
+          )}
         </div>
         <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {mesasComPedidos?.map(mesa => (
