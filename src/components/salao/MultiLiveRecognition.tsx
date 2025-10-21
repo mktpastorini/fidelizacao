@@ -3,7 +3,7 @@ import Webcam from 'react-webcam';
 import { useMultiFaceRecognition, FaceMatch } from '@/hooks/useMultiFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Video, VideoOff, Users } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
@@ -42,11 +42,12 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
 
-  const drawRect = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, color: string) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, width, height);
-  };
+  // Removendo a função drawRect, pois não será mais utilizada.
+  // const drawRect = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, color: string) => {
+  //   ctx.strokeStyle = color;
+  //   ctx.lineWidth = 2;
+  //   ctx.strokeRect(x, y, width, height);
+  // };
 
   // A função drawClientInfo não será mais chamada, mas a mantemos aqui caso precise ser reativada no futuro.
   const drawClientInfo = (
@@ -133,7 +134,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     const results = await recognizeMultiple(imageSrc);
-    setRecognizedFaces(results); // Atualiza para desenhar as caixas
+    setRecognizedFaces(results); // Atualiza para desenhar as caixas (mas não desenharemos)
 
     // Atualiza a lista persistente, filtrando clientes já alocados
     setPersistentRecognizedClients(prevClients => {
@@ -160,25 +161,23 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
       return updatedClients.filter(c => !allocatedSet.has(c.client.id));
     });
 
-    if (results.length > 0) {
-      results.forEach(match => {
-        const { box } = match; // Não precisamos do 'client' aqui para desenhar info
-        // Escalar as coordenadas da caixa para o tamanho do vídeo
-        const scaleX = canvas.width / video.videoWidth;
-        const scaleY = canvas.height / video.videoHeight;
+    // REMOVIDO: Não desenha mais os retângulos verdes
+    // if (results.length > 0) {
+    //   results.forEach(match => {
+    //     const { box } = match;
+    //     const scaleX = canvas.width / video.videoWidth;
+    //     const scaleY = canvas.height / video.videoHeight;
 
-        const x_original = box.x_min * scaleX;
-        const y_original = box.y_min * scaleY;
-        const width_original = (box.x_max - box.x_min) * scaleX;
-        const height_original = (box.y_max - box.y_min) * scaleY;
+    //     const x_original = box.x_min * scaleX;
+    //     const y_original = box.y_min * scaleY;
+    //     const width_original = (box.x_max - box.x_min) * scaleX;
+    //     const height_original = (box.y_max - box.y_min) * scaleY;
 
-        // Ajustar para a exibição espelhada da webcam
-        const x_mirrored = canvas.width - (x_original + width_original);
+    //     const x_mirrored = canvas.width - (x_original + width_original);
 
-        drawRect(ctx, x_mirrored, y_original, width_original, height_original, '#4CAF50'); // Verde para reconhecido
-        // drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width); // REMOVIDO: Não desenha mais as informações do cliente
-      });
-    }
+    //     drawRect(ctx, x_mirrored, y_original, width_original, height_original, '#4CAF50');
+    //   });
+    // }
   }, [isScanning, isCameraOn, lastRecognitionTime, recognizeMultiple, settings, allocatedClientIds]);
 
   useEffect(() => {
@@ -237,7 +236,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
   return (
     <Card className="sticky top-6 h-full flex flex-col">
-      {/* Removido CardHeader e CardTitle */}
       <CardContent className="flex-1 flex flex-col items-center gap-4 p-4 pt-0">
         <div className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
           {isCameraOn && !displayError ? (
@@ -251,6 +249,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                 mirrored={true}
                 onUserMediaError={handleMediaError}
               />
+              {/* O canvas ainda é necessário para limpar a tela, mesmo que não desenhemos nada */}
               <canvas ref={canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
               {/* Botão de ativar/desativar a câmera sobreposto */}
               <Button 
