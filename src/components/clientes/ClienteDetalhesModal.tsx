@@ -107,7 +107,7 @@ export function ClienteDetalhesModal({ isOpen, onOpenChange, cliente }: ClienteD
                 <div className="grid grid-cols-3 gap-2">
                     <StatDisplay title="Total de Visitas" value={cliente.visitas || 0} icon={DoorOpen} className="bg-primary/80" />
                     <StatDisplay title="Pedidos Pagos" value={stats.totalPedidosPagos} icon={ReceiptText} className="bg-primary/80" />
-                    <StatDisplay title="Gasto Total" value={formatCurrency(stats.totalSpent)} icon={Users} className="bg-primary/80" />
+                    <StatDisplay title="Pontos Acumulados" value={cliente.pontos || 0} icon={Star} className="bg-primary/80" /> {/* NOVO STAT */}
                 </div>
             </div>
 

@@ -2,7 +2,7 @@ import { Cliente } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Phone, User, Eye, MoreVertical, Edit, Trash2, DoorOpen } from "lucide-react";
+import { Phone, User, Eye, MoreVertical, Edit, Trash2, DoorOpen, Star } from "lucide-react";
 import { formatDistanceToNowStrict } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -63,6 +63,7 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
             <p className="text-foreground italic text-xs">"{preferenciaPrincipal}"</p>
             {cliente.whatsapp && <InfoLine icon={Phone} text={cliente.whatsapp} />}
             <InfoLine icon={DoorOpen} text={`${cliente.visitas || 0} visita(s)`} />
+            <InfoLine icon={Star} text={`${cliente.pontos || 0} ponto(s) acumulado(s)`} />
           </div>
         </div>
 

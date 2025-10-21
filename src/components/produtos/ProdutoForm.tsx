@@ -43,6 +43,7 @@ const formSchema = z.object({
   alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
   valor_compra: numericOrNull.nullable().optional(),
   mostrar_no_menu: z.boolean().default(false),
+  pontos_resgate: z.union([z.coerce.number().int().min(0, "Os pontos devem ser um número inteiro positivo."), emptyStringToNull]).nullable().optional(), // NOVO CAMPO
 });
 
 type ProdutoFormProps = {
@@ -68,6 +69,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       alerta_estoque_baixo: defaultValues?.alerta_estoque_baixo || 0,
       valor_compra: defaultValues?.valor_compra || undefined,
       mostrar_no_menu: defaultValues?.mostrar_no_menu || false,
+      pontos_resgate: defaultValues?.pontos_resgate || undefined, // NOVO DEFAULT
     },
   });
 
@@ -214,6 +216,31 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                       <Input type="number" {...field} />
                     </FormControl>
                     <FormDescription>Receba um alerta visual quando o estoque atingir ou cair abaixo desta quantidade.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="fidelidade" className="border rounded-lg px-4">
+            <AccordionTrigger className="hover:no-underline">Fidelidade e Resgate de Pontos</AccordionTrigger>
+            <AccordionContent className="pt-4 space-y-4">
+              <FormField
+                control={form.control}
+                name="pontos_resgate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pontos Necessários para Resgate</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        placeholder="Ex: 10" 
+                        {...field} 
+                        value={field.value ?? ''}
+                        onChange={(e) => field.onChange(e.target.value === '' ? null : e.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>Deixe em branco se este produto não puder ser resgatado por pontos.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
