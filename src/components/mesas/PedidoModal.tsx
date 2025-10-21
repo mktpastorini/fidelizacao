@@ -159,6 +159,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida notificações
       showSuccess("Item adicionado com sucesso!");
       form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
     },
@@ -174,6 +175,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida notificações
       showSuccess("Item removido com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
@@ -193,6 +195,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["ocupantes", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida notificações
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagando(null);
@@ -228,6 +231,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida notificações
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
@@ -242,7 +246,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
     const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
     const requerPreparo = produtoSelecionado?.requer_preparo ?? true;
-    const status = 'pendente';
+    
+    // Lógica de correção: Se não requer preparo, o status inicial é 'entregue'
+    const status: ItemPedido['status'] = requerPreparo ? 'pendente' : 'entregue'; 
+    
     addItemMutation.mutate({ ...values, status, requer_preparo: requerPreparo });
   };
 
