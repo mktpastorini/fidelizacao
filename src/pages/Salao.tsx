@@ -396,16 +396,17 @@ export default function SalaoPage() {
                 )}
               </Tooltip>
             </TooltipProvider>
-          )}
-          <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsMultiDetectionMode(prev => !prev)} 
-            disabled={isClosed}
-          >
-            {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
-            {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
           </Button>
+        )}
+        <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
+        <Button 
+          variant="outline" 
+          onClick={() => setIsMultiDetectionMode(prev => !prev)} 
+          disabled={isClosed}
+        >
+          {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+          {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
+        </Button>
       </>
     );
     setPageActions(pageButtons);
