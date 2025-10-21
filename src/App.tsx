@@ -6,6 +6,7 @@ import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { RoleGuard } from "./components/RoleGuard"; // Importado RoleGuard
 import DashboardPage from "./pages/Dashboard";
 import SalaoPage from "./pages/Salao";
 import Clientes from "./pages/Clientes";
@@ -18,6 +19,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import MenuPublicoPage from "./pages/MenuPublico";
+import UsuariosPage from "./pages/Usuarios"; // IMPORTADO
 import { PageActionsProvider } from "./contexts/PageActionsContext";
 
 const queryClient = new QueryClient();
@@ -52,15 +54,17 @@ const App = () => (
                   <Layout />
                 </PageActionsProvider>
               }>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/" element={<SalaoPage />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/produtos" element={<Produtos />} />
-                <Route path="/mesas" element={<Mesas />} />
-                <Route path="/cozinha" element={<Cozinha />} />
-                <Route path="/historico" element={<Historico />} />
-                <Route path="/mensagens" element={<Mensagens />} />
-                <Route path="/configuracoes" element={<Configuracoes />} />
+                {/* Rotas com RoleGuard */}
+                <Route path="/dashboard" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha']}><DashboardPage /></RoleGuard>} />
+                <Route path="/" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SalaoPage /></RoleGuard>} />
+                <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
+                <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
+                <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
+                <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha']}><Cozinha /></RoleGuard>} />
+                <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
+                <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
+                <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha']}><Configuracoes /></RoleGuard>} />
+                <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
