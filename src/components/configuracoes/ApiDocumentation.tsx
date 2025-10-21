@@ -36,7 +36,7 @@ export function ApiDocumentation() {
         <CardContent>
           <p className="text-sm">
             As interações são feitas via webhooks (Fidelize → Seu Sistema) e endpoints de API (Seu Sistema → Fidelize).
-            A autenticação para a API do Fidelize é feita via Bearer Token no cabeçalho `Authorization`, usando a Chave de API da aba "Perfil & Integrações".
+            A autenticação para a API do Fidelize é feita via Bearer Token no cabeçalho <code className="bg-muted text-foreground p-1 rounded">Authorization</code>, usando a Chave de API da aba "Perfil & Integrações".
           </p>
         </CardContent>
       </Card>
@@ -53,12 +53,12 @@ export function ApiDocumentation() {
           <CodeBlock code={unifiedPayload} />
           <h4 className="font-semibold mt-4">Campos do Payload:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li><code className="bg-gray-100 p-1 rounded">recipients</code>: Um array de objetos, um para cada destinatário. Para eventos únicos (chegada, pagamento), este array conterá apenas um elemento.</li>
-            <li><code className="bg-gray-100 p-1 rounded">log_id</code>: O ID único desta transação. **Guarde este ID** para nos informar o status da entrega (string, UUID).</li>
-            <li><code className="bg-gray-100 p-1 rounded">phone</code>: O número de WhatsApp do cliente (string).</li>
-            <li><code className="bg-gray-100 p-1 rounded">message</code>: A mensagem final, já personalizada (string).</li>
-            <li><code className="bg-gray-100 p-1 rounded">client_name</code>: O nome completo do cliente (string).</li>
-            <li><code className="bg-gray-100 p-1 rounded">callback_endpoint</code>: A URL de callback que seu sistema deve chamar para nos informar o status da entrega (string, URL).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">recipients</code>: Um array de objetos, um para cada destinatário. Para eventos únicos (chegada, pagamento), este array conterá apenas um elemento.</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">log_id</code>: O ID único desta transação. **Guarde este ID** para nos informar o status da entrega (string, UUID).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">phone</code>: O número de WhatsApp do cliente (string).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">message</code>: A mensagem final, já personalizada (string).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">client_name</code>: O nome completo do cliente (string).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">callback_endpoint</code>: A URL de callback que seu sistema deve chamar para nos informar o status da entrega (string, URL).</li>
           </ul>
         </CardContent>
       </Card>
@@ -72,19 +72,19 @@ export function ApiDocumentation() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/update-message-status`
+            <Badge variant="secondary">POST</Badge> <code className="bg-muted text-foreground p-1 rounded">https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/update-message-status</code>
           </div>
           <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
-            <li>`Content-Type`: `application/json`</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Authorization</code>: <code className="bg-muted text-foreground p-1 rounded">Bearer SUA_CHAVE_DE_API</code></li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Content-Type</code>: <code className="bg-muted text-foreground p-1 rounded">application/json</code></li>
           </ul>
           <h4 className="font-semibold">Exemplo de Corpo (Body):</h4>
           <CodeBlock code={updateStatusPayload} />
           <h4 className="font-semibold">Campos do Corpo:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li><code className="bg-gray-100 p-1 rounded">log_id</code>: O ID que você recebeu no webhook (string, UUID).</li>
-            <li><code className="bg-gray-100 p-1 rounded">status</code>: O status final da entrega. Valores possíveis: `"delivered"` ou `"failed"` (string).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">log_id</code>: O ID que você recebeu no webhook (string, UUID).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">status</code>: O status final da entrega. Valores possíveis: <code className="bg-muted text-foreground p-1 rounded">"delivered"</code> ou <code className="bg-muted text-foreground p-1 rounded">"failed"</code> (string).</li>
           </ul>
         </CardContent>
       </Card>
@@ -98,12 +98,12 @@ export function ApiDocumentation() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-birthday-wishes`
+            <Badge variant="secondary">POST</Badge> <code className="bg-muted text-foreground p-1 rounded">https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-birthday-wishes</code>
           </div>
           <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
-            <li>`Content-Type`: `application/json`</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Authorization</code>: <code className="bg-muted text-foreground p-1 rounded">Bearer SUA_CHAVE_DE_API</code></li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Content-Type</code>: <code className="bg-muted text-foreground p-1 rounded">application/json</code></li>
           </ul>
           <h4 className="font-semibold">Corpo (Body):</h4>
           <CodeBlock code={triggerPayload} />
@@ -128,12 +128,12 @@ export function ApiDocumentation() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm">
-            <Badge variant="secondary">GET</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-birthday-schedule`
+            <Badge variant="secondary">GET</Badge> <code className="bg-muted text-foreground p-1 rounded">https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-birthday-schedule</code>
           </div>
           <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
-            <li>`Content-Type`: `application/json`</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Authorization</code>: <code className="bg-muted text-foreground p-1 rounded">Bearer SUA_CHAVE_DE_API</code></li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Content-Type</code>: <code className="bg-muted text-foreground p-1 rounded">application/json</code></li>
           </ul>
           <h4 className="font-semibold">Exemplo de Resposta:</h4>
           <CodeBlock code={`{
@@ -142,13 +142,12 @@ export function ApiDocumentation() {
 }`} />
           <h4 className="font-semibold">Campos da Resposta:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li><code className="bg-gray-100 p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
-            <li><code className="bg-gray-100 p-1 rounded">aniversario_horario</code>: O horário configurado para envio das mensagens de aniversário (string, formato HH:MM).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">aniversario_horario</code>: O horário configurado para envio das mensagens de aniversário (string, formato HH:MM).</li>
           </ul>
         </CardContent>
       </Card>
       
-      {/* NOVOS ENDPOINTS DE FECHAMENTO DO DIA */}
       <Card>
         <CardHeader>
           <CardTitle>API: Fechamento Automático do Dia</CardTitle>
@@ -158,12 +157,12 @@ export function ApiDocumentation() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-close-day`
+            <Badge variant="secondary">POST</Badge> <code className="bg-muted text-foreground p-1 rounded">https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-close-day</code>
           </div>
           <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
-            <li>`Content-Type`: `application/json`</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Authorization</code>: <code className="bg-muted text-foreground p-1 rounded">Bearer SUA_CHAVE_DE_API</code></li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Content-Type</code>: <code className="bg-muted text-foreground p-1 rounded">application/json</code></li>
           </ul>
           <h4 className="font-semibold">Corpo (Body):</h4>
           <CodeBlock code={triggerPayload} />
@@ -182,12 +181,12 @@ export function ApiDocumentation() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm">
-            <Badge variant="secondary">GET</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-close-day-schedule`
+            <Badge variant="secondary">GET</Badge> <code className="bg-muted text-foreground p-1 rounded">https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-close-day-schedule</code>
           </div>
           <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li>`Authorization`: `Bearer SUA_CHAVE_DE_API`</li>
-            <li>`Content-Type`: `application/json`</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Authorization</code>: <code className="bg-muted text-foreground p-1 rounded">Bearer SUA_CHAVE_DE_API</code></li>
+            <li><code className="bg-muted text-foreground p-1 rounded">Content-Type</code>: <code className="bg-muted text-foreground p-1 rounded">application/json</code></li>
           </ul>
           <h4 className="font-semibold">Exemplo de Resposta:</h4>
           <CodeBlock code={`{
@@ -196,8 +195,8 @@ export function ApiDocumentation() {
 }`} />
           <h4 className="font-semibold">Campos da Resposta:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm">
-            <li><code className="bg-gray-100 p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
-            <li><code className="bg-gray-100 p-1 rounded">auto_close_time</code>: O horário configurado para o fechamento automático (string, formato HH:MM).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
+            <li><code className="bg-muted text-foreground p-1 rounded">auto_close_time</code>: O horário configurado para o fechamento automático (string, formato HH:MM).</li>
           </ul>
         </CardContent>
       </Card>
