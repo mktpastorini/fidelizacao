@@ -358,46 +358,50 @@ export default function SalaoPage() {
 
   // --- Configuração dos Page Actions ---
   useEffect(() => {
+    const closeDayButton = (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div tabIndex={0}>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
+                    <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </TooltipTrigger>
+          {!isCloseDayReady && (
+            <TooltipContent>
+              <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
+      </TooltipProvider>
+    );
+
+    const openDayButton = (
+      <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
+        <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
+      </Button>
+    );
+
     const pageButtons = (
       <>
-        {isClosed ? (
-          <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
-            <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
-          </Button>
-        ) : (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div tabIndex={0}>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
-                        <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialog>
-                  </div>
-                </TooltipTrigger>
-                {!isCloseDayReady && (
-                  <TooltipContent>
-                    <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          </Button>
-        )}
+        {isClosed ? openDayButton : closeDayButton}
         <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
         <Button 
           variant="outline" 
