@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Produto } from "@/types/supabase";
@@ -17,11 +17,13 @@ import { Star, Utensils, PlusCircle, Loader2 } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type ResgatePontosDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  clientePrincipal: Cliente | null;
+  ocupantes: Cliente[]; // Agora recebe todos os ocupantes
   mesaId: string | null;
   produtosResgatáveis: Produto[];
 };
@@ -31,26 +33,39 @@ const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style:
 export function ResgatePontosDialog({
   isOpen,
   onOpenChange,
-  clientePrincipal,
+  ocupantes,
   mesaId,
   produtosResgatáveis,
 }: ResgatePontosDialogProps) {
   const queryClient = useQueryClient();
+  const [selectedClienteId, setSelectedClienteId] = useState<string | null>(null);
   const [selectedProduto, setSelectedProduto] = useState<Produto | null>(null);
   const [quantidade, setQuantidade] = useState(1);
 
-  const produtosDisponiveis = useMemo(() => {
-    if (!clientePrincipal) return [];
-    return produtosResgatáveis.filter(p => p.pontos_resgate && p.pontos_resgate > 0);
-  }, [clientePrincipal, produtosResgatáveis]);
+  // Reset state when dialog opens/closes
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedClienteId(ocupantes.length > 0 ? ocupantes[0].id : null);
+      setSelectedProduto(null);
+      setQuantidade(1);
+    }
+  }, [isOpen, ocupantes]);
 
-  const pontosDisponiveis = clientePrincipal?.pontos || 0;
+  const clienteResgatando = useMemo(() => {
+    return ocupantes.find(c => c.id === selectedClienteId) || null;
+  }, [ocupantes, selectedClienteId]);
+
+  const produtosDisponiveis = useMemo(() => {
+    return produtosResgatáveis.filter(p => p.pontos_resgate && p.pontos_resgate > 0);
+  }, [produtosResgatáveis]);
+
+  const pontosDisponiveis = clienteResgatando?.pontos || 0;
   const pontosNecessarios = selectedProduto?.pontos_resgate ? selectedProduto.pontos_resgate * quantidade : 0;
-  const podeResgatar = pontosDisponiveis >= pontosNecessarios && !!selectedProduto;
+  const podeResgatar = !!clienteResgatando && pontosDisponiveis >= pontosNecessarios && !!selectedProduto;
 
   const resgateMutation = useMutation({
     mutationFn: async () => {
-      if (!clientePrincipal || !mesaId || !selectedProduto || !selectedProduto.pontos_resgate) {
+      if (!clienteResgatando || !mesaId || !selectedProduto || !selectedProduto.pontos_resgate) {
         throw new Error("Dados incompletos para o resgate.");
       }
       if (!podeResgatar) {
@@ -78,7 +93,7 @@ export function ResgatePontosDialog({
       } else {
         const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
           mesa_id: mesaId,
-          cliente_id: clientePrincipal.id,
+          cliente_id: clienteResgatando.id, // Usa o cliente que está resgatando como principal se for novo pedido
           user_id: user.id,
           status: "aberto",
         }).select("id").single();
@@ -93,7 +108,7 @@ export function ResgatePontosDialog({
         nome_produto: `[RESGATE] ${selectedProduto.nome}`,
         quantidade: quantidade,
         preco: selectedProduto.preco, // Mantemos o preço original para fins de relatório, mas aplicamos 100% de desconto
-        consumido_por_cliente_id: clientePrincipal.id,
+        consumido_por_cliente_id: clienteResgatando.id,
         desconto_percentual: 100,
         desconto_motivo: `Resgate de ${pontosNecessarios} pontos`,
         status: "pendente",
@@ -104,7 +119,7 @@ export function ResgatePontosDialog({
       // 3. Deduzir os pontos do cliente
       const { error: pointsError } = await supabase.from("clientes")
         .update({ pontos: pontosDisponiveis - pontosNecessarios })
-        .eq("id", clientePrincipal.id);
+        .eq("id", clienteResgatando.id);
       if (pointsError) throw pointsError;
     },
     onSuccess: () => {
@@ -128,15 +143,13 @@ export function ResgatePontosDialog({
     setQuantidade(prev => Math.max(1, prev + delta));
   };
 
-  if (!clientePrincipal) return null;
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Resgate de Pontos Fidelidade</DialogTitle>
           <DialogDescription>
-            Cliente: <span className="font-semibold">{clientePrincipal.nome}</span> | Pontos: <span className="font-bold text-primary">{pontosDisponiveis}</span>
+            Selecione o cliente e o prêmio para resgate.
           </DialogDescription>
         </DialogHeader>
         
@@ -187,11 +200,33 @@ export function ResgatePontosDialog({
           {/* Coluna de Confirmação */}
           <div className="space-y-4 p-4 border rounded-lg bg-secondary">
             <h3 className="font-semibold text-lg">Confirmação de Resgate</h3>
-            {selectedProduto ? (
+            
+            {/* Seletor de Cliente */}
+            <div>
+              <Label htmlFor="cliente-resgate">Cliente Resgatando</Label>
+              <Select 
+                value={selectedClienteId || ''} 
+                onValueChange={setSelectedClienteId}
+                disabled={ocupantes.length === 0}
+              >
+                <SelectTrigger id="cliente-resgate" className="mt-1">
+                  <SelectValue placeholder="Selecione o cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ocupantes.map(cliente => (
+                    <SelectItem key={cliente.id} value={cliente.id}>
+                      {cliente.nome} ({cliente.pontos} pts)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {clienteResgatando ? (
               <div className="space-y-4">
                 <Card className="p-4">
-                  <p className="font-bold text-xl">{selectedProduto.nome}</p>
-                  <p className="text-sm text-muted-foreground">Custo: {selectedProduto.pontos_resgate} pontos</p>
+                  <p className="font-bold text-xl">{selectedProduto?.nome || 'Selecione um produto'}</p>
+                  <p className="text-sm text-muted-foreground">Custo: {selectedProduto?.pontos_resgate || 0} pontos</p>
                 </Card>
 
                 <div>
@@ -240,7 +275,7 @@ export function ResgatePontosDialog({
                 {!podeResgatar && <p className="text-destructive text-sm text-center">Pontos insuficientes ou produto não selecionado.</p>}
               </div>
             ) : (
-              <p className="text-muted-foreground text-center py-12">Selecione um prêmio na lista ao lado para resgatar.</p>
+              <p className="text-muted-foreground text-center py-12">Selecione um cliente e um prêmio para resgatar.</p>
             )}
           </div>
         </div>

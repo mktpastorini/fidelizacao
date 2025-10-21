@@ -269,7 +269,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               {clientePrincipal && (
                 <Badge variant="secondary" className="ml-4 flex items-center gap-1">
                   <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                  {clientePrincipal.pontos} pontos
+                  {clientePrincipal.pontos} pontos (Principal)
                 </Badge>
               )}
             </DialogDescription>
@@ -398,11 +398,11 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     )}/>
                     <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
                     
-                    {/* NOVO BOTÃO DE RESGATE */}
-                    {clientePrincipal && produtosResgatáveis.length > 0 && (
+                    {/* NOVO BOTÃO DE RESGATE - Agora só verifica se há ocupantes e produtos resgatáveis */}
+                    {ocupantes && ocupantes.length > 0 && produtosResgatáveis.length > 0 && (
                       <Button type="button" variant="secondary" className="w-full mt-2" onClick={() => setIsResgateOpen(true)}>
                         <Star className="w-4 h-4 mr-2 fill-yellow-500 text-yellow-500" />
-                        Resgatar Prêmios ({clientePrincipal.pontos} pts)
+                        Resgatar Prêmios
                       </Button>
                     )}
                   </form>
@@ -448,7 +448,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       <ResgatePontosDialog
         isOpen={isResgateOpen}
         onOpenChange={setIsResgateOpen}
-        clientePrincipal={clientePrincipal}
+        ocupantes={ocupantes || []} // Passando todos os ocupantes
         mesaId={mesa?.id || null}
         produtosResgatáveis={produtosResgatáveis}
       />
