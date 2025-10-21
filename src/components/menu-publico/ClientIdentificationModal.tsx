@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 type ItemToOrder = {
   produto: Produto;
   quantidade: number;
+  observacoes: string;
 };
 
 type ClientIdentificationModalProps = {
@@ -41,6 +42,7 @@ export function ClientIdentificationModal({
   const [match, setMatch] = useState<Cliente | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [isSubmittingNewClient, setIsSubmittingNewClient] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null); // Novo estado para erro de mídia
 
   const videoConstraints = {
     width: 400,
@@ -52,6 +54,7 @@ export function ClientIdentificationModal({
     setMatch(null);
     setSnapshot(null);
     setStep('capture');
+    setMediaError(null); // Resetar erro de mídia
   }, []);
 
   useEffect(() => {
@@ -59,6 +62,17 @@ export function ClientIdentificationModal({
       resetState();
     }
   }, [isOpen, resetState]);
+
+  const handleMediaError = useCallback((err: any) => {
+    console.error("Erro ao acessar a câmera:", err);
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      setMediaError("Acesso à câmera negado. Por favor, permita o acesso nas configurações do seu navegador.");
+    } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      setMediaError("Acesso à câmera bloqueado. O menu deve ser acessado via HTTPS.");
+    } else {
+      setMediaError(`Erro de mídia: ${err.message}`);
+    }
+  }, []);
 
   const performRecognition = useCallback(async (imageSrc: string) => {
     if (!isReady || !recognize) return;
@@ -76,6 +90,10 @@ export function ClientIdentificationModal({
   }, [isReady, recognize]);
 
   const handleCapture = useCallback(() => {
+    if (mediaError) {
+      showError(mediaError);
+      return;
+    }
     if (webcamRef.current) {
       const imageSrc = webcamRef.current.getScreenshot();
       if (imageSrc) {
@@ -85,7 +103,7 @@ export function ClientIdentificationModal({
         showError("Não foi possível capturar a imagem. Tente novamente.");
       }
     }
-  }, [performRecognition]);
+  }, [performRecognition, mediaError]);
 
   const handleConfirmMatch = () => {
     if (match) {
@@ -143,8 +161,16 @@ export function ClientIdentificationModal({
   };
 
   const renderContent = () => {
-    if (recognitionError) {
-      return <p className="text-red-500 text-center">{recognitionError}</p>;
+    const displayError = recognitionError || mediaError;
+
+    if (displayError) {
+      return (
+        <div className="text-center py-4 space-y-4">
+          <p className="text-lg font-bold text-red-500">Erro de Câmera/Reconhecimento</p>
+          <p className="text-sm text-muted-foreground">{displayError}</p>
+          <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
+        </div>
+      );
     }
 
     switch (step) {
@@ -159,6 +185,7 @@ export function ClientIdentificationModal({
                 videoConstraints={videoConstraints} 
                 className="w-full h-full object-cover" 
                 mirrored={true}
+                onUserMediaError={handleMediaError} // Captura erros de mídia
               />
             </div>
             <Button onClick={handleCapture} disabled={!isReady} className="w-full max-w-xs">
@@ -239,7 +266,7 @@ export function ClientIdentificationModal({
         <div className="py-4">
           {renderContent()}
         </div>
-        {step === 'capture' && (
+        {step === 'capture' && !mediaError && (
           <DialogFooter>
             <Button variant="ghost" onClick={handleCancelIdentification}>
               <X className="w-4 h-4 mr-2" /> Pedir como Mesa (Geral)
