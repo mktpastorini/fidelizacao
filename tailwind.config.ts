@@ -99,8 +99,8 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        // Sombra extremamente grande e forte, com um toque de cor primária
-        'dock': '0 0 150px rgba(0, 0, 0, 1), 0 0 75px rgba(var(--primary-rgb), 0.9)',
+        // Sombra externa extremamente grande e forte
+        'dock': '0 0 150px rgba(0, 0, 0, 1), 0 0 75px rgba(var(--primary-rgb), 0.9), inset 0 0 10px rgba(var(--primary-rgb), 0.5)',
       }
     },
   },
