@@ -6,7 +6,7 @@ import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { RoleGuard } from "./components/RoleGuard"; // Importado RoleGuard
+import { RoleGuard } from "./components/RoleGuard";
 import DashboardPage from "./pages/Dashboard";
 import SalaoPage from "./pages/Salao";
 import Clientes from "./pages/Clientes";
@@ -19,7 +19,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import MenuPublicoPage from "./pages/MenuPublico";
-import UsuariosPage from "./pages/Usuarios"; // IMPORTADO
+import UsuariosPage from "./pages/Usuarios";
 import { PageActionsProvider } from "./contexts/PageActionsContext";
 
 const queryClient = new QueryClient();
@@ -60,11 +60,17 @@ const App = () => (
                 <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
                 <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
                 <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
+                
+                {/* Cozinha: Acesso exclusivo ou compartilhado */}
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha', 'garcom']}><Cozinha /></RoleGuard>} />
+                
+                {/* Restringindo acesso a Cozinha e Gerência */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
-                {/* Removendo 'garcom' e 'balcao' do acesso a configurações */}
+                
+                {/* Cozinha precisa de acesso a Configurações para configurar a câmera */}
                 <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha']}><Configuracoes /></RoleGuard>} />
+                
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
             </Route>
