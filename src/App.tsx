@@ -63,7 +63,8 @@ const App = () => (
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha']}><Cozinha /></RoleGuard>} />
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
-                <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha']}><Configuracoes /></RoleGuard>} />
+                {/* Removendo 'garcom' e 'balcao' do acesso a configurações */}
+                <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha']}><Configuracoes /></RoleGuard>} />
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
             </Route>

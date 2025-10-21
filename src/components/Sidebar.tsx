@@ -59,9 +59,12 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="p-2 border-t border-border">
-        <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
-            <div className="flex items-center"><Settings className="w-5 h-5 mr-3" /><span>Configurações</span></div>
-        </NavLink>
+        {/* Restringindo o acesso a Configurações no Sidebar */}
+        {userRole && ['superadmin', 'admin', 'gerente', 'cozinha'].includes(userRole) && (
+          <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
+              <div className="flex items-center"><Settings className="w-5 h-5 mr-3" /><span>Configurações</span></div>
+          </NavLink>
+        )}
         <Button variant="ghost" className="w-full justify-start mt-1 text-muted-foreground hover:text-foreground" onClick={handleLogout}>
           <LogOut className="w-5 h-5 mr-3" />
           <span>Sair</span>
