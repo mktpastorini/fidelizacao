@@ -99,8 +99,8 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        // Aumentando o espalhamento e a opacidade para ser bem visível
-        'dock': '0 15px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(var(--primary-rgb), 0.5)',
+        // Aumentando drasticamente o espalhamento (50px -> 100px) e o offset (15px -> 25px)
+        'dock': '0 25px 100px rgba(0, 0, 0, 0.9), 0 0 50px rgba(var(--primary-rgb), 0.7)',
       }
     },
   },
