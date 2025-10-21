@@ -1,27 +1,34 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon } from "lucide-react";
+import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
 
 const navItems = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/", icon: Home, label: "Salão" },
-  { to: "/clientes", icon: Users, label: "Clientes" },
-  { to: "/produtos", icon: ClipboardList, label: "Cardápio" },
-  { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas" },
-  { to: "/cozinha", icon: ChefHat, label: "Cozinha" },
-  { to: "/historico", icon: History, label: "Pedidos Fechados" },
-  { to: "/mensagens", icon: MessageSquare, label: "Mensagens" },
+  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha'] },
+  { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
+  { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] },
+  { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
+  { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
 ];
 
 export function Sidebar() {
   const navigate = useNavigate();
+  const { userRole, isLoading } = useSettings(); // Usando useSettings
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/login");
   };
+
+  if (isLoading) {
+    // Não renderiza nada enquanto carrega o perfil/função
+    return null;
+  }
 
   return (
     <aside className="w-64 bg-card border-r flex flex-col text-foreground shrink-0">
@@ -31,23 +38,32 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === "/" || item.to === "/dashboard"}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
-                isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-              )
-            }
-          >
-            <div className="flex items-center">
-              <item.icon className="w-5 h-5 mr-3" />
-              <span>{item.label}</span>
-            </div>
-          </NavLink>
+          // Renderiza apenas se a função do usuário estiver na lista de funções permitidas
+          item.roles.includes(userRole!) && (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === "/" || item.to === "/dashboard"}
+              className={({ isActive }) =>
+                cn(
+                  "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                )
+              }
+            >
+              <div className="flex items-center">
+                <item.icon className="w-5 h-5 mr-3" />
+                <span>{item.label}</span>
+              </div>
+            </NavLink>
+          )
         ))}
+        {/* Link de Gerenciamento de Usuários (Apenas Superadmin) */}
+        {userRole === 'superadmin' && (
+          <NavLink to="/usuarios" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
+              <div className="flex items-center"><UserCog className="w-5 h-5 mr-3" /><span>Gerenciar Usuários</span></div>
+          </NavLink>
+        )}
       </nav>
       <div className="p-2 border-t border-border">
         <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
