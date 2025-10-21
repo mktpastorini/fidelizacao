@@ -13,7 +13,8 @@ const MainContent = () => (
 );
 
 const DockContent = () => (
-  <main className="p-6 lg:p-8 pb-24 relative">
+  // Ocupa todo o espaço vertical disponível, permitindo rolagem interna
+  <main className="flex-1 p-6 lg:p-8 pb-24 relative overflow-y-auto">
     <Header />
     <Outlet />
   </main>
@@ -28,9 +29,10 @@ export function Layout() {
 
   if (settings?.menu_style === 'dock') {
     return (
-      <div className="relative min-h-screen bg-background">
-        <DockContent />
-        <Dock />
+      // Contêiner flexível para o layout de dock
+      <div className="relative flex flex-col h-screen bg-background">
+        <DockContent /> {/* Conteúdo principal com rolagem */}
+        <Dock /> {/* Dock fixo na parte inferior */}
       </div>
     );
   }

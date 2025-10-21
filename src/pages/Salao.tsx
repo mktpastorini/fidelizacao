@@ -362,7 +362,7 @@ export default function SalaoPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 h-full flex flex-col">
+    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
       {isClosed && (
         <Alert variant="destructive">
           <Lock className="h-4 w-4" />
