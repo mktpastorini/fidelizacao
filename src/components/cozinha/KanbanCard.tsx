@@ -5,7 +5,7 @@ import { Clock, User, Utensils, CheckCircle, AlertTriangle } from "lucide-react"
 import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
-import { useSettings } from "@/contexts/SettingsContext"; // Importado
+import { useSettings } from "@/contexts/SettingsContext";
 
 type KanbanCardProps = {
   item: ItemPedido & {
@@ -61,7 +61,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
               // Item sem preparo: Garçom/Balcão pode marcar como entregue (Permissão RLS já adicionada)
               <Button size="sm" variant="outline" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => onStatusChange(item.id, 'entregue')}>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                Entregar (Sem Preparo)
+                Entregar ao Cliente
               </Button>
             ) : (
               // Item com preparo: Ação restrita à Cozinha/Gerência
