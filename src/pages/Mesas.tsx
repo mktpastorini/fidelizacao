@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Mesa, Cliente } from "@/types/supabase";
@@ -22,7 +22,6 @@ import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { usePageActions } from "@/contexts/PageActionsContext";
-import React from "react";
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -248,7 +247,7 @@ export default function MesasPage() {
   }, [handleFormOpen, setPageActions]);
 
   return (
-    <div>
+    <React.Fragment>
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Painel de Mesas</h1>
         <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
@@ -331,6 +330,6 @@ export default function MesasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </React.Fragment>
   );
 }
