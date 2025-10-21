@@ -19,7 +19,7 @@ import {
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useSettings } from "@/contexts/SettingsContext";
+import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
 
 const allNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha'] },
@@ -30,7 +30,7 @@ const allNavItems = [
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
-  { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] },
+  { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin', 'gerente', 'cozinha'] }, // Removido 'garcom' e 'balcao'
   { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
 ];
 

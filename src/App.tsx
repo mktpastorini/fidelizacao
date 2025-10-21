@@ -6,7 +6,7 @@ import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ThemeProvider } from "./components/ThemeProvider";
-import { RoleGuard } from "./components/RoleGuard";
+import { RoleGuard } from "./components/RoleGuard"; // Importado RoleGuard
 import DashboardPage from "./pages/Dashboard";
 import SalaoPage from "./pages/Salao";
 import Clientes from "./pages/Clientes";
@@ -19,7 +19,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import MenuPublicoPage from "./pages/MenuPublico";
-import UsuariosPage from "./pages/Usuarios";
+import UsuariosPage from "./pages/Usuarios"; // IMPORTADO
 import { PageActionsProvider } from "./contexts/PageActionsContext";
 
 const queryClient = new QueryClient();
@@ -55,34 +55,16 @@ const App = () => (
                 </PageActionsProvider>
               }>
                 {/* Rotas com RoleGuard */}
-                {/* Dashboard: Acessível por todos */}
                 <Route path="/dashboard" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha']}><DashboardPage /></RoleGuard>} />
-                
-                {/* Salão (Rota principal /): Acessível por todos, exceto Cozinha */}
                 <Route path="/" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SalaoPage /></RoleGuard>} />
-                
-                {/* Clientes: Acessível por Garçom e acima */}
                 <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
-                
-                {/* Produtos: Acessível por Balcão e acima */}
                 <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
-                
-                {/* Mesas: Acessível por Garçom e acima */}
                 <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
-                
-                {/* Cozinha: Acessível por Cozinha e acima */}
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha']}><Cozinha /></RoleGuard>} />
-                
-                {/* Histórico: Acessível por Gerente e acima */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
-                
-                {/* Mensagens: Acessível por Gerente e acima */}
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
-                
-                {/* Configurações: Acessível por Cozinha e acima (exceto Garçom/Balcão) */}
+                {/* Removendo 'garcom' e 'balcao' do acesso a configurações */}
                 <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha']}><Configuracoes /></RoleGuard>} />
-                
-                {/* Usuários: Acessível apenas por Superadmin */}
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
             </Route>
