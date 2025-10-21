@@ -41,31 +41,18 @@ async function fetchPendingApprovalRequests(userRole: UserRole): Promise<Approva
     return [];
   }
   
-  // Nota: A coluna 'target_id' é polimórfica (pode ser mesa_id ou item_id).
-  // O PostgREST não suporta junções polimórficas automáticas.
-  // Vamos tentar forçar as junções usando o nome da tabela e a coluna 'id' como chave de junção.
-  // Se falhar, teremos que buscar os dados aninhados separadamente no frontend.
-  
   const { data, error } = await supabase
     .from("approval_requests")
     .select(`
       *,
       requester:profiles(first_name, last_name, role),
-      mesa:mesas!target_id(numero),
-      item_pedido:itens_pedido!target_id(*)
+      mesa:mesas(numero),
+      item_pedido:itens_pedido(*)
     `)
     .eq("status", "pending")
     .order("created_at", { ascending: true });
 
-  if (error) {
-    // Se o erro 400 persistir, o problema é a junção polimórfica.
-    // Por enquanto, vamos lançar o erro para debug.
-    throw new Error(error.message);
-  }
-  
-  // O PostgREST tentará fazer a junção onde approval_requests.target_id = mesas.id
-  // e approval_requests.target_id = itens_pedido.id.
-  // Apenas uma delas retornará dados para cada linha, o que é o comportamento desejado.
+  if (error) throw new Error(error.message);
   return data as ApprovalRequest[] || [];
 }
 
