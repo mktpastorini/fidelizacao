@@ -91,7 +91,7 @@ serve(async (req) => {
           
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
-            .select('id, nome, avatar_url, gostos') // Selecionar apenas as informações necessárias
+            .select('id, nome, avatar_url, gostos, casado_com, visitas') // Selecionar informações adicionais
             .eq('id', bestSubject.subject)
             .single();
 

@@ -25,10 +25,10 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Restrições de vídeo mais flexíveis
+  // Restrições de vídeo mais flexíveis para evitar OverconstrainedError
   const videoConstraints = {
-    width: { ideal: 1280 }, // Preferir 1280px de largura
-    height: { ideal: 720 }, // Preferir 720px de altura
+    width: { ideal: 1280, min: 640 }, // Preferir 1280px, mas aceitar até 640px
+    height: { ideal: 720, min: 480 }, // Preferir 720px, mas aceitar até 480px
     facingMode: "user", // Preferir câmera frontal, se disponível
     deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
@@ -39,13 +39,64 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
     ctx.strokeRect(x, y, width, height);
   };
 
-  const drawText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, color: string, bgColor: string) => {
+  const drawClientInfo = (
+    ctx: CanvasRenderingContext2D,
+    client: FaceMatch['client'],
+    box: FaceMatch['box'],
+    scaleX: number,
+    scaleY: number,
+    canvasWidth: number
+  ) => {
+    // Coordenadas originais da caixa
+    const x_original = box.x_min * scaleX;
+    const y_original = box.y_min * scaleY;
+    const width_original = (box.x_max - box.x_min) * scaleX;
+    // const height_original = (box.y_max - box.y_min) * scaleY; // Não usado diretamente para o texto
+
+    // Ajustar para a exibição espelhada da webcam
+    const x_mirrored = canvasWidth - (x_original + width_original);
+    const y_text_start = y_original; // Começa a desenhar o texto acima da caixa
+
+    const infoLines: string[] = [];
+    infoLines.push(client.nome);
+    if (client.casado_com) {
+      infoLines.push(`Cônjuge: ${client.casado_com}`);
+    }
+    if (client.gostos) {
+      const preferences = Object.entries(client.gostos)
+        .filter(([, value]) => value)
+        .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${String(value)}`);
+      if (preferences.length > 0) {
+        infoLines.push(...preferences);
+      }
+    }
+    infoLines.push(`Visitas: ${client.visitas || 0}`);
+
+    const lineHeight = 20;
+    const padding = 5;
+    
     ctx.font = '16px Arial';
-    ctx.fillStyle = bgColor;
-    const textWidth = ctx.measureText(text).width;
-    ctx.fillRect(x, y - 20, textWidth + 8, 24); // Background for text
-    ctx.fillStyle = color;
-    ctx.fillText(text, x + 4, y - 4);
+    let maxWidth = 0;
+    infoLines.forEach(line => {
+      const textWidth = ctx.measureText(line).width;
+      if (textWidth > maxWidth) maxWidth = textWidth;
+    });
+
+    const boxHeight = (infoLines.length * lineHeight) + (2 * padding);
+    const boxWidth = maxWidth + (2 * padding);
+    
+    // Posição do fundo do texto (acima da caixa do rosto)
+    const backgroundY = y_text_start - boxHeight - padding;
+    
+    // Desenhar fundo do texto
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'; // Fundo escuro semi-transparente
+    ctx.fillRect(x_mirrored, backgroundY, boxWidth, boxHeight);
+
+    // Desenhar cada linha de texto
+    ctx.fillStyle = 'white';
+    infoLines.forEach((line, index) => {
+      ctx.fillText(line, x_mirrored + padding, backgroundY + padding + (index * lineHeight) + (lineHeight * 0.75));
+    });
   };
 
   const handleRecognition = useCallback(async () => {
@@ -79,17 +130,19 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
       results.forEach(match => {
         const { box, client } = match;
         // Escalar as coordenadas da caixa para o tamanho do vídeo
-        // Usar as dimensões reais do vídeo para o cálculo de escala
         const scaleX = canvas.width / video.videoWidth;
         const scaleY = canvas.height / video.videoHeight;
 
-        const x = box.x_min * scaleX;
-        const y = box.y_min * scaleY;
-        const width = (box.x_max - box.x_min) * scaleX;
-        const height = (box.y_max - box.y_min) * scaleY;
+        const x_original = box.x_min * scaleX;
+        const y_original = box.y_min * scaleY;
+        const width_original = (box.x_max - box.x_min) * scaleX;
+        const height_original = (box.y_max - box.y_min) * scaleY;
 
-        drawRect(ctx, x, y, width, height, '#4CAF50'); // Verde para reconhecido
-        drawText(ctx, client.nome, x, y, 'white', '#4CAF50');
+        // Ajustar para a exibição espelhada da webcam
+        const x_mirrored = canvas.width - (x_original + width_original);
+
+        drawRect(ctx, x_mirrored, y_original, width_original, height_original, '#4CAF50'); // Verde para reconhecido
+        drawClientInfo(ctx, client, box, scaleX, scaleY, canvas.width);
 
         // Opcional: Chamar onClientRecognized para o primeiro cliente reconhecido
         if (onClientRecognized) {
