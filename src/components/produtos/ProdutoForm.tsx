@@ -43,7 +43,7 @@ const formSchema = z.object({
   alerta_estoque_baixo: z.coerce.number().int().min(0, "O alerta deve ser um número positivo.").default(0),
   valor_compra: numericOrNull.nullable().optional(),
   mostrar_no_menu: z.boolean().default(false),
-  pontos_resgate: z.union([z.coerce.number().int().min(0, "Os pontos devem ser um número inteiro positivo."), emptyStringToNull]).nullable().optional(), // NOVO CAMPO
+  pontos_resgate: z.union([z.coerce.number().int().min(0, "Os pontos devem ser um número inteiro positivo."), emptyStringToNull]).nullable().optional(),
 });
 
 type ProdutoFormProps = {
@@ -69,16 +69,32 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       alerta_estoque_baixo: defaultValues?.alerta_estoque_baixo || 0,
       valor_compra: defaultValues?.valor_compra || undefined,
       mostrar_no_menu: defaultValues?.mostrar_no_menu || false,
-      pontos_resgate: defaultValues?.pontos_resgate || undefined, // NOVO DEFAULT
+      pontos_resgate: defaultValues?.pontos_resgate || undefined,
     },
   });
 
   const produtoTipo = form.watch('tipo');
   const isInventoryDisabled = produtoTipo === 'rodizio' || produtoTipo === 'componente_rodizio';
 
+  const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
+    let cleanedValues = { ...values };
+
+    // Se o inventário estiver desabilitado, forçamos os valores de estoque e custo para 0/null
+    if (isInventoryDisabled) {
+      cleanedValues = {
+        ...cleanedValues,
+        estoque_atual: 0,
+        alerta_estoque_baixo: 0,
+        valor_compra: null,
+      };
+    }
+    
+    onSubmit(cleanedValues);
+  };
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4 max-h-[70vh] overflow-y-auto pr-4">
         <FormField
           control={form.control}
           name="imagem_url"
