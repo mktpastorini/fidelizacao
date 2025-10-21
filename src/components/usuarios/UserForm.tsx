@@ -41,6 +41,7 @@ const createSchema = baseSchema.extend({
   password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
 });
 
+// Definindo o tipo base para o formulário
 type UserFormValues = z.infer<typeof createSchema> & { id?: string };
 
 type UserFormProps = {
@@ -56,7 +57,8 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
   const form = useForm<UserFormValues>({
     resolver: zodResolver(schema as any),
     defaultValues: {
-      id: defaultValues?.id || undefined,
+      // Garantimos que o ID seja uma string vazia se for undefined, para evitar a string "undefined"
+      id: defaultValues?.id || "", 
       email: defaultValues?.email || "",
       password: "",
       first_name: defaultValues?.first_name || "",
@@ -67,7 +69,11 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
 
   const handleSubmit = (values: UserFormValues) => {
     if (isEditing) {
-      // Para edição, enviamos apenas os campos editáveis + ID
+      // Para edição, garantimos que o ID seja uma string não vazia
+      if (!values.id) {
+        console.error("Erro: ID do usuário ausente no modo de edição.");
+        return;
+      }
       onSubmit({
         id: values.id,
         first_name: values.first_name,
