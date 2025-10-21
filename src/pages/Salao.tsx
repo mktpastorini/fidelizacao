@@ -89,6 +89,11 @@ export default function SalaoPage() {
   const isClosed = data?.settings?.establishment_is_closed || false;
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
 
+  // IDs de todos os clientes atualmente alocados em qualquer mesa
+  const allocatedClientIds = data?.mesas
+    .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
+    .filter((value, index, self) => self.indexOf(value) === index) || []; // Remove duplicatas
+
   const closeDayMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke('close-day');
@@ -320,11 +325,6 @@ export default function SalaoPage() {
 
   const mesasLivres = data?.mesas.filter(m => !m.cliente_id) || [];
 
-  // IDs de todos os clientes atualmente alocados em qualquer mesa
-  const allocatedClientIds = data?.mesas
-    .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
-    .filter((value, index, self) => self.indexOf(value) === index) || []; // Remove duplicatas
-
   const handleMesaClick = (mesa: Mesa) => {
     if (isClosed && !mesa.cliente_id) {
       showError("O estabelecimento está fechado. Não é possível ocupar novas mesas.");
@@ -339,7 +339,16 @@ export default function SalaoPage() {
   };
 
   const handleClientRecognized = (cliente: Cliente) => {
-    if ((recognizedClient?.id === cliente.id && isArrivalOpen) || isClosed) return;
+    if (isClosed) return;
+    
+    // NOVO: Verifica se o cliente já está alocado
+    if (allocatedClientIds.includes(cliente.id)) {
+        console.log(`Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
+        return;
+    }
+
+    // Se o cliente for o mesmo e o modal já estiver aberto, não faz nada
+    if (recognizedClient?.id === cliente.id && isArrivalOpen) return;
     
     setRecognizedClient(cliente);
     setIsArrivalOpen(true);
