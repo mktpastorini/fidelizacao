@@ -77,6 +77,19 @@ serve(async (req) => {
       });
     } 
     
+    else if (action === 'UPDATE_PASSWORD') {
+      if (!user_id || !password) throw new Error("ID do usuário e nova senha são obrigatórios para redefinir a senha.");
+      
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, { password });
+      
+      if (updateError) throw updateError;
+      
+      return new Response(JSON.stringify({ success: true, message: "Senha atualizada com sucesso." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+    
     else {
       throw new Error("Ação inválida.");
     }

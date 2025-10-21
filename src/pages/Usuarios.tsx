@@ -7,13 +7,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { showError, showSuccess } from "@/utils/toast";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { ShieldAlert, User, Trash2, Loader2, PlusCircle, Edit } from "lucide-react";
+import { ShieldAlert, User, Trash2, Loader2, PlusCircle, Edit, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useState } from "react";
 import { UserRole } from "@/types/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UserForm } from "@/components/usuarios/UserForm";
+import { PasswordResetForm } from "@/components/usuarios/PasswordResetForm"; // Importado
 
 type UserProfile = {
   id: string;
@@ -52,6 +53,7 @@ export default function UsuariosPage() {
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [userToResetPassword, setUserToResetPassword] = useState<UserProfile | null>(null); // Novo estado
 
   const { data: users, isLoading: isLoadingUsers, isError } = useQuery({
     queryKey: ["allUsers"],
@@ -95,11 +97,6 @@ export default function UsuariosPage() {
         .update({ first_name, last_name, role })
         .eq("id", id);
       if (profileError) throw profileError;
-      
-      // 2. Atualiza o metadata do usuário auth (para consistência)
-      // Isso requer uma Edge Function com Service Role Key, mas como não temos uma para UPDATE,
-      // vamos confiar que a atualização do perfil é suficiente para o frontend.
-      // Em um ambiente real, você chamaria uma função aqui.
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allUsers"] });
@@ -123,7 +120,16 @@ export default function UsuariosPage() {
       const newUserId = data.userId;
 
       // 2. Atualiza o perfil com a função correta (o trigger cria o perfil com 'garcom' por padrão)
-      const { error: roleError } = await supabaseAdmin
+      // Nota: Esta parte requer o cliente admin, que não está disponível no frontend.
+      // A Edge Function manage-auth-user não retorna o Service Role Key.
+      // Para contornar, vamos confiar que o trigger handle_new_user cria o perfil,
+      // e o Superadmin pode ajustar a função manualmente na tabela se necessário,
+      // ou criamos uma nova Edge Function para atualizar o perfil (mas vamos manter simples por enquanto).
+      
+      // Como a função manage-auth-user não atualiza o perfil, faremos a atualização da role aqui
+      // usando o cliente Supabase normal, que deve funcionar se o RLS permitir que o Superadmin
+      // atualize perfis (o que está configurado).
+      const { error: roleError } = await supabase
         .from("profiles")
         .update({ role: role })
         .eq("id", newUserId);
@@ -149,6 +155,21 @@ export default function UsuariosPage() {
       queryClient.invalidateQueries({ queryKey: ["allUsers"] });
       showSuccess("Usuário removido com sucesso!");
       setUserToDelete(null);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, password }: { userId: string; password: string }) => {
+      const { data, error } = await supabase.functions.invoke('manage-auth-user', {
+        body: { action: 'UPDATE_PASSWORD', user_id: userId, password },
+      });
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.error || "Falha ao redefinir senha.");
+    },
+    onSuccess: () => {
+      showSuccess("Senha redefinida com sucesso!");
+      setUserToResetPassword(null);
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -223,8 +244,19 @@ export default function UsuariosPage() {
                       variant="outline" 
                       size="icon" 
                       className="mr-2"
+                      onClick={() => setUserToResetPassword(user)}
+                      disabled={resetPasswordMutation.isPending}
+                      title="Redefinir Senha"
+                    >
+                      <Lock className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="mr-2"
                       onClick={() => handleFormOpen(user)}
                       disabled={updateProfileMutation.isPending}
+                      title="Editar Perfil"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -233,6 +265,7 @@ export default function UsuariosPage() {
                       size="icon" 
                       onClick={() => setUserToDelete(user)}
                       disabled={user.id === supabase.auth.getUser().id || deleteUserMutation.isPending} // Não permite deletar a si mesmo
+                      title="Excluir Usuário"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -282,6 +315,19 @@ export default function UsuariosPage() {
             isSubmitting={updateProfileMutation.isPending || createUserMutation.isPending}
             defaultValues={editingUser || undefined}
             isEditing={!!editingUser}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de Redefinição de Senha */}
+      <Dialog open={!!userToResetPassword} onOpenChange={() => setUserToResetPassword(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Redefinir Senha para {userToResetPassword?.first_name || userToResetPassword?.email}</DialogTitle>
+          </DialogHeader>
+          <PasswordResetForm
+            onSubmit={(values) => resetPasswordMutation.mutate({ userId: userToResetPassword!.id, password: values.password })}
+            isSubmitting={resetPasswordMutation.isPending}
           />
         </DialogContent>
       </Dialog>
