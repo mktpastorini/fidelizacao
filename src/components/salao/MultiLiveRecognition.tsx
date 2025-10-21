@@ -197,7 +197,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
   return (
     <Card className="sticky top-6 h-full flex flex-col">
-      <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0">
+      <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0 min-h-0"> {/* Adicionado min-h-0 aqui */}
         <div className="flex justify-end">
           <Button 
             variant="outline" 
@@ -212,7 +212,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         {displayError && <Alert variant="destructive"><AlertTitle>Erro Global</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
         <ScrollArea className="flex-1"> {/* Adicionado ScrollArea aqui */}
-          <div className="grid grid-cols-1 gap-4"> {/* Removido pr-2 daqui */}
+          <div className="grid grid-cols-1 gap-4 pr-2"> {/* Removido overflow-y-auto e flex-1 daqui */}
             {cameraInstances.length === 0 && allVideoDevices.length > 0 && (
               <div className="text-center text-muted-foreground p-4">
                 <p>Clique em "Adicionar Câmera" para começar.</p>
