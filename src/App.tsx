@@ -18,6 +18,7 @@ import Configuracoes from "./pages/Configuracoes";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import MenuPublicoPage from "./pages/MenuPublico"; // Importando a página do menu público
+import { PageActionsProvider } from "./contexts/PageActionsContext";
 
 const queryClient = new QueryClient();
 
@@ -42,7 +43,11 @@ const App = () => (
                 </SettingsProvider>
               }
             >
-              <Route element={<Layout />}>
+              <Route element={
+                <PageActionsProvider>
+                  <Layout />
+                </PageActionsProvider>
+              }>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/" element={<SalaoPage />} />
                 <Route path="/clientes" element={<Clientes />} />
