@@ -14,6 +14,7 @@
     --popover-foreground: 240 10% 3.9%;
 
     --primary: 217.2 91.2% 59.8%;
+    --primary-rgb: 217.2, 91.2%, 59.8%; /* Adicionado para uso em sombras */
     --primary-foreground: 0 0% 98%;
 
     --secondary: 240 4.8% 95.9%;
@@ -43,6 +44,7 @@
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
     --primary: 208 73% 57%;
+    --primary-rgb: 208, 73%, 57%; /* Adicionado para uso em sombras */
     --primary-foreground: 0 0% 98%;
     --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;

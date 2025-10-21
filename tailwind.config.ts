@@ -99,8 +99,8 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        // Sombra personalizada para o dock: mais espalhada e com um toque de cor primária
-        'dock': '0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(var(--primary-rgb), 0.3)',
+        // Aumentando o espalhamento e a opacidade para ser bem visível
+        'dock': '0 15px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(var(--primary-rgb), 0.5)',
       }
     },
   },
