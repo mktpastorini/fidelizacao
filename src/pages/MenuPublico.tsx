@@ -10,13 +10,20 @@ import { PublicMenuProductCard } from "@/components/menu-publico/PublicMenuProdu
 import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { showError } from "@/utils/toast"; // Importando showError
+import { showError, showSuccess } from "@/utils/toast";
+import { ClientIdentificationModal } from "@/components/menu-publico/ClientIdentificationModal";
 
 type MesaData = Mesa & { user_id: string };
 
 type MenuData = {
   produtos: Produto[];
   categorias: Categoria[];
+};
+
+type ItemToOrder = {
+  produto: Produto;
+  quantidade: number;
+  observacoes: string;
 };
 
 async function fetchMenuData(): Promise<MenuData> {
@@ -52,6 +59,8 @@ export default function MenuPublicoPage() {
   const [mesaData, setMesaData] = useState<MesaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
+  const [isIdentificationOpen, setIsIdentificationOpen] = useState(false);
+  const [itemToIdentify, setItemToIdentify] = useState<ItemToOrder | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const navigate = useNavigate();
   const { mesaId } = useParams<{ mesaId: string }>();
@@ -84,12 +93,8 @@ export default function MenuPublicoPage() {
     return menuData.produtos.filter(p => p.categoria_id === selectedCategory);
   }, [menuData.produtos, selectedCategory]);
 
-  const handleOrder = async (produto: Produto, quantidade: number) => {
-    if (!mesaId || !mesaData || !mesaData.user_id) {
-      showError("Mesa ou dados do estabelecimento não identificados.");
-      return;
-    }
-    if (!isMesaOcupada) {
+  const handleInitiateOrder = (produto: Produto, quantidade: number, observacoes: string) => {
+    if (!mesaId || !mesaData || !isMesaOcupada) {
       showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
       return;
     }
@@ -98,6 +103,17 @@ export default function MenuPublicoPage() {
       return;
     }
 
+    setItemToIdentify({ produto, quantidade, observacoes });
+    setIsIdentificationOpen(true);
+  };
+
+  const handleOrderConfirmed = async (clienteId: string | null) => {
+    if (!itemToIdentify || !mesaId || !mesaData || !mesaData.user_id) {
+      showError("Erro interno: Dados do pedido ou da mesa ausentes.");
+      return;
+    }
+
+    const { produto, quantidade, observacoes } = itemToIdentify;
     const userId = mesaData.user_id;
 
     try {
@@ -133,18 +149,23 @@ export default function MenuPublicoPage() {
       // 3. Insere o item no pedido
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
-        nome_produto: produto.nome,
+        nome_produto: produto.nome + (observacoes ? ` (${observacoes})` : ''),
         quantidade: quantidade,
         preco: produto.preco,
         status: "pendente",
         requer_preparo: produto.requer_preparo,
-        user_id: userId, // Garante que o user_id do estabelecimento está aqui
-        consumido_por_cliente_id: null,
+        user_id: userId,
+        consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
       });
       if (itemError) throw itemError;
+      
+      showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
+
     } catch (error: any) {
       console.error("Erro ao adicionar pedido:", error);
       showError(error.message || "Erro ao adicionar pedido. Verifique as permissões.");
+    } finally {
+      setItemToIdentify(null);
     }
   };
 
@@ -208,7 +229,7 @@ export default function MenuPublicoPage() {
               <PublicMenuProductCard 
                 key={produto.id} 
                 produto={produto} 
-                onOrder={handleOrder} 
+                onInitiateOrder={handleInitiateOrder} 
                 disabled={produto.estoque_atual <= 0} 
               />
             ))
@@ -248,6 +269,16 @@ export default function MenuPublicoPage() {
           mesaId={mesaId}
         />
       )}
+
+      {/* Modal de Identificação Facial */}
+      <ClientIdentificationModal
+        isOpen={isIdentificationOpen}
+        onOpenChange={setIsIdentificationOpen}
+        itemToOrder={itemToIdentify}
+        mesaId={mesaId || ''}
+        mesaUserId={mesaData?.user_id || ''}
+        onOrderConfirmed={handleOrderConfirmed}
+      />
     </div>
   );
 }

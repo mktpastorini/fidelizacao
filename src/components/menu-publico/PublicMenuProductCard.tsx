@@ -11,13 +11,13 @@ import { Textarea } from "../ui/textarea";
 
 type PublicMenuProductCardProps = {
   produto: Produto;
-  onOrder: (produto: Produto, quantidade: number) => Promise<void>;
+  onInitiateOrder: (produto: Produto, quantidade: number, observacoes: string) => void;
   disabled?: boolean;
 };
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-export function PublicMenuProductCard({ produto, onOrder, disabled = false }: PublicMenuProductCardProps) {
+export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = false }: PublicMenuProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isOrdering, setIsOrdering] = useState(false);
@@ -34,21 +34,14 @@ export function PublicMenuProductCard({ produto, onOrder, disabled = false }: Pu
     setIsConfirmOpen(true);
   };
 
-  const handleConfirmOrder = async () => {
+  const handleConfirmOrder = () => {
     if (quantidade < 1) {
       showError("A quantidade deve ser pelo menos 1.");
       return;
     }
-    setIsOrdering(true);
-    try {
-      await onOrder(produto, quantidade); 
-      showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
-      setIsConfirmOpen(false);
-    } catch (error: any) {
-      showError(error.message || "Erro ao adicionar pedido.");
-    } finally {
-      setIsOrdering(false);
-    }
+    // Em vez de fazer o pedido, chamamos a função para iniciar o fluxo de identificação
+    onInitiateOrder(produto, quantidade, observacoes);
+    setIsConfirmOpen(false);
   };
 
   const handleQuantityChange = (delta: number) => {
@@ -218,7 +211,7 @@ export function PublicMenuProductCard({ produto, onOrder, disabled = false }: Pu
               disabled={isOrdering || disabled}
               className="bg-blue-500 hover:bg-blue-600 text-white"
             >
-              {isOrdering ? "Adicionando..." : "Adicionar ao Pedido"}
+              Adicionar ao Pedido
             </Button>
           </DialogFooter>
         </DialogContent>
