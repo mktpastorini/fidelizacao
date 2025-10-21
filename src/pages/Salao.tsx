@@ -408,15 +408,15 @@ export default function SalaoPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-8 items-start">
-        <div className="lg:col-span-1">
+      <div className={`grid gap-8 items-start ${isMultiDetectionMode ? 'lg:grid-cols-1' : 'lg:grid-cols-3'}`}>
+        <div className={isMultiDetectionMode ? 'lg:col-span-1' : 'lg:col-span-1'}>
           {isMultiDetectionMode ? (
             <MultiLiveRecognition />
           ) : (
             <LiveRecognition onClientRecognized={handleClientRecognized} />
           )}
         </div>
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className={isMultiDetectionMode ? 'lg:col-span-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4' : 'lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4'}>
           {mesasComPedidos?.map(mesa => (
             <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
           ))}

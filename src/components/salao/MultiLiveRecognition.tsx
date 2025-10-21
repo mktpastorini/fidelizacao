@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Video, VideoOff, Users } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge'; // Importação adicionada
 
 type MultiLiveRecognitionProps = {
   onClientRecognized?: (cliente: FaceMatch['client']) => void; // Opcional, para quando um cliente é reconhecido
@@ -24,9 +25,11 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Restrições de vídeo mais flexíveis
   const videoConstraints = {
-    width: 640, // Aumentar a largura para melhor detecção
-    height: 480, // Aumentar a altura
+    width: { ideal: 1280 }, // Preferir 1280px de largura
+    height: { ideal: 720 }, // Preferir 720px de altura
+    facingMode: "user", // Preferir câmera frontal, se disponível
     deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
 
@@ -76,8 +79,9 @@ export function MultiLiveRecognition({ onClientRecognized }: MultiLiveRecognitio
       results.forEach(match => {
         const { box, client } = match;
         // Escalar as coordenadas da caixa para o tamanho do vídeo
-        const scaleX = canvas.width / videoConstraints.width;
-        const scaleY = canvas.height / videoConstraints.height;
+        // Usar as dimensões reais do vídeo para o cálculo de escala
+        const scaleX = canvas.width / video.videoWidth;
+        const scaleY = canvas.height / video.videoHeight;
 
         const x = box.x_min * scaleX;
         const y = box.y_min * scaleY;
