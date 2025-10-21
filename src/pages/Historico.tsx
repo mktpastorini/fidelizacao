@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Pedido, ItemPedido } from "@/types/supabase";
@@ -14,6 +14,8 @@ import { Button } from "@/components/ui/button";
 import { DetalhesPedidoModal } from "@/components/historico/DetalhesPedidoModal";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { usePageActions } from "@/contexts/PageActionsContext";
+import React from "react";
 
 type PedidoComClienteEItens = Pedido & {
   cliente: { nome: string } | null;
@@ -32,6 +34,7 @@ async function fetchPedidosPagos(): Promise<PedidoComClienteEItens[]> {
 }
 
 export default function HistoricoPage() {
+  const { setPageActions } = usePageActions();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPedido, setSelectedPedido] = useState<PedidoComClienteEItens | null>(null);
 
@@ -50,6 +53,18 @@ export default function HistoricoPage() {
   };
 
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // Define os botões específicos da página para o cabeçalho
+  useEffect(() => {
+    const pageButtons = (
+      <div className="flex items-center gap-2">
+        {/* No histórico, não há botões específicos no cabeçalho */}
+      </div>
+    );
+    setPageActions(pageButtons);
+
+    return () => setPageActions(null); // Clean up on unmount
+  }, [setPageActions]);
 
   return (
     <div>

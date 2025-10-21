@@ -4,20 +4,25 @@ import { Dock } from "./Dock";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Skeleton } from "./ui/skeleton";
 import { Header } from "./Header";
+import { PageActionsProvider } from "@/contexts/PageActionsContext";
+import React from "react";
 
 const MainContent = () => (
-  <main className="flex-1 p-6 lg:p-8 overflow-y-auto relative">
-    <Header />
-    <Outlet />
-  </main>
+  <PageActionsProvider>
+    <main className="flex-1 p-6 lg:p-8 overflow-y-auto relative">
+      <Header />
+      <Outlet />
+    </main>
+  </PageActionsProvider>
 );
 
 const DockContent = () => (
-  // Ocupa todo o espaço vertical disponível, permitindo rolagem interna
-  <main className="flex-1 p-6 lg:p-8 pb-24 relative overflow-y-auto">
-    <Header />
-    <Outlet />
-  </main>
+  <PageActionsProvider>
+    <main className="flex-1 p-6 lg:p-8 pb-24 relative overflow-y-auto">
+      <Header />
+      <Outlet />
+    </main>
+  </PageActionsProvider>
 );
 
 export function Layout() {
@@ -29,10 +34,9 @@ export function Layout() {
 
   if (settings?.menu_style === 'dock') {
     return (
-      // Contêiner flexível para o layout de dock
       <div className="relative flex flex-col h-screen bg-background">
-        <DockContent /> {/* Conteúdo principal com rolagem */}
-        <Dock /> {/* Dock fixo na parte inferior */}
+        <DockContent />
+        <Dock />
       </div>
     );
   }

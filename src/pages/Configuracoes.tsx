@@ -17,6 +17,8 @@ import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
+import { usePageActions } from "@/contexts/PageActionsContext";
+import React, { useEffect } from "react";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -101,6 +103,7 @@ function CompreFaceSettingsForm() {
 
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
 
   const { data, isLoading: isLoadingPage, isError } = useQuery({
@@ -174,6 +177,18 @@ export default function ConfiguracoesPage() {
   };
 
   const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
+
+  // Define os botões específicos da página para o cabeçalho
+  useEffect(() => {
+    const pageButtons = (
+      <div className="flex items-center gap-2">
+        {/* Nas configurações, não há botões específicos no cabeçalho */}
+      </div>
+    );
+    setPageActions(pageButtons);
+
+    return () => setPageActions(null); // Clean up on unmount
+  }, [setPageActions]);
 
   return (
     <div>
