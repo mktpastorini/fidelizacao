@@ -18,7 +18,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"; // Importando componentes de redimensionamento
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { useApprovalRequest } from "@/hooks/useApprovalRequest"; // Importado
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -69,11 +70,13 @@ async function fetchSalaoData(): Promise<SalaoData> {
 
 export default function SalaoPage() {
   const queryClient = useQueryClient();
+  const { requestApproval, isRequesting } = useApprovalRequest(); // Usando o hook
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
+  const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null); // Adicionado estado para liberar mesa
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
   const [isMultiDetectionMode, setIsMultiDetectionMode] = useState(false);
   const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
@@ -259,9 +262,9 @@ export default function SalaoPage() {
         .select("id")
         .eq("mesa_id", selectedMesa.id)
         .eq("status", "aberto")
-        .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
-        .limit(1) // Limita a 1 resultado
-        .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (existingPedidoError) throw existingPedidoError;
 
@@ -310,8 +313,8 @@ export default function SalaoPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
     },
@@ -338,10 +341,25 @@ export default function SalaoPage() {
     }
   };
 
+  const handleFreeMesa = async () => {
+    if (!mesaToFree) return;
+    
+    const request: any = {
+      action_type: 'free_table',
+      target_id: mesaToFree.id,
+      payload: { mesa_numero: mesaToFree.numero },
+    };
+
+    const executed = await requestApproval(request);
+    if (executed || isRequesting) {
+      setMesaToFree(null);
+    }
+  };
+
   const handleClientRecognized = (cliente: Cliente) => {
     if (isClosed) return;
     
-    // NOVO: Verifica se o cliente já está alocado
+    // Verifica se o cliente já está alocado
     if (allocatedClientIds.includes(cliente.id)) {
         console.log(`Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
         return;
@@ -453,7 +471,13 @@ export default function SalaoPage() {
             <div className="h-full overflow-y-auto p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {mesasComPedidos?.map(mesa => (
-                  <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+                  <MesaCard 
+                    key={mesa.id} 
+                    mesa={mesa} 
+                    ocupantesCount={mesa.ocupantes.length} 
+                    onClick={() => handleMesaClick(mesa)} 
+                    onFreeMesa={() => setMesaToFree(mesa)} // Adicionado onFreeMesa
+                  />
                 ))}
               </div>
             </div>
@@ -466,7 +490,13 @@ export default function SalaoPage() {
           </div>
           <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             {mesasComPedidos?.map(mesa => (
-              <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+              <MesaCard 
+                key={mesa.id} 
+                mesa={mesa} 
+                ocupantesCount={mesa.ocupantes.length} 
+                onClick={() => handleMesaClick(mesa)} 
+                onFreeMesa={() => setMesaToFree(mesa)} // Adicionado onFreeMesa
+              />
             ))}
           </div>
         </div>
@@ -476,6 +506,24 @@ export default function SalaoPage() {
       <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
       <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={(clientePrincipalId, acompanhanteIds, currentOccupantIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds, currentOccupantIds })} isSubmitting={ocuparMesaMutation.isPending} />
+      
+      {/* AlertDialog para liberar mesa (usando o novo hook) */}
+      <AlertDialog open={!!mesaToFree} onOpenChange={() => setMesaToFree(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Liberar Mesa {mesaToFree?.numero}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação irá desassociar o cliente da mesa e cancelar qualquer pedido aberto associado. Deseja continuar?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Não</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFreeMesa} disabled={isRequesting}>
+              {isRequesting ? "Solicitando..." : "Sim, Liberar Mesa"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

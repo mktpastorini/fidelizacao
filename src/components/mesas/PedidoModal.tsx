@@ -24,7 +24,7 @@ import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
-import { ResgatePontosDialog } from "./ResgatePontosDialog"; // IMPORTADO
+import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -89,7 +89,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [clientePagando, setClientePagando] = useState<Cliente | null>(null);
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
-  const [isResgateOpen, setIsResgateOpen] = useState(false); // NOVO ESTADO
+  const [isResgateOpen, setIsResgateOpen] = useState(false);
   
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
@@ -165,22 +165,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onError: (error: Error) => showError(error.message),
   });
 
-  const updateItemMutation = useMutation({
-    mutationFn: async (values: { itemId: string; desconto_percentual: number; desconto_motivo?: string }) => {
-      const { itemId, ...updateData } = values;
-      const { error } = await supabase.from("itens_pedido").update(updateData).eq("id", itemId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      showSuccess("Desconto aplicado com sucesso!");
-      setItemParaDesconto(null);
-    },
-    onError: (error: Error) => showError(error.message),
-  });
-
   const deleteItemMutation = useMutation({
     mutationFn: async (itemId: string) => {
       const { error } = await supabase.from("itens_pedido").delete().eq("id", itemId);
@@ -242,13 +226,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["historicoCliente"] }); // Invalida histórico para mostrar o ponto
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para mostrar o ponto
+      queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
     onError: (error: Error) => showError(error.message),
   });
+
+  const handleDiscountRequested = () => {
+    // Invalida o pedido para buscar o item atualizado com o desconto
+    queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+  };
 
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
     const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
@@ -437,18 +426,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         isOpen={!!itemParaDesconto}
         onOpenChange={() => setItemParaDesconto(null)}
         item={itemParaDesconto}
-        isSubmitting={updateItemMutation.isPending}
-        onSubmit={(values) => {
-          if (itemParaDesconto) {
-            updateItemMutation.mutate({ itemId: itemParaDesconto.id, ...values });
-          }
-        }}
+        onDiscountRequested={handleDiscountRequested} // Passando a nova função de callback
       />
       {/* NOVO MODAL DE RESGATE */}
       <ResgatePontosDialog
         isOpen={isResgateOpen}
         onOpenChange={setIsResgateOpen}
-        ocupantes={ocupantes || []} // Passando todos os ocupantes
+        ocupantes={ocupantes || []}
         mesaId={mesa?.id || null}
         produtosResgatáveis={produtosResgatáveis}
       />

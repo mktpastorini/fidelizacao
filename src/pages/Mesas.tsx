@@ -21,6 +21,7 @@ import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
+import { useApprovalRequest } from "@/hooks/useApprovalRequest"; // Importado
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -45,13 +46,14 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MesasPage() {
   const queryClient = useQueryClient();
+  const { requestApproval, isRequesting } = useApprovalRequest(); // Usando o hook
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
   const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
-  const [mesaToDelete, setMesaToDelete] = useState<Mesa | null>(null); // Novo estado para a mesa a ser excluída
+  const [mesaToDelete, setMesaToDelete] = useState<Mesa | null>(null);
 
   const { data: mesas, isLoading, isError } = useQuery({ queryKey: ["mesas"], queryFn: fetchMesas });
   const { data: clientes } = useQuery({ queryKey: ["clientes_list"], queryFn: fetchClientes });
@@ -69,6 +71,25 @@ export default function MesasPage() {
   const handleOcuparMesaOpen = (mesa: Mesa) => {
     setSelectedMesa(mesa);
     setIsOcuparMesaOpen(true);
+  };
+
+  const handleFreeMesa = async () => {
+    if (!mesaToFree) return;
+    
+    const request: any = {
+      action_type: 'free_table',
+      target_id: mesaToFree.id,
+      payload: { mesa_numero: mesaToFree.numero },
+    };
+
+    const executed = await requestApproval(request);
+    if (executed) {
+      // Se a ação foi executada diretamente (Admin/Gerente), o hook já mostrou o toast.
+      setMesaToFree(null);
+    } else if (isRequesting) {
+      // Se a solicitação foi enviada (Garçom/Balcão), o hook já mostrou o toast.
+      setMesaToFree(null);
+    }
   };
 
   const addMesaMutation = useMutation({
@@ -102,12 +123,12 @@ export default function MesasPage() {
   const deleteMesaMutation = useMutation({
     mutationFn: async (mesaId: string) => {
       const { error } = await supabase.from("mesas").delete().eq("id", mesaId);
-      if (error) throw error;
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Mesa excluída!");
-      setMesaToDelete(null); // Limpa o estado após a exclusão
+      setMesaToDelete(null);
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -129,9 +150,9 @@ export default function MesasPage() {
         .select("id")
         .eq("mesa_id", selectedMesa.id)
         .eq("status", "aberto")
-        .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
-        .limit(1) // Limita a 1 resultado
-        .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (existingPedidoError) throw existingPedidoError;
 
@@ -180,39 +201,10 @@ export default function MesasPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
-    },
-    onError: (err: Error) => showError(err.message),
-  });
-
-  const unassignClienteMutation = useMutation({
-    mutationFn: async (mesaId: string) => {
-      let orderWasCancelled = false;
-      const { data: openOrder, error: findError } = await supabase.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').single();
-      if (findError && findError.code !== 'PGRST116') throw findError;
-
-      if (openOrder) {
-        const { error: updateError } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
-        if (updateError) throw updateError;
-        orderWasCancelled = true;
-      }
-
-      await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
-      return { orderWasCancelled };
-    },
-    onSuccess: ({ orderWasCancelled }) => {
-      queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
-      if (orderWasCancelled) {
-        showSuccess("Mesa liberada e pedido cancelado!");
-      } else {
-        showSuccess("Mesa liberada!");
-      }
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -257,7 +249,7 @@ export default function MesasPage() {
               onEditMesa={() => handleFormOpen(mesa)}
               onFreeMesa={() => setMesaToFree(mesa)}
               onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
-              onDelete={() => setMesaToDelete(mesa)} // Passando a função para definir a mesa a ser excluída
+              onDelete={() => setMesaToDelete(mesa)}
             />
           ))}
         </div>
@@ -294,11 +286,8 @@ export default function MesasPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Não</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              if (mesaToFree) unassignClienteMutation.mutate(mesaToFree.id);
-              setMesaToFree(null);
-            }}>
-              Sim, Liberar Mesa
+            <AlertDialogAction onClick={handleFreeMesa} disabled={isRequesting}>
+              {isRequesting ? "Solicitando..." : "Sim, Liberar Mesa"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

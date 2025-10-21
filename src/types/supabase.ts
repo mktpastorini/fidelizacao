@@ -110,3 +110,26 @@ export type Produto = {
   mostrar_no_menu?: boolean;
   pontos_resgate: number | null; // NOVO CAMPO
 };
+
+// Tipos para o sistema de aprovação
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+export type ApprovalActionType = 'free_table' | 'apply_discount';
+
+export type ApprovalRequest = {
+  id: string;
+  user_id: string;
+  requester_role: UserRole;
+  action_type: ApprovalActionType;
+  target_id: string;
+  payload: Record<string, any>;
+  status: ApprovalStatus;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  // Relações para facilitar o frontend
+  requester?: { first_name: string | null; last_name: string | null; role: UserRole } | null;
+  mesa?: { numero: number } | null;
+  item_pedido?: ItemPedido | null;
+};
+
+export type UserRole = 'superadmin' | 'admin' | 'gerente' | 'balcao' | 'garcom' | 'cozinha';
