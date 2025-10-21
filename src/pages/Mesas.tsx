@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Mesa, Cliente } from "@/types/supabase";
@@ -21,7 +21,6 @@ import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
-import { usePageActions } from "@/contexts/PageActionsContext";
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -46,14 +45,13 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MesasPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
   const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
-  const [mesaToDelete, setMesaToDelete] = useState<Mesa | null>(null);
+  const [mesaToDelete, setMesaToDelete] = useState<Mesa | null>(null); // Novo estado para a mesa a ser excluída
 
   const { data: mesas, isLoading, isError } = useQuery({ queryKey: ["mesas"], queryFn: fetchMesas });
   const { data: clientes } = useQuery({ queryKey: ["clientes_list"], queryFn: fetchClientes });
@@ -109,7 +107,7 @@ export default function MesasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       showSuccess("Mesa excluída!");
-      setMesaToDelete(null);
+      setMesaToDelete(null); // Limpa o estado após a exclusão
     },
     onError: (err: Error) => showError(err.message),
   });
@@ -131,8 +129,6 @@ export default function MesasPage() {
         .select("id")
         .eq("mesa_id", selectedMesa.id)
         .eq("status", "aberto")
-        .order("created_at", { ascending: false })
-        .limit(1)
         .maybeSingle();
 
       if (existingPedidoError) throw existingPedidoError;
@@ -182,7 +178,7 @@ export default function MesasPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
       showSuccess("Mesa ocupada/atualizada com sucesso!");
       setIsOcuparMesaOpen(false);
     },
@@ -207,7 +203,7 @@ export default function MesasPage() {
     },
     onSuccess: ({ orderWasCancelled }) => {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Invalidate salaoData to reflect changes
       if (orderWasCancelled) {
         showSuccess("Mesa liberada e pedido cancelado!");
       } else {
@@ -234,23 +230,16 @@ export default function MesasPage() {
     }
   };
 
-  // Define os botões específicos da página para o cabeçalho
-  useEffect(() => {
-    const pageButtons = (
-      <div className="flex items-center gap-2">
-        <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
-      </div>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null); // Clean up on unmount
-  }, [handleFormOpen, setPageActions]);
-
   return (
-    <React.Fragment>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Painel de Mesas</h1>
-        <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Painel de Mesas</h1>
+          <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
+        </div>
       </div>
 
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-destructive">Erro ao carregar mesas.</p> : (
@@ -264,7 +253,7 @@ export default function MesasPage() {
               onEditMesa={() => handleFormOpen(mesa)}
               onFreeMesa={() => setMesaToFree(mesa)}
               onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
-              onDelete={() => setMesaToDelete(mesa)}
+              onDelete={() => setMesaToDelete(mesa)} // Passando a função para definir a mesa a ser excluída
             />
           ))}
         </div>
@@ -307,11 +296,11 @@ export default function MesasPage() {
             }}>
               Sim, Liberar Mesa
             </AlertDialogAction>
-          </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Novo AlertDialog para confirmar a exclusão da mesa */}
       <AlertDialog open={!!mesaToDelete} onOpenChange={() => setMesaToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -330,6 +319,6 @@ export default function MesasPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </React.Fragment>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -13,8 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth } from "date-fns";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import React from "react";
 
 type DailyStats = {
   revenue_today: number;
@@ -82,7 +80,6 @@ async function fetchRangeStats(dateRange: DateRange): Promise<RangeStats> {
 }
 
 export default function DashboardPage() {
-  const { setPageActions } = usePageActions();
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(getBrazilTime()),
     to: endOfMonth(getBrazilTime()),
@@ -103,18 +100,6 @@ export default function DashboardPage() {
     if (typeof value !== 'number') return "R$ 0,00";
     return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
-
-  // Define os botões específicos da página para o cabeçalho
-  useEffect(() => {
-    const pageButtons = (
-      <div className="flex items-center gap-2">
-        {/* No dashboard, não há botões específicos além do date picker, que pode ficar no corpo da página */}
-      </div>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null); // Clean up on unmount
-  }, [setPageActions]);
 
   if (isLoadingDaily) {
     return <Skeleton className="h-screen w-full" />;

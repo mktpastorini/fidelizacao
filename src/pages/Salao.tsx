@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Mesa, Pedido, ItemPedido, UserSettings } from "@/types/supabase";
@@ -18,9 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import React from "react";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"; // Importando componentes de redimensionamento
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -71,7 +69,6 @@ async function fetchSalaoData(): Promise<SalaoData> {
 
 export default function SalaoPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions();
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -181,7 +178,7 @@ export default function SalaoPage() {
         body: { clientId: cliente.id, userId: user.id },
       });
       if (functionError) {
-        showError(`Mesa alocada, mas falha ao enviar webhook: ${functionError.message}`);
+        showError(`Mesa alocada, mas falha ao enviar mensagem: ${functionError.message}`);
       }
     },
     onSuccess: () => {
@@ -356,65 +353,6 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
-  // Define os botões específicos da página para o cabeçalho
-  useEffect(() => {
-    const pageButtons = (
-      <div className="flex items-center gap-2">
-        {isClosed ? (
-          <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
-            <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
-          </Button>
-        ) : (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div tabIndex={0}>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
-                        <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </TooltipTrigger>
-              {!isCloseDayReady && (
-                <TooltipContent>
-                  <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
-        )}
-        <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
-        <Button 
-          variant="outline" 
-          onClick={() => setIsMultiDetectionMode(prev => !prev)} 
-          disabled={isClosed}
-        >
-          {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
-          {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
-        </Button>
-      </div>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null); // Clean up on unmount
-  }, [isClosed, isCloseDayReady, openDayMutation, closeDayMutation, setIsNewClientOpen, setIsMultiDetectionMode, isMultiDetectionMode, setPageActions]);
-
-
   if (isLoading) {
     return <Skeleton className="h-screen w-full" />;
   }
@@ -424,7 +362,7 @@ export default function SalaoPage() {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col">
+    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
       {isClosed && (
         <Alert variant="destructive">
           <Lock className="h-4 w-4" />
@@ -434,40 +372,94 @@ export default function SalaoPage() {
           </AlertDescription>
         </Alert>
       )}
-      <div className="flex-1 min-h-0">
-        {isMultiDetectionMode ? (
-          <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-            <ResizablePanel defaultSize={33} minSize={20}>
-              <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} allocatedClientIds={allocatedClientIds} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={33} minSize={20}>
-              <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
-            </ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={34} minSize={20}>
-              <div className="h-full overflow-y-auto p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {mesasComPedidos?.map(mesa => (
-                    <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
-                  ))}
-                </div>
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        ) : (
-          <div className="grid lg:grid-cols-3 gap-8 items-start">
-            <div className="lg:col-span-1">
-              <LiveRecognition onClientRecognized={handleClientRecognized} />
-            </div>
-            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {mesasComPedidos?.map(mesa => (
-                <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
-              ))}
-            </div>
-          </div>
-        )}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
+        <div>
+          <h1 className="text-3xl font-bold">Visão do Salão</h1>
+          <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {isClosed ? (
+            <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
+              <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
+            </Button>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div tabIndex={0}>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
+                          <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </TooltipTrigger>
+                {!isCloseDayReady && (
+                  <TooltipContent>
+                    <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsMultiDetectionMode(prev => !prev)} 
+            disabled={isClosed}
+          >
+            {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+            {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
+          </Button>
+        </div>
       </div>
+
+      {isMultiDetectionMode ? (
+        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+          <ResizablePanel defaultSize={33} minSize={20}>
+            <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} allocatedClientIds={allocatedClientIds} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={33} minSize={20}>
+            <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={34} minSize={20}>
+            <div className="h-full overflow-y-auto p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {mesasComPedidos?.map(mesa => (
+                  <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+                ))}
+              </div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <div className="grid lg:grid-cols-3 gap-8 items-start">
+          <div className="lg:col-span-1">
+            <LiveRecognition onClientRecognized={handleClientRecognized} />
+          </div>
+          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {mesasComPedidos?.map(mesa => (
+              <MesaCard key={mesa.id} mesa={mesa} ocupantesCount={mesa.ocupantes.length} onClick={() => handleMesaClick(mesa)} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
       <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />

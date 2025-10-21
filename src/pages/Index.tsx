@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import ClientesPage from "./clientes";
 import { FacialRecognitionDialog } from "@/components/dashboard/FacialRecognitionDialog";
 import { Dialog } from "@/components/ui/dialog";
@@ -8,13 +8,8 @@ import { ClienteForm } from "@/components/clientes/ClienteForm";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { showError, showSuccess } from "@/utils/toast";
-import { Button } from "@/components/ui/button";
-import { ScanFace } from "lucide-react";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import React from "react";
 
 export default function Index() {
-  const { setPageActions } = usePageActions();
   const [isFacialRecognitionOpen, setIsFacialRecognitionOpen] = useState(false);
   const [isCadastroOpen, setIsCadastroOpen] = useState(false);
 
@@ -65,24 +60,15 @@ export default function Index() {
     onError: (error: Error) => showError(error.message),
   });
 
-  // Define os botões específicos da página para o cabeçalho
-  useEffect(() => {
-    const pageButtons = (
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => setIsFacialRecognitionOpen(true)}
-        >
-          <ScanFace className="w-4 h-4 mr-2" /> Abrir Reconhecimento Facial
-        </Button>
-      </div>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null); // Clean up on unmount
-  }, [setIsFacialRecognitionOpen, setPageActions]);
-
   return (
     <>
+      <button
+        className="fixed bottom-6 right-6 bg-primary text-white rounded-full p-4 shadow-lg hover:bg-primary-dark transition"
+        onClick={() => setIsFacialRecognitionOpen(true)}
+      >
+        Abrir Reconhecimento Facial
+      </button>
+
       <FacialRecognitionDialog
         isOpen={isFacialRecognitionOpen}
         onOpenChange={setIsFacialRecognitionOpen}

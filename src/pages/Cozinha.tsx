@@ -1,12 +1,9 @@
-import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import React from "react";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -35,7 +32,6 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions();
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
@@ -65,18 +61,6 @@ export default function CozinhaPage() {
   const pendingItems = items?.filter(item => item.status === 'pendente') || [];
   const preparingItems = items?.filter(item => item.status === 'preparando') || [];
   const deliveredItems = items?.filter(item => item.status === 'entregue') || [];
-
-  // Define os botões específicos da página para o cabeçalho
-  useEffect(() => {
-    const pageButtons = (
-      <div className="flex items-center gap-2">
-        {/* No painel da cozinha, não há botões específicos no cabeçalho */}
-      </div>
-    );
-    setPageActions(pageButtons);
-
-    return () => setPageActions(null); // Clean up on unmount
-  }, [setPageActions]);
 
   return (
     <div className="h-full flex flex-col">
