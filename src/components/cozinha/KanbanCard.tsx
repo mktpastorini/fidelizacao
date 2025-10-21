@@ -31,6 +31,8 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
 
   const isOverdue = minutesSinceCreation > 5 && item.status === 'pendente';
 
+  const isNonPrepItem = !item.requer_preparo;
+
   return (
     <Card className="mb-4 bg-background shadow-md">
       <CardContent className="p-4 space-y-3">
@@ -50,19 +52,22 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
         </div>
         <div className="pt-2">
           {item.status === 'pendente' && (
-            item.requer_preparo ? (
+            isNonPrepItem ? (
+              // Item sem preparo: Garçom pode marcar como entregue
+              <Button size="sm" variant="outline" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => onStatusChange(item.id, 'entregue')}>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Entregar (Sem Preparo)
+              </Button>
+            ) : (
+              // Item com preparo: Cozinha marca como preparando
               <Button size="sm" className="w-full" onClick={() => onStatusChange(item.id, 'preparando')}>
                 <Utensils className="w-4 h-4 mr-2" />
                 Preparar
               </Button>
-            ) : (
-              <Button size="sm" variant="outline" className="w-full" onClick={() => onStatusChange(item.id, 'entregue')}>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Entregar
-              </Button>
             )
           )}
           {item.status === 'preparando' && (
+            // Item em preparo: Cozinha marca como pronto
             <Button size="sm" className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" onClick={() => onStatusChange(item.id, 'entregue')}>
               <CheckCircle className="w-4 h-4 mr-2" />
               Pronto
