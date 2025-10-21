@@ -26,7 +26,7 @@ import { ClienteDetalhesModal } from "@/components/clientes/ClienteDetalhesModal
 import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
-import { usePageActions } from "@/contexts/PageActionsContext"; // Importando usePageActions
+import { usePageActions } from "@/contexts/PageActionsContext";
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
@@ -49,7 +49,7 @@ async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
 
 export default function ClientesPage() {
   const queryClient = useQueryClient();
-  const { setPageActions } = usePageActions(); // Usando o contexto
+  const { setPageActions } = usePageActions();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetalhesOpen, setIsDetalhesOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
@@ -227,7 +227,7 @@ export default function ClientesPage() {
       )}
 
       <Dialog open={isFormOpen} onOpenChange={handleFormClose}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingCliente ? "Editar Cliente" : "Adicionar Novo Cliente"}</DialogTitle>
             <DialogDescription>
