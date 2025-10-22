@@ -9,7 +9,7 @@ export function AuthLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { settings, isLoading: isLoadingSettings, userRole } = useSettings();
+  const { settings, isLoading: isLoadingSettings } = useSettings();
 
   useEffect(() => {
     const setupSessionAndProfile = async () => {
@@ -57,24 +57,22 @@ export function AuthLayout() {
   }, [navigate]);
 
   useEffect(() => {
-    // Lógica de redirecionamento para login
+    // Só executa a lógica de persistência da URL se as configurações já foram carregadas
     if (!loading && !session && !isLoadingSettings) {
+      console.log("AuthLayout: Tentando salvar login_video_url no localStorage.");
+      console.log("AuthLayout: Valor lido do settings:", settings?.login_video_url);
       
-      // Se o usuário não está logado, tentamos carregar a URL do vídeo de fundo
-      // A URL do vídeo é agora carregada no Login.tsx a partir do localStorage,
-      // que foi preenchido pelo Admin/Superadmin.
-      
-      // Se o usuário logado for Admin/Superadmin, ele salva a URL no localStorage
-      // para que o Login.tsx possa usá-la antes do SettingsContext ser carregado.
-      if (userRole && ['superadmin', 'admin'].includes(userRole) && settings?.login_video_url) {
+      // Antes de redirecionar para /login, salva a URL do vídeo se estiver disponível
+      if (settings?.login_video_url) {
         localStorage.setItem('login_video_url', settings.login_video_url);
-      } else if (userRole && ['superadmin', 'admin'].includes(userRole) && !settings?.login_video_url) {
+        console.log("AuthLayout: URL salva com sucesso no localStorage.");
+      } else {
         localStorage.removeItem('login_video_url');
+        console.log("AuthLayout: Nenhuma URL encontrada no settings, removendo do localStorage.");
       }
-      
       navigate("/login");
     }
-  }, [session, loading, navigate, settings, isLoadingSettings, userRole]);
+  }, [session, loading, navigate, settings, isLoadingSettings]);
 
   if (loading || isLoadingSettings) {
     return (

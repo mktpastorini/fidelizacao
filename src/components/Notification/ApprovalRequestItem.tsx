@@ -40,10 +40,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   // Construindo o nome completo do solicitante
   const firstName = requesterProfile?.first_name || '';
   const lastName = requesterProfile?.last_name || '';
-  const fullName = (firstName + ' ' + lastName).trim();
-  
-  // Fallback: Se o nome estiver vazio, usa o ID do usuário (truncado)
-  const displayRequesterName = fullName || `ID: ${request.user_id.substring(0, 8)}...`;
+  const fullName = (firstName + ' ' + lastName).trim() || 'Usuário Desconhecido';
   
   const requesterRole = roleLabels[request.requester_role] || 'Desconhecido';
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { locale: ptBR, addSuffix: true });
@@ -59,7 +56,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   const mesaNumero = mesa?.numero;
 
   // Construindo a descrição detalhada
-  const requesterDetail = `${displayRequesterName} (${requesterRole})`;
+  const requesterDetail = `${fullName} (${requesterRole})`;
 
   switch (request.action_type) {
     case 'free_table':
@@ -99,7 +96,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
       <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-3">
         <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            <span>Solicitado por: {displayRequesterName} ({requesterRole})</span>
+            <span>Solicitado por: {fullName} ({requesterRole})</span>
         </div>
         <span>{timeAgo}</span>
       </div>
