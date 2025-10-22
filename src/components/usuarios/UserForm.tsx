@@ -57,7 +57,7 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
   const form = useForm<UserFormValues>({
     resolver: zodResolver(schema as any),
     defaultValues: {
-      // Garantimos que o ID seja uma string vazia se for undefined, para evitar a string "undefined"
+      // O ID é crucial para a edição, mas não faz parte do esquema de validação
       id: defaultValues?.id || "", 
       email: defaultValues?.email || "",
       password: "",
@@ -69,13 +69,15 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
 
   const handleSubmit = (values: UserFormValues) => {
     if (isEditing) {
-      // Para edição, garantimos que o ID seja uma string não vazia
-      if (!values.id) {
+      // No modo de edição, o ID deve vir dos defaultValues, pois não é um campo renderizado.
+      const userId = defaultValues?.id; 
+      
+      if (!userId) {
         console.error("Erro: ID do usuário ausente no modo de edição.");
         return;
       }
       onSubmit({
-        id: values.id,
+        id: userId, // Usamos o ID dos defaultValues
         first_name: values.first_name,
         last_name: values.last_name,
         role: values.role,
