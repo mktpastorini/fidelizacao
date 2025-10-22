@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ApprovalRequest, UserRole } from "@/types/supabase";
 import { useSettings } from "@/contexts/SettingsContext";
 import { showError, showSuccess } from "@/utils/toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,12 +15,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, Table, Tag, Loader2, User } from "lucide-react";
+import { ShieldAlert, Table, Tag, Loader2, User, CheckCircle, XCircle, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "../ui/scroll-area";
 
-// Função de busca (copiada do NotificationCenter, mas ajustada para ser standalone)
+// Função de busca (ajustada para incluir log de depuração)
 async function fetchPendingApprovalRequests(userRole: UserRole): Promise<ApprovalRequest[]> {
   if (!['superadmin', 'admin', 'gerente'].includes(userRole)) {
     return [];
@@ -41,6 +42,13 @@ async function fetchPendingApprovalRequests(userRole: UserRole): Promise<Approva
     console.error("RLS Error fetching approval requests:", error);
     throw new Error(error.message);
   }
+  
+  // LOG DE DEBBUG
+  console.log("--- [ApprovalAlertModal] Dados de Aprovação Recebidos ---");
+  console.log("Role:", userRole);
+  console.log("Requests:", data);
+  console.log("---------------------------------------------------------");
+  
   return data as ApprovalRequest[] || [];
 }
 
@@ -57,8 +65,7 @@ export function ApprovalAlertModal() {
   const queryClient = useQueryClient();
   const { userRole, isLoading: isLoadingSettings } = useSettings();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentRequest, setCurrentRequest] = useState<ApprovalRequest | null>(null);
-
+  
   const isManagerOrAdmin = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
   const { data: pendingRequests, isLoading: isLoadingRequests } = useQuery({
@@ -68,14 +75,10 @@ export function ApprovalAlertModal() {
     refetchInterval: 5000, // Verifica a cada 5 segundos
   });
 
-  // Efeito para abrir o modal quando uma nova solicitação chega
-  useEffect(() => {
-    if (pendingRequests && pendingRequests.length > 0 && !currentRequest) {
-      setCurrentRequest(pendingRequests[0]);
-    } else if (pendingRequests && pendingRequests.length === 0) {
-      setCurrentRequest(null);
-    }
-  }, [pendingRequests, currentRequest]);
+  // Usamos o primeiro item da lista como o item atual a ser exibido
+  const currentRequest = useMemo(() => {
+    return pendingRequests?.[0] || null;
+  }, [pendingRequests]);
 
   const processRequestMutation = useMutation({
     mutationFn: async ({ requestId, action }: { requestId: string; action: 'approve' | 'reject' }) => {
@@ -87,13 +90,13 @@ export function ApprovalAlertModal() {
       return data;
     },
     onSuccess: (data) => {
+      // Invalida a query para buscar o próximo item imediatamente
       queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess(data.message);
-      setCurrentRequest(null); // Fecha o modal e passa para o próximo (se houver)
     },
     onError: (error: Error) => {
       showError(error.message);
@@ -157,6 +160,22 @@ export function ApprovalAlertModal() {
                 <Clock className="w-4 h-4" /> Solicitado há {timeAgo}
             </p>
         </div>
+        
+        {/* Exibe a lista de solicitações pendentes se houver mais de uma */}
+        {pendingRequests && pendingRequests.length > 1 && (
+            <div className="mt-4">
+                <h4 className="font-semibold text-sm mb-2">Outras {pendingRequests.length - 1} Solicitações Pendentes:</h4>
+                <ScrollArea className="h-24 border rounded-md p-2">
+                    <ul className="space-y-1 text-xs text-muted-foreground">
+                        {pendingRequests.slice(1).map((req, index) => (
+                            <li key={req.id} className="truncate">
+                                {index + 2}. {roleLabels[req.requester_role]} - {req.action_type === 'free_table' ? `Liberar Mesa ${req.mesa?.numero || '?'}` : `Desconto ${req.payload.desconto_percentual}%`}
+                            </li>
+                        ))}
+                    </ul>
+                </ScrollArea>
+            </div>
+        )}
 
         <AlertDialogFooter>
           <Button
