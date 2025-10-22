@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import Webcam from 'react-webcam';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
