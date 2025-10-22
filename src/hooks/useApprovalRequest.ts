@@ -28,7 +28,7 @@ export function useApprovalRequest() {
         status: 'pending',
       };
       
-      console.log("[ApprovalRequest] Tentando inserir payload:", insertionPayload); // NOVO LOG AQUI
+      console.log("[ApprovalRequest] Tentando inserir payload:", insertionPayload);
 
       const { error } = await supabase.from("approval_requests").insert(insertionPayload);
       if (error) {
@@ -37,6 +37,7 @@ export function useApprovalRequest() {
       }
     },
     onSuccess: () => {
+      // FORÇA A ATUALIZAÇÃO INSTANTÂNEA DO MODAL DO ADMINISTRADOR
       queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
       showSuccess("Solicitação enviada para aprovação!");
     },

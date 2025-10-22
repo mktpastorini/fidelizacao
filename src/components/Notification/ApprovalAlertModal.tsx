@@ -72,7 +72,7 @@ export function ApprovalAlertModal() {
     queryKey: ["pending_approval_requests"],
     queryFn: () => fetchPendingApprovalRequests(userRole!),
     enabled: isManagerOrAdmin && !isLoadingSettings,
-    refetchInterval: 5000, // Verifica a cada 5 segundos
+    // Removendo refetchInterval para depender da invalidação forçada
   });
 
   // Usamos o primeiro item da lista como o item atual a ser exibido
@@ -135,6 +135,7 @@ export function ApprovalAlertModal() {
   }
 
   return (
+    // O modal está sempre aberto enquanto houver um currentRequest
     <AlertDialog open={!!currentRequest}>
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
