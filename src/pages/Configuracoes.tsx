@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Copy, RefreshCw, Send } from "lucide-react";
+import { Copy, RefreshCw, Send, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -21,6 +21,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 type UserData = {
   templates: MessageTemplate[];
   produtos: Produto[];
+  profile: { first_name: string | null, last_name: string | null } | null;
 };
 
 // Função para obter data/hora no horário de Brasília
@@ -32,15 +33,18 @@ function getBrazilTime() {
 
 async function fetchPageData(): Promise<UserData> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { templates: [], produtos: [] };
+  if (!user) return { templates: [], produtos: [], profile: null };
 
   const { data: templates, error: templatesError } = await supabase.from("message_templates").select("*");
   if (templatesError) throw new Error(`Erro ao buscar templates: ${templatesError.message}`);
 
   const { data: produtos, error: produtosError } = await supabase.from("produtos").select("*").order("nome");
   if (produtosError) throw new Error(`Erro ao buscar produtos: ${produtosError.message}`);
+  
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("first_name, last_name").eq("id", user.id).single();
+  if (profileError && profileError.code !== 'PGRST116') throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
 
-  return { templates: templates || [], produtos: produtos || [] };
+  return { templates: templates || [], produtos: produtos || [], profile: profile || null };
 }
 
 function CompreFaceSettingsForm() {
@@ -99,6 +103,64 @@ function CompreFaceSettingsForm() {
   );
 }
 
+function ProfileSettingsForm({ defaultProfile }: { defaultProfile: UserData['profile'] }) {
+  const { refetch: refetchSettings } = useSettings();
+  const [firstName, setFirstName] = useState(defaultProfile?.first_name || '');
+  const [lastName, setLastName] = useState(defaultProfile?.last_name || '');
+
+  useEffect(() => {
+    setFirstName(defaultProfile?.first_name || '');
+    setLastName(defaultProfile?.last_name || '');
+  }, [defaultProfile]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (values: { first_name: string, last_name: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado");
+      
+      const { error } = await supabase.from("profiles").update(values).eq("id", user.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      refetchSettings(); // Refetch para atualizar o nome no contexto
+      showSuccess("Nome atualizado com sucesso!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const isDirty = firstName !== (defaultProfile?.first_name || '') || lastName !== (defaultProfile?.last_name || '');
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="first-name">Primeiro Nome</Label>
+        <Input
+          id="first-name"
+          placeholder="Seu primeiro nome"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+        />
+      </div>
+      <div>
+        <Label htmlFor="last-name">Sobrenome</Label>
+        <Input
+          id="last-name"
+          placeholder="Seu sobrenome"
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+        />
+      </div>
+      <Button 
+        onClick={() => updateProfileMutation.mutate({ first_name: firstName, last_name: lastName })} 
+        disabled={updateProfileMutation.isPending || !isDirty}
+      >
+        {updateProfileMutation.isPending ? "Salvando..." : "Salvar Nome"}
+      </Button>
+    </div>
+  );
+}
+
+
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
@@ -122,7 +184,13 @@ export default function ConfiguracoesPage() {
       
       // Se o usuário não pode configurar o sistema, ele só pode atualizar a câmera preferida
       if (!canConfigureSystem && updatedSettings.preferred_camera_device_id === undefined) {
-        throw new Error("Acesso negado. Apenas Superadmins e Admins podem alterar estas configurações.");
+        // Se o usuário não é admin, ele só pode salvar a câmera.
+        // Se ele tentar salvar outra coisa, o contexto já deve ter impedido, mas garantimos aqui.
+        if (Object.keys(updatedSettings).length === 1 && updatedSettings.preferred_camera_device_id !== undefined) {
+             // OK, é apenas a câmera.
+        } else {
+             throw new Error("Acesso negado. Apenas Superadmins e Admins podem alterar estas configurações globais.");
+        }
       }
       
       const settingsToUpsert = { id: user.id, ...updatedSettings };
@@ -185,6 +253,21 @@ export default function ConfiguracoesPage() {
 
   const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
 
+  // Define as abas visíveis
+  const tabs = [
+    { value: "perfil", label: "Meu Perfil", visible: true },
+    { value: "acesso", label: "Acesso & API Key", visible: true },
+    { value: "camera", label: "Câmera", visible: true },
+    { value: "mensagens", label: "Integrações de Mensagens", visible: canConfigureSystem },
+    { value: "reconhecimento", label: "Reconhecimento Facial", visible: canConfigureSystem },
+    { value: "operacao", label: "Operação do Salão", visible: canConfigureSystem },
+    { value: "aparencia", label: "Aparência", visible: canConfigureSystem },
+    { value: "api", label: "Documentação API", visible: canViewApi },
+  ].filter(tab => tab.visible);
+
+  // Determina a aba padrão
+  const defaultTab = tabs[0]?.value || 'perfil';
+
   return (
     <div>
       <div className="mb-6">
@@ -194,24 +277,37 @@ export default function ConfiguracoesPage() {
         </p>
       </div>
 
-      <Tabs defaultValue="acesso" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="acesso">Acesso & Segurança</TabsTrigger>
-          {canConfigureSystem && <TabsTrigger value="mensagens">Integrações de Mensagens</TabsTrigger>}
-          {canConfigureSystem && <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>}
-          {canConfigureSystem && <TabsTrigger value="operacao">Operação do Salão</TabsTrigger>}
-          {canConfigureSystem && <TabsTrigger value="aparencia">Aparência</TabsTrigger>}
-          {canViewApi && <TabsTrigger value="api">Documentação API</TabsTrigger>}
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+          {tabs.map(tab => (
+            <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+          ))}
         </TabsList>
 
-        {/* 1. Acesso & Segurança (Acessível a todos que podem ver a página) */}
+        {/* 0. Meu Perfil (Nome) - Acessível a todos */}
+        <TabsContent value="perfil" className="mt-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><User className="w-5 h-5" /> Meu Perfil</CardTitle><CardDescription>Atualize seu nome de exibição no sistema.</CardDescription></CardHeader>
+            <CardContent>
+              {isLoading ? <Skeleton className="h-24 w-full" /> : <ProfileSettingsForm defaultProfile={data?.profile || null} />}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 1. Acesso & API Key (Acessível a todos que podem ver a página) */}
         <TabsContent value="acesso" className="mt-6">
-          <div className="space-y-6">
-            <Card>
-              <CardHeader><CardTitle>Chave de API</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
-              <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader><CardTitle>Chave de API Pessoal</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
+            <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerar Nova Chave" : "Gerar Nova Chave"}</Button></div>)}</CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* 1.1 Câmera Preferida (Acessível a todos que podem ver a página) */}
+        <TabsContent value="camera" className="mt-6">
+          <Card>
+            <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
+            <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
+          </Card>
         </TabsContent>
 
         {/* 2. Integrações de Mensagens (Restrito a Superadmin/Admin) */}
@@ -274,7 +370,7 @@ export default function ConfiguracoesPage() {
           </TabsContent>
         )}
 
-        {/* 3. Reconhecimento Facial (Restrito a Superadmin/Admin, exceto CameraSettings) */}
+        {/* 3. Reconhecimento Facial (Restrito a Superadmin/Admin) */}
         {canConfigureSystem && (
           <TabsContent value="reconhecimento" className="mt-6">
             <div className="space-y-6">
@@ -282,25 +378,10 @@ export default function ConfiguracoesPage() {
                 <CardHeader><CardTitle>Servidor de Reconhecimento (CompreFace)</CardTitle><CardDescription>Conecte seu servidor CompreFace auto-hospedado.</CardDescription></CardHeader>
                 <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : <CompreFaceSettingsForm />}</CardContent>
               </Card>
-              <Card>
-                <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
-                <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
-              </Card>
             </div>
           </TabsContent>
         )}
         
-        {/* 3.1 Configuração da Câmera (Acessível para Gerente/Cozinha) */}
-        {!canConfigureSystem && canViewApi && (
-          <TabsContent value="reconhecimento" className="mt-6">
-            <Card>
-              <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
-              <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-
         {/* 4. Operação do Salão (Restrito a Superadmin/Admin) */}
         {canConfigureSystem && (
           <TabsContent value="operacao" className="mt-6">
