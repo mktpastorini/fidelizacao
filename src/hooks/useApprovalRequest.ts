@@ -19,16 +19,18 @@ export function useApprovalRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !userRole) throw new Error("Usuário não autenticado.");
 
-      console.log(`[ApprovalRequest] Criando solicitação para ${request.action_type} por ${userRole}`);
-
-      const { error } = await supabase.from("approval_requests").insert({
+      const insertionPayload = {
         user_id: user.id,
         requester_role: userRole,
         action_type: request.action_type,
         target_id: request.target_id,
         payload: request.payload,
         status: 'pending',
-      });
+      };
+      
+      console.log("[ApprovalRequest] Tentando inserir payload:", insertionPayload); // NOVO LOG AQUI
+
+      const { error } = await supabase.from("approval_requests").insert(insertionPayload);
       if (error) {
         console.error("[ApprovalRequest] Erro ao inserir solicitação:", error);
         throw error;
