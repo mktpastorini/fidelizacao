@@ -9,6 +9,11 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, User, Video, VideoOff } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+type ClientArrival = {
+  client: Cliente;
+  distance: number;
+};
+
 type LiveRecognitionProps = {
   onClientRecognized: (cliente: Cliente) => void;
 };
@@ -21,13 +26,21 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [useFallbackConstraints, setUseFallbackConstraints] = useState(false); // Novo estado para fallback
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const videoConstraints = {
-    width: 400,
-    height: 400,
-    deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
-  };
+  const videoConstraints = useMemo(() => {
+    if (useFallbackConstraints || !settings?.preferred_camera_device_id) {
+      // Restrições padrão (qualquer câmera)
+      return { width: 400, height: 400 };
+    }
+    // Restrições específicas (câmera preferida)
+    return {
+      width: 400,
+      height: 400,
+      deviceId: { exact: settings.preferred_camera_device_id },
+    };
+  }, [settings?.preferred_camera_device_id, useFallbackConstraints]);
 
   const handleRecognition = useCallback(async () => {
     if (isScanning || !isCameraOn || !webcamRef.current) return;
@@ -66,6 +79,15 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
 
   const handleMediaError = (err: any) => {
     console.error("Erro ao acessar a câmera no LiveRecognition:", err);
+    
+    if (err.name === 'OverconstrainedError' && !useFallbackConstraints) {
+      // Se falhou com restrições específicas, tenta com restrições padrão
+      console.warn("OverconstrainedError detectado. Tentando fallback de câmera.");
+      setUseFallbackConstraints(true);
+      setMediaError("Câmera preferida indisponível. Tentando usar a câmera padrão...");
+      return;
+    }
+
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
       setMediaError("Acesso à câmera negado. Verifique as permissões do navegador.");
     } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {

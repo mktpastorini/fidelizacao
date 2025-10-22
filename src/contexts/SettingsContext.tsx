@@ -19,7 +19,7 @@ async function fetchGlobalSettings(supabaseClient: any): Promise<Partial<UserSet
     .select('id')
     .in('role', ['superadmin', 'admin'])
     .limit(1)
-    .single();
+    .maybeSingle(); // Usar maybeSingle
 
   if (adminProfileError || !adminProfile) {
     console.warn("Nenhum Superadmin/Admin encontrado para configurações globais.");
@@ -31,9 +31,9 @@ async function fetchGlobalSettings(supabaseClient: any): Promise<Partial<UserSet
     .from('user_settings')
     .select('webhook_url, chegada_template_id, pagamento_template_id, aniversario_template_id, aniversario_horario, auto_add_item_enabled, default_produto_id, establishment_is_closed, daily_report_phone_number, auto_close_enabled, auto_close_time, menu_style, compreface_url, compreface_api_key, login_video_url')
     .eq('id', adminProfile.id)
-    .single();
+    .maybeSingle(); // Usar maybeSingle
     
-  if (adminSettingsError) {
+  if (adminSettingsError && adminSettingsError.code !== 'PGRST116') {
     console.error("Erro ao buscar configurações globais do Admin:", adminSettingsError);
     return {};
   }
@@ -59,7 +59,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         .from('user_settings')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Usar maybeSingle
       
       if (personalSettingsError && personalSettingsError.code !== 'PGRST116') {
         console.error("Erro ao buscar configurações pessoais:", personalSettingsError);
@@ -70,7 +70,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('role')
         .eq('id', user.id)
-        .single();
+        .maybeSingle(); // Usar maybeSingle
 
       if (profileError && profileError.code !== 'PGRST116') {
         console.error("Erro ao buscar perfil:", profileError);
@@ -80,18 +80,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setUserRole(role as UserRole);
 
       // 4. Mesclar: Global (fallback) + Pessoal (sobrescreve)
-      // Apenas a câmera preferida é pessoal. O resto é global.
-      const mergedSettings: UserSettings = {
-        ...globalSettings,
-        ...(personalSettingsData || {}),
-        // Sobrescreve campos pessoais com os dados pessoais
-        id: user.id,
-        preferred_camera_device_id: personalSettingsData?.preferred_camera_device_id || null,
-        api_key: personalSettingsData?.api_key || globalSettings.api_key || null, // API Key é pessoal, mas se não existir, usa a global (embora a global não deva ser usada por não-admins)
-      } as UserSettings;
-      
-      // Para garantir que a API Key seja sempre a do usuário logado (pessoal)
-      // e que as configurações globais sejam herdadas, vamos refinar a mesclagem.
       
       const finalSettings: UserSettings = {
         // Herda todas as configurações globais
