@@ -24,10 +24,10 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   // Acessando dados do solicitante
   const requesterProfile = request.requester?.[0];
   
-  // Usando nome e sobrenome, ou 'Usuário' como fallback
+  // Construindo o nome completo do solicitante
   const firstName = requesterProfile?.first_name || '';
   const lastName = requesterProfile?.last_name || '';
-  const fullName = (firstName + ' ' + lastName).trim() || 'Usuário';
+  const fullName = (firstName + ' ' + lastName).trim() || 'Usuário Desconhecido';
   
   const requesterRole = roleLabels[request.requester_role] || 'Desconhecido';
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { locale: ptBR, addSuffix: true });
@@ -46,10 +46,10 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
 
   switch (request.action_type) {
     case 'free_table':
-      // Garantindo que o número da mesa seja exibido no título e na descrição
-      const mesaDisplay = mesaNumero ? `Mesa ${mesaNumero}` : 'Mesa Desconhecida';
-      title = `Liberar ${mesaDisplay}`;
-      description = `${requesterDetail} solicitou liberar a ${mesaDisplay}.`;
+      // Se o número da mesa não vier, usamos o target_id (que é o ID da mesa) como fallback na descrição
+      const mesaDisplay = mesaNumero ? `Mesa ${mesaNumero}` : `Mesa ID: ${request.target_id.substring(0, 8)}...`;
+      title = `Liberar Mesa ${mesaNumero || '?'}`;
+      description = `${requesterDetail} solicitou liberar a mesa.`;
       IconComponent = Table;
       iconColor = "text-blue-500";
       break;

@@ -28,7 +28,7 @@ export function useApprovalRequest() {
         status: 'pending',
       };
       
-      // Preenche a coluna FK correta para o PostgREST
+      // CRITICAL FIX: Preenche a coluna FK correta para o PostgREST
       if (request.action_type === 'free_table') {
         insertionPayload.mesa_id_fk = request.target_id;
       } else if (request.action_type === 'apply_discount') {
