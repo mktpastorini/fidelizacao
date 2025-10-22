@@ -21,7 +21,12 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export function ApprovalRequestItem({ request, onProcess, isProcessing }: ApprovalRequestItemProps) {
+  
+  // Adicionando log para debug
+  console.log("Dados da Solicitação:", request);
+  
   // Acessando dados do solicitante
+  // O PostgREST retorna relações como arrays, então acessamos o primeiro elemento
   const requesterProfile = request.requester?.[0];
   
   // Construindo o nome completo do solicitante
