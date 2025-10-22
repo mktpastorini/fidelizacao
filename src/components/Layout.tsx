@@ -4,6 +4,7 @@ import { Dock } from "./Dock";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Skeleton } from "./ui/skeleton";
 import { Header } from "./Header";
+import { ApprovalAlertModal } from "./Notification/ApprovalAlertModal"; // Importado
 
 const MainContent = () => (
   // Aumentando o padding superior e direito para dar espaço ao Header flutuante
@@ -32,6 +33,7 @@ export function Layout() {
     return (
       // Contêiner flexível para o layout de dock
       <div className="relative flex flex-col h-screen bg-background">
+        <ApprovalAlertModal /> {/* Adicionado o modal aqui */}
         <DockContent /> {/* Conteúdo principal com rolagem */}
         <Dock /> {/* Dock fixo na parte inferior */}
       </div>
@@ -42,6 +44,7 @@ export function Layout() {
     <div className="flex min-h-screen bg-background">
       <Sidebar />
       <MainContent />
+      <ApprovalAlertModal /> {/* Adicionado o modal aqui */}
     </div>
   );
 }

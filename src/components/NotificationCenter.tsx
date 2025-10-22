@@ -6,7 +6,6 @@ import { Bell, Phone, AlertTriangle, Cake, ShieldAlert, Loader2, Utensils, Clock
 import { Badge } from "@/components/ui/badge";
 import { LowStockProduct, ApprovalRequest, UserRole, ItemPedido } from "@/types/supabase";
 import { Separator } from "@/components/ui/separator";
-import { ApprovalRequestCard } from "./Notification/ApprovalRequestCard";
 import { useSettings } from "@/contexts/SettingsContext";
 import { showError, showSuccess } from "@/utils/toast";
 import { useState } from "react";
@@ -37,25 +36,7 @@ async function fetchLowStockProducts(): Promise<LowStockProduct[]> {
   return data || [];
 }
 
-async function fetchPendingApprovalRequests(userRole: UserRole): Promise<ApprovalRequest[]> {
-  if (!['superadmin', 'admin', 'gerente'].includes(userRole)) {
-    return [];
-  }
-  
-  const { data, error } = await supabase
-    .from("approval_requests")
-    .select(`
-      *,
-      requester:profiles(first_name, last_name, role),
-      mesa:mesas(numero),
-      item_pedido:itens_pedido(*)
-    `)
-    .eq("status", "pending")
-    .order("created_at", { ascending: true });
-
-  if (error) throw new Error(error.message);
-  return data as ApprovalRequest[] || [];
-}
+// Removendo a função fetchPendingApprovalRequests, pois o modal fará a busca.
 
 async function fetchPendingOrderItems(): Promise<PendingOrderItem[]> {
   const { data, error } = await supabase
@@ -80,9 +61,7 @@ async function fetchPendingOrderItems(): Promise<PendingOrderItem[]> {
 }
 
 export function NotificationCenter() {
-  const queryClient = useQueryClient();
   const { userRole } = useSettings();
-  const [isProcessing, setIsProcessing] = useState(false);
 
   const isManagerOrAdmin = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
   const isSaloonStaff = !!userRole && ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'].includes(userRole);
@@ -99,12 +78,7 @@ export function NotificationCenter() {
     refetchInterval: 60000,
   });
 
-  const { data: pendingRequests, isLoading: isLoadingRequests } = useQuery({
-    queryKey: ["pending_approval_requests"],
-    queryFn: () => fetchPendingApprovalRequests(userRole!),
-    enabled: isManagerOrAdmin,
-    refetchInterval: 10000,
-  });
+  // Removendo a query de pendingRequests
 
   const { data: pendingOrderItems } = useQuery({
     queryKey: ["pendingOrderItems"],
@@ -113,44 +87,20 @@ export function NotificationCenter() {
     refetchInterval: 10000,
   });
 
-  const processRequestMutation = useMutation({
-    mutationFn: async ({ requestId, action }: { requestId: string; action: 'approve' | 'reject' }) => {
-      setIsProcessing(true);
-      const { data, error } = await supabase.functions.invoke('process-approval-request', {
-        body: { request_id: requestId, action },
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
-      queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida pedidos para atualizar o sininho
-      showSuccess(data.message);
-    },
-    onError: (error: Error) => showError(error.message),
-    onSettled: () => setIsProcessing(false),
-  });
-
-  const handleProcessRequest = (requestId: string, action: 'approve' | 'reject') => {
-    processRequestMutation.mutate({ requestId, action });
-  };
+  // Removendo a mutation de processRequestMutation e handleProcessRequest
 
   const birthdayCount = birthdayClients?.length || 0;
   const lowStockCount = lowStockProducts?.length || 0;
-  const requestCount = pendingRequests?.length || 0;
   const orderItemCount = pendingOrderItems?.length || 0;
 
   // Garçons/Balcões só veem Pedidos e Aniversários
+  // Gerentes/Admins veem Estoque, Pedidos e Aniversários (Aprovação é via Modal agora)
   const totalCount = isManagerOrAdmin 
-    ? birthdayCount + lowStockCount + requestCount + orderItemCount
+    ? birthdayCount + lowStockCount + orderItemCount
     : isSaloonStaff
       ? birthdayCount + orderItemCount
-      : birthdayCount; // Cozinha só vê aniversários aqui (o painel é o foco)
+      : birthdayCount;
 
-  const shouldShowRequests = isManagerOrAdmin && requestCount > 0;
   const shouldShowLowStock = isManagerOrAdmin && lowStockCount > 0;
   const shouldShowOrderItems = isSaloonStaff && orderItemCount > 0;
   const shouldShowBirthdays = birthdayCount > 0;
@@ -174,31 +124,9 @@ export function NotificationCenter() {
             </p>
           </div>
           
-          <ScrollArea className="max-h-[70vh] pr-4"> {/* Adicionado ScrollArea aqui */}
+          <ScrollArea className="max-h-[70vh] pr-4">
             <div className="grid gap-4">
-              {/* Alertas de Aprovação (Apenas para Gerentes/Admins) */}
-              {shouldShowRequests && (
-                <>
-                  <div className="space-y-2">
-                    <h5 className="flex items-center font-semibold text-warning"><ShieldAlert className="w-4 h-4 mr-2" /> Aprovações Pendentes ({requestCount})</h5>
-                    {isLoadingRequests ? (
-                        <div className="flex items-center justify-center p-4"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Carregando...</div>
-                    ) : (
-                        <div className="grid gap-2">
-                            {pendingRequests?.map((request) => (
-                                <ApprovalRequestCard 
-                                    key={request.id} 
-                                    request={request} 
-                                    onProcess={handleProcessRequest} 
-                                    isProcessing={isProcessing}
-                                />
-                            ))}
-                        </div>
-                    )}
-                  </div>
-                  {(shouldShowOrderItems || shouldShowLowStock || shouldShowBirthdays) && <Separator />}
-                </>
-              )}
+              {/* Alertas de Aprovação REMOVIDOS - Agora são tratados pelo modal */}
 
               {/* Alertas de Pedidos Pendentes/Em Preparo (Para Garçons/Balcões/Gerentes) */}
               {shouldShowOrderItems && (
