@@ -127,6 +127,7 @@ export function NotificationCenter() {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Invalida pedidos para atualizar o sininho
       showSuccess(data.message);
     },
     onError: (error: Error) => showError(error.message),
