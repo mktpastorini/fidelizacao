@@ -37,17 +37,19 @@ serve(async (req) => {
     // 2. Determinar o ID do usuário (dono do estabelecimento)
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
+      
       // Tenta validar o token do usuário logado (Painel Admin/Garçom)
       const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
       
       if (user && !userError) {
         userId = user.id;
-        console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin/Garçom): ${userId}`);
+        console.log(`[recognize-face] 2/7: Usuário autenticado (Painel): ${userId}`);
       } else if (mesa_id) {
+        // Se a autenticação falhou, mas temos mesa_id (Menu Público), tentamos buscar o userId pela mesa
         console.log("[recognize-face] Falha na autenticação do token do usuário. Tentando buscar user_id pela mesa...");
       } else {
         // Se não há mesa_id e a autenticação falhou, lançamos o erro
-        throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
+        throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Token inválido ou expirado."}`);
       }
     } 
     
@@ -63,7 +65,7 @@ serve(async (req) => {
         throw new Error(`Mesa ID inválido ou usuário da mesa não encontrado: ${mesaError?.message}`);
       }
       userId = mesa.user_id;
-      console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID: ${userId}`);
+      console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID (Menu Público): ${userId}`);
     } 
     
     if (!userId) {
@@ -135,6 +137,7 @@ serve(async (req) => {
     console.error("--- [recognize-face] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
     console.error("Stack:", error.stack);
+    // Garante que a resposta de erro seja 500 e contenha a mensagem de erro
     return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
