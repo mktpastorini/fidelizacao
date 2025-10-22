@@ -19,7 +19,7 @@ import { LiveRecognition } from "@/components/salao/LiveRecognition";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { useApprovalRequest } from "@/hooks/useApprovalRequest"; // Importado
+import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -32,11 +32,10 @@ type SalaoData = {
   settings: UserSettings | null;
 };
 
-// Função para obter data/hora no horário de Brasília
 function getBrazilTime() {
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
+  return new Date(utc - (3 * 3600000));
 }
 
 async function fetchSalaoData(): Promise<SalaoData> {
@@ -70,13 +69,13 @@ async function fetchSalaoData(): Promise<SalaoData> {
 
 export default function SalaoPage() {
   const queryClient = useQueryClient();
-  const { requestApproval, isRequesting } = useApprovalRequest(); // Usando o hook
+  const { requestApproval, isRequesting } = useApprovalRequest();
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
-  const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null); // Adicionado estado para liberar mesa
+  const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
   const [isMultiDetectionMode, setIsMultiDetectionMode] = useState(false);
   const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
@@ -92,10 +91,9 @@ export default function SalaoPage() {
   const isClosed = data?.settings?.establishment_is_closed || false;
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
 
-  // IDs de todos os clientes atualmente alocados em qualquer mesa
   const allocatedClientIds = data?.mesas
     .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
-    .filter((value, index, self) => self.indexOf(value) === index) || []; // Remove duplicatas
+    .filter((value, index, self) => self.indexOf(value) === index) || [];
 
   const closeDayMutation = useMutation({
     mutationFn: async () => {
@@ -134,7 +132,6 @@ export default function SalaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      // 1. Tenta encontrar um pedido aberto existente para a mesa
       let pedidoId: string | null = null;
       const { data: existingPedido, error: existingPedidoError } = await supabase
         .from("pedidos")
@@ -147,18 +144,15 @@ export default function SalaoPage() {
 
       if (existingPedidoError) {
         console.warn("Erro ao buscar pedido existente:", existingPedidoError.message);
-        // Não lançar erro aqui, apenas registrar e tentar criar um novo
       }
 
       if (existingPedido) {
         pedidoId = existingPedido.id;
-        // Atualiza o pedido existente com o novo cliente principal e acompanhantes
         await supabase.from("pedidos").update({
           cliente_id: cliente.id,
-          acompanhantes: [{ id: cliente.id, nome: cliente.nome }], // Apenas o cliente principal inicialmente
+          acompanhantes: [{ id: cliente.id, nome: cliente.nome }],
         }).eq("id", pedidoId);
       } else {
-        // Se não houver pedido aberto, cria um novo
         const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
           mesa_id: mesaId,
           cliente_id: cliente.id,
@@ -170,11 +164,8 @@ export default function SalaoPage() {
         pedidoId = newPedido.id;
       }
 
-      // 2. Atualiza a mesa com o cliente principal
       await supabase.from("mesas").update({ cliente_id: cliente.id }).eq("id", mesaId);
       
-      // 3. Insere o cliente principal como ocupante da mesa
-      // Primeiro, remove qualquer ocupante existente para garantir que o trigger seja disparado apenas para o novo
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
       await supabase.from("mesa_ocupantes").insert({
         mesa_id: mesaId,
@@ -191,7 +182,7 @@ export default function SalaoPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar a contagem de visitas
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
       showSuccess("Cliente alocado à mesa com sucesso!");
       setIsArrivalOpen(false);
       setRecognizedClient(null);
@@ -255,7 +246,6 @@ export default function SalaoPage() {
       const todosOcupantes = data?.clientes?.filter(c => todosNovosOcupantesIds.includes(c.id)) || [];
       const acompanhantesJson = todosOcupantes.map(c => ({ id: c.id, nome: c.nome }));
   
-      // 1. Find or create the open pedido
       let pedidoId: string | null = null;
       const { data: existingPedido, error: existingPedidoError } = await supabase
         .from("pedidos")
@@ -270,13 +260,11 @@ export default function SalaoPage() {
 
       if (existingPedido) {
         pedidoId = existingPedido.id;
-        // Update existing pedido's cliente_id and acompanhantes if necessary
         await supabase.from("pedidos").update({
           cliente_id: clientePrincipalId,
           acompanhantes: acompanhantesJson,
         }).eq("id", pedidoId);
       } else {
-        // Create new pedido if none exists
         const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
           mesa_id: selectedMesa.id,
           cliente_id: clientePrincipalId,
@@ -288,10 +276,8 @@ export default function SalaoPage() {
         pedidoId = newPedido.id;
       }
 
-      // 2. Update the mesa's main client
       await supabase.from("mesas").update({ cliente_id: clientePrincipalId }).eq("id", selectedMesa.id);
   
-      // 3. Manage mesa_ocupantes to trigger only for new additions
       const currentOccupantSet = new Set(currentOccupantIds);
       const newOccupantSet = new Set(todosNovosOcupantesIds);
 
@@ -364,20 +350,17 @@ export default function SalaoPage() {
   const handleClientRecognized = (cliente: Cliente) => {
     if (isClosed) return;
     
-    // Verifica se o cliente já está alocado
     if (allocatedClientIds.includes(cliente.id)) {
         console.log(`Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
         return;
     }
 
-    // Se o cliente for o mesmo e o modal já estiver aberto, não faz nada
     if (recognizedClient?.id === cliente.id && isArrivalOpen) return;
     
     setRecognizedClient(cliente);
     setIsArrivalOpen(true);
   };
 
-  // Função para alocar cliente a partir do painel de multi-detecção
   const handleAllocateClientFromPanel = (client: Cliente) => {
     if (isClosed) {
       showError("O estabelecimento está fechado. Não é possível alocar clientes.");
@@ -396,7 +379,7 @@ export default function SalaoPage() {
   }
 
   return (
-    <div className="space-y-6 h-full flex flex-col"> {/* h-full e flex-col para ocupar a altura disponível */}
+    <div className="space-y-6 h-full flex flex-col">
       {isClosed && (
         <Alert variant="destructive">
           <Lock className="h-4 w-4" />
@@ -481,10 +464,10 @@ export default function SalaoPage() {
                     mesa={mesa} 
                     ocupantesCount={mesa.ocupantes.length} 
                     onClick={() => handleMesaClick(mesa)} 
-                    onEditMesa={() => {}} // Não é usado aqui, mas precisa estar presente
+                    onEditMesa={() => {}} 
                     onFreeMesa={() => setMesaToFree(mesa)}
-                    onEditOcupantes={() => handleOcuparMesaOpen(mesa)} // Adicionado onEditOcupantes
-                    onDelete={() => {}} // Não é usado aqui, mas precisa estar presente
+                    onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
+                    onDelete={() => {}} 
                   />
                 ))}
               </div>
@@ -503,10 +486,10 @@ export default function SalaoPage() {
                 mesa={mesa} 
                 ocupantesCount={mesa.ocupantes.length} 
                 onClick={() => handleMesaClick(mesa)} 
-                onEditMesa={() => {}} // Não é usado aqui, mas precisa estar presente
+                onEditMesa={() => {}} 
                 onFreeMesa={() => setMesaToFree(mesa)}
-                onEditOcupantes={() => handleOcuparMesaOpen(mesa)} // Adicionado onEditOcupantes
-                onDelete={() => {}} // Não é usado aqui, mas precisa estar presente
+                onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
+                onDelete={() => {}} 
               />
             ))}
           </div>
@@ -514,11 +497,10 @@ export default function SalaoPage() {
       )}
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
-      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableTableMutation.isPending} />
+      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
       <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={(clientePrincipalId, acompanhanteIds, currentOccupantIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds, currentOccupantIds })} isSubmitting={ocuparMesaMutation.isPending} />
       
-      {/* AlertDialog para liberar mesa (usando o novo hook) */}
       <AlertDialog open={!!mesaToFree} onOpenChange={() => setMesaToFree(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
