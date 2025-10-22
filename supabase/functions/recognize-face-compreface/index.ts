@@ -35,14 +35,33 @@ serve(async (req) => {
 
     // 2. Determinar o ID do usuário (dono do estabelecimento)
     const authHeader = req.headers.get('Authorization');
-    if (authHeader && authHeader !== `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`) {
-      // Se houver um token de usuário logado (ex: do painel admin)
-      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-      if (userError || !user) throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
-      userId = user.id;
-      console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin): ${userId}`);
-    } else if (mesa_id) {
-      // Se for requisição anônima do menu público, buscar o user_id pela mesa
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      // Cria um cliente Supabase com o token de autenticação do usuário
+      const userClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      
+      if (userError || !user) {
+        // Se falhar a autenticação do usuário, tentamos o fallback da mesa se houver
+        if (mesa_id) {
+            console.log("[recognize-face] Falha na autenticação do token do usuário. Tentando buscar user_id pela mesa...");
+        } else {
+            // Se não há mesa_id e a autenticação falhou, lançamos o erro
+            throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
+        }
+      } else {
+        userId = user.id;
+        console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin/Garçom): ${userId}`);
+      }
+    } 
+    
+    if (!userId && mesa_id) {
+      // Se for requisição anônima do menu público ou falha na autenticação do painel, buscar o user_id pela mesa
       const { data: mesa, error: mesaError } = await supabaseAdmin
         .from('mesas')
         .select('user_id')
@@ -54,11 +73,11 @@ serve(async (req) => {
       }
       userId = mesa.user_id;
       console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID: ${userId}`);
-    } else {
+    } else if (!userId) {
       throw new Error("ID do usuário ou da mesa é obrigatório para o reconhecimento.");
     }
 
-    // 3. Buscando configurações do CompreFace
+    // 3. Buscando configurações do CompreFace (USANDO SUPABASE ADMIN)
     console.log("[recognize-face] 3/7: Buscando configurações do CompreFace...");
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -101,7 +120,7 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
       
-      // 7. Buscar dados do cliente (usando o ID do cliente e o ID do usuário dono da mesa para RLS)
+      // 7. Buscar dados do cliente (USANDO SUPABASE ADMIN)
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
