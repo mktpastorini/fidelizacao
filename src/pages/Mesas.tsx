@@ -214,7 +214,7 @@ export default function MesasPage() {
     if (mesa.cliente_id) {
       setIsPedidoOpen(true);
     } else {
-      setIsOcuparMesaOpen(true);
+      handleOcuparMesaOpen(mesa);
     }
   };
 

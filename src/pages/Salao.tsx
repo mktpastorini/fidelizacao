@@ -337,8 +337,13 @@ export default function SalaoPage() {
     if (mesa.cliente_id) {
       setIsPedidoOpen(true);
     } else {
-      setIsOcuparMesaOpen(true);
+      handleOcuparMesaOpen(mesa);
     }
+  };
+
+  const handleOcuparMesaOpen = (mesa: Mesa) => {
+    setSelectedMesa(mesa);
+    setIsOcuparMesaOpen(true);
   };
 
   const handleFreeMesa = async () => {
@@ -476,7 +481,10 @@ export default function SalaoPage() {
                     mesa={mesa} 
                     ocupantesCount={mesa.ocupantes.length} 
                     onClick={() => handleMesaClick(mesa)} 
-                    onFreeMesa={() => setMesaToFree(mesa)} // Adicionado onFreeMesa
+                    onEditMesa={() => {}} // Não é usado aqui, mas precisa estar presente
+                    onFreeMesa={() => setMesaToFree(mesa)}
+                    onEditOcupantes={() => handleOcuparMesaOpen(mesa)} // Adicionado onEditOcupantes
+                    onDelete={() => {}} // Não é usado aqui, mas precisa estar presente
                   />
                 ))}
               </div>
@@ -495,7 +503,10 @@ export default function SalaoPage() {
                 mesa={mesa} 
                 ocupantesCount={mesa.ocupantes.length} 
                 onClick={() => handleMesaClick(mesa)} 
-                onFreeMesa={() => setMesaToFree(mesa)} // Adicionado onFreeMesa
+                onEditMesa={() => {}} // Não é usado aqui, mas precisa estar presente
+                onFreeMesa={() => setMesaToFree(mesa)}
+                onEditOcupantes={() => handleOcuparMesaOpen(mesa)} // Adicionado onEditOcupantes
+                onDelete={() => {}} // Não é usado aqui, mas precisa estar presente
               />
             ))}
           </div>
@@ -503,7 +514,7 @@ export default function SalaoPage() {
       )}
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
-      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
+      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableTableMutation.isPending} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
       <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={(clientePrincipalId, acompanhanteIds, currentOccupantIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds, currentOccupantIds })} isSubmitting={ocuparMesaMutation.isPending} />
       
