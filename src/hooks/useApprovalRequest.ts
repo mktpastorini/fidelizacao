@@ -19,6 +19,8 @@ export function useApprovalRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !userRole) throw new Error("Usuário não autenticado.");
 
+      console.log(`[ApprovalRequest] Criando solicitação para ${request.action_type} por ${userRole}`);
+
       const { error } = await supabase.from("approval_requests").insert({
         user_id: user.id,
         requester_role: userRole,
@@ -27,7 +29,10 @@ export function useApprovalRequest() {
         payload: request.payload,
         status: 'pending',
       });
-      if (error) throw error;
+      if (error) {
+        console.error("[ApprovalRequest] Erro ao inserir solicitação:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
@@ -96,14 +101,21 @@ export function useApprovalRequest() {
   };
 
   const requestApproval = async (request: RequestPayload) => {
+    if (!userRole) {
+        showError("Aguarde, a função do usuário ainda está sendo carregada.");
+        return false;
+    }
+    
     const rolesThatRequireApproval: UserRole[] = ['balcao', 'garcom', 'cozinha'];
     
-    if (rolesThatRequireApproval.includes(userRole!)) {
+    if (rolesThatRequireApproval.includes(userRole)) {
       // Se for um usuário que precisa de aprovação, cria a solicitação
+      console.log(`[ApprovalRequest] Usuário ${userRole} requer aprovação. Criando solicitação...`);
       createRequestMutation.mutate(request);
       return false; // Indica que a ação não foi executada diretamente
     } else {
       // Se for Admin/Gerente/Superadmin, executa a ação diretamente
+      console.log(`[ApprovalRequest] Usuário ${userRole} tem permissão. Executando ação diretamente...`);
       return executeActionDirectly(request);
     }
   };
