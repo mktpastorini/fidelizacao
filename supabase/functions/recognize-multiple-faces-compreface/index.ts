@@ -91,7 +91,11 @@ serve(async (req) => {
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
-      throw settingsError;
+      // Se houver erro na busca de configurações, retorna 400 para o frontend
+      return new Response(JSON.stringify({ error: settingsError.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
     
     console.log("[recognize-multiple-faces] 3/6: Configurações carregadas.");
