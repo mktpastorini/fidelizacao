@@ -10,7 +10,6 @@ serve(async (req) => {
   console.log("--- [recognize-multiple-faces] INICIANDO EXECUÇÃO ---");
 
   if (req.method === 'OPTIONS') {
-    console.log("[recognize-multiple-faces] Requisição OPTIONS recebida.");
     return new Response(null, { headers: corsHeaders })
   }
 
@@ -23,7 +22,6 @@ serve(async (req) => {
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
-      console.log("[recognize-multiple-faces] Prefixo data:image removido do base64.");
     }
 
     const supabaseAdmin = createClient(
@@ -37,9 +35,14 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      // Tenta obter o usuário usando o token fornecido (para usuários logados no painel)
-      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+      // Cria um cliente Supabase com o token de autenticação do usuário
+      const userClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
       
       if (userError || !user) {
         throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
