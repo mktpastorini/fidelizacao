@@ -35,14 +35,32 @@ serve(async (req) => {
 
     // 2. Determinar o ID do usuário (dono do estabelecimento)
     const authHeader = req.headers.get('Authorization');
+    
     if (authHeader && authHeader !== `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`) {
-      // Se houver um token de usuário logado (ex: do painel admin)
-      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-      if (userError || !user) throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
-      userId = user.id;
-      console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin): ${userId}`);
-    } else if (mesa_id) {
-      // Se for requisição anônima do menu público, buscar o user_id pela mesa
+      // Tenta obter o usuário usando o token fornecido (para usuários logados no painel)
+      const userClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      
+      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      
+      if (userError || !user) {
+        // Se falhar a autenticação do usuário, tentamos o fallback da mesa se houver
+        if (mesa_id) {
+            console.log("[recognize-face] Falha na autenticação do token do usuário. Tentando buscar user_id pela mesa...");
+        } else {
+            throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
+        }
+      } else {
+        userId = user.id;
+        console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin/Garçom): ${userId}`);
+      }
+    } 
+    
+    if (!userId && mesa_id) {
+      // Se for requisição anônima do menu público ou falha na autenticação do painel, buscar o user_id pela mesa
       const { data: mesa, error: mesaError } = await supabaseAdmin
         .from('mesas')
         .select('user_id')
@@ -54,7 +72,7 @@ serve(async (req) => {
       }
       userId = mesa.user_id;
       console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID: ${userId}`);
-    } else {
+    } else if (!userId) {
       throw new Error("ID do usuário ou da mesa é obrigatório para o reconhecimento.");
     }
 
