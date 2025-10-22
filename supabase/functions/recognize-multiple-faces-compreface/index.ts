@@ -13,6 +13,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
   try {
     console.log("[recognize-multiple-faces] 1/6: Parsing body da requisição...");
     const { image_url } = await req.json();
@@ -24,26 +29,21 @@ serve(async (req) => {
       imageData = image_url.split(',')[1];
     }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     let userId: string | null = null;
-
-    // 2. Determinar o ID do usuário (dono do estabelecimento)
     const authHeader = req.headers.get('Authorization');
     
+    // 2. Determinar o ID do usuário (dono do estabelecimento)
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
-      // Usar supabaseAdmin para validar o token do usuário logado
+      // Tenta validar o token do usuário logado (Painel Admin/Garçom)
       const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
       
-      if (userError || !user) {
+      if (user && !userError) {
+        userId = user.id;
+        console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userId}`);
+      } else {
         throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
       }
-      userId = user.id;
-      console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userId}`);
     } else {
       throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
     }
