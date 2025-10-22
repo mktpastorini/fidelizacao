@@ -28,8 +28,7 @@ async function fetchPendingApprovalRequests(userRole: UserRole): Promise<Approva
     .from("approval_requests")
     .select(`
       *,
-      // Usando a coluna user_id como a FK para a tabela profiles
-      requester:profiles!user_id(first_name, last_name, role),
+      requester:profiles(first_name, last_name, role),
       mesa:mesas!mesa_id_fk(numero),
       item_pedido:itens_pedido!item_pedido_id_fk(id, nome_produto, quantidade, preco, desconto_percentual, desconto_motivo)
     `)
