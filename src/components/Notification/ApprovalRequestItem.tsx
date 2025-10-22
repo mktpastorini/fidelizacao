@@ -41,8 +41,10 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
 
   switch (request.action_type) {
     case 'free_table':
-      title = `Liberar Mesa ${mesaNumero || '?'}`;
-      description = `${requesterDetail} solicitou liberar a Mesa ${mesaNumero || '?'}.`;
+      // Garantindo que o número da mesa seja exibido no título e na descrição
+      const mesaDisplay = mesaNumero ? `Mesa ${mesaNumero}` : 'Mesa Desconhecida';
+      title = `Liberar ${mesaDisplay}`;
+      description = `${requesterDetail} solicitou liberar a ${mesaDisplay}.`;
       IconComponent = Table;
       iconColor = "text-blue-500";
       break;
@@ -67,7 +69,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
           </div>
           <div>
             <h5 className="font-semibold text-base">{title}</h5>
-            <p className="text-xs text-muted-foreground max-w-xs">{description}</p> {/* Removido 'truncate' para exibir a descrição completa */}
+            <p className="text-xs text-muted-foreground max-w-xs">{description}</p>
           </div>
         </div>
       </div>
