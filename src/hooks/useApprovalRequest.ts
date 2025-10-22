@@ -108,14 +108,14 @@ export function useApprovalRequest() {
     
     const rolesThatRequireApproval: UserRole[] = ['balcao', 'garcom', 'cozinha'];
     
+    console.log(`[ApprovalCheck] Usuário: ${userRole}. Requer aprovação? ${rolesThatRequireApproval.includes(userRole)}`);
+
     if (rolesThatRequireApproval.includes(userRole)) {
       // Se for um usuário que precisa de aprovação, cria a solicitação
-      console.log(`[ApprovalRequest] Usuário ${userRole} requer aprovação. Criando solicitação...`);
       createRequestMutation.mutate(request);
       return false; // Indica que a ação não foi executada diretamente
     } else {
       // Se for Admin/Gerente/Superadmin, executa a ação diretamente
-      console.log(`[ApprovalRequest] Usuário ${userRole} tem permissão. Executando ação diretamente...`);
       return executeActionDirectly(request);
     }
   };
