@@ -110,15 +110,20 @@ export default function ConfiguracoesPage() {
 
   const isLoading = isLoadingSettings || isLoadingPage;
   
-  // Funções que só Superadmin/Admin/Gerente podem usar
-  const isHighLevelStaff = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
-  // Funções que só Superadmin/Admin podem usar
-  const isAdminOrSuperAdmin = !!userRole && ['superadmin', 'admin'].includes(userRole);
+  // Funções que podem configurar o sistema (Superadmin e Admin)
+  const canConfigureSystem = !!userRole && ['superadmin', 'admin'].includes(userRole);
+  // Funções que podem ver a documentação e API Key (Superadmin, Admin, Gerente, Cozinha)
+  const canViewApi = !!userRole && ['superadmin', 'admin', 'gerente', 'cozinha'].includes(userRole);
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Partial<UserSettings>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
+      
+      // Se o usuário não pode configurar o sistema, ele só pode atualizar a câmera preferida
+      if (!canConfigureSystem && updatedSettings.preferred_camera_device_id === undefined) {
+        throw new Error("Acesso negado. Apenas Superadmins e Admins podem alterar estas configurações.");
+      }
       
       const settingsToUpsert = { id: user.id, ...updatedSettings };
 
@@ -192,11 +197,11 @@ export default function ConfiguracoesPage() {
       <Tabs defaultValue="acesso" className="w-full">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="acesso">Acesso & Segurança</TabsTrigger>
-          {isHighLevelStaff && <TabsTrigger value="mensagens">Integrações de Mensagens</TabsTrigger>}
-          {isHighLevelStaff && <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>}
-          {isHighLevelStaff && <TabsTrigger value="operacao">Operação do Salão</TabsTrigger>}
-          {isAdminOrSuperAdmin && <TabsTrigger value="aparencia">Aparência</TabsTrigger>}
-          {isHighLevelStaff && <TabsTrigger value="api">Documentação API</TabsTrigger>}
+          {canConfigureSystem && <TabsTrigger value="mensagens">Integrações de Mensagens</TabsTrigger>}
+          {canConfigureSystem && <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>}
+          {canConfigureSystem && <TabsTrigger value="operacao">Operação do Salão</TabsTrigger>}
+          {canConfigureSystem && <TabsTrigger value="aparencia">Aparência</TabsTrigger>}
+          {canViewApi && <TabsTrigger value="api">Documentação API</TabsTrigger>}
         </TabsList>
 
         {/* 1. Acesso & Segurança (Acessível a todos que podem ver a página) */}
@@ -209,8 +214,8 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        {/* 2. Integrações de Mensagens (Restrito a HighLevelStaff) */}
-        {isHighLevelStaff && (
+        {/* 2. Integrações de Mensagens (Restrito a Superadmin/Admin) */}
+        {canConfigureSystem && (
           <TabsContent value="mensagens" className="mt-6">
             <div className="space-y-6">
               <Card>
@@ -269,16 +274,14 @@ export default function ConfiguracoesPage() {
           </TabsContent>
         )}
 
-        {/* 3. Reconhecimento Facial (Restrito a HighLevelStaff, exceto CameraSettings) */}
-        {isHighLevelStaff && (
+        {/* 3. Reconhecimento Facial (Restrito a Superadmin/Admin, exceto CameraSettings) */}
+        {canConfigureSystem && (
           <TabsContent value="reconhecimento" className="mt-6">
             <div className="space-y-6">
-              {isAdminOrSuperAdmin && (
-                <Card>
-                  <CardHeader><CardTitle>Servidor de Reconhecimento (CompreFace)</CardTitle><CardDescription>Conecte seu servidor CompreFace auto-hospedado.</CardDescription></CardHeader>
-                  <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : <CompreFaceSettingsForm />}</CardContent>
-                </Card>
-              )}
+              <Card>
+                <CardHeader><CardTitle>Servidor de Reconhecimento (CompreFace)</CardTitle><CardDescription>Conecte seu servidor CompreFace auto-hospedado.</CardDescription></CardHeader>
+                <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : <CompreFaceSettingsForm />}</CardContent>
+              </Card>
               <Card>
                 <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
                 <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
@@ -286,9 +289,20 @@ export default function ConfiguracoesPage() {
             </div>
           </TabsContent>
         )}
+        
+        {/* 3.1 Configuração da Câmera (Acessível para Gerente/Cozinha) */}
+        {!canConfigureSystem && canViewApi && (
+          <TabsContent value="reconhecimento" className="mt-6">
+            <Card>
+              <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
+              <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
-        {/* 4. Operação do Salão (Restrito a HighLevelStaff) */}
-        {isHighLevelStaff && (
+
+        {/* 4. Operação do Salão (Restrito a Superadmin/Admin) */}
+        {canConfigureSystem && (
           <TabsContent value="operacao" className="mt-6">
             <div className="space-y-6">
               <Card>
@@ -304,7 +318,7 @@ export default function ConfiguracoesPage() {
         )}
 
         {/* 5. Aparência (Restrito a Superadmin/Admin) */}
-        {isAdminOrSuperAdmin && (
+        {canConfigureSystem && (
           <TabsContent value="aparencia" className="mt-6">
             <div className="space-y-6">
               <Card>
@@ -332,8 +346,8 @@ export default function ConfiguracoesPage() {
           </TabsContent>
         )}
 
-        {/* 6. Documentação API (Restrito a HighLevelStaff) */}
-        {isHighLevelStaff && (
+        {/* 6. Documentação API (Acessível a todos que podem ver a página) */}
+        {canViewApi && (
           <TabsContent value="api" className="mt-6">
             <ApiDocumentation />
           </TabsContent>
