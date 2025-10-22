@@ -42,8 +42,8 @@ async function fetchAllUsers(): Promise<UserProfile[]> {
     id: u.id,
     email: u.email,
     role: u.role,
-    first_name: u.first_name,
-    last_name: u.last_name,
+    first_name: u.user_metadata.first_name || u.first_name || null, // Usar user_metadata como fallback
+    last_name: u.user_metadata.last_name || u.last_name || null, // Usar user_metadata como fallback
   }));
 }
 
@@ -88,10 +88,22 @@ export default function UsuariosPage() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (values: { id: string; first_name: string; last_name: string; role: UserRole }) => {
-      const { id, first_name, last_name, role } = values;
+    mutationFn: async (values: { id: string; email: string; first_name: string; last_name: string; role: UserRole }) => {
+      const { id, email, first_name, last_name, role } = values;
       
-      // 1. Atualiza o perfil (nome e função)
+      // 1. Busca o usuário atual para verificar se o email mudou
+      const currentUser = users?.find(u => u.id === id);
+      
+      // 2. Atualiza o email se ele mudou
+      if (currentUser && currentUser.email !== email) {
+        const { data, error } = await supabase.functions.invoke('manage-auth-user', {
+          body: { action: 'UPDATE_EMAIL', user_id: id, new_email: email },
+        });
+        if (error) throw new Error(error.message);
+        if (!data.success) throw new Error(data.error || "Falha ao atualizar email.");
+      }
+
+      // 3. Atualiza o perfil (nome e função)
       const { error: profileError } = await supabase
         .from("profiles")
         .update({ first_name, last_name, role })
@@ -120,15 +132,6 @@ export default function UsuariosPage() {
       const newUserId = data.userId;
 
       // 2. Atualiza o perfil com a função correta (o trigger cria o perfil com 'garcom' por padrão)
-      // Nota: Esta parte requer o cliente admin, que não está disponível no frontend.
-      // A Edge Function manage-auth-user não retorna o Service Role Key.
-      // Para contornar, vamos confiar que o trigger handle_new_user cria o perfil,
-      // e o Superadmin pode ajustar a função manualmente na tabela se necessário,
-      // ou criamos uma nova Edge Function para atualizar o perfil (mas vamos manter simples por enquanto).
-      
-      // Como a função manage-auth-user não atualiza o perfil, faremos a atualização da role aqui
-      // usando o cliente Supabase normal, que deve funcionar se o RLS permitir que o Superadmin
-      // atualize perfis (o que está configurado).
       const { error: roleError } = await supabase
         .from("profiles")
         .update({ role: role })
