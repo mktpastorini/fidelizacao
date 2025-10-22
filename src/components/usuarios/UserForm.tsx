@@ -36,8 +36,11 @@ const baseSchema = z.object({
   role: z.enum(['superadmin', 'admin', 'gerente', 'balcao', 'garcom', 'cozinha']),
 });
 
-const createSchema = baseSchema.extend({
-  email: z.string().email("Email inválido."),
+const editSchema = baseSchema.extend({
+  email: z.string().email("Email inválido."), // Email é obrigatório na edição
+});
+
+const createSchema = editSchema.extend({
   password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
 });
 
@@ -52,12 +55,11 @@ type UserFormProps = {
 };
 
 export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: UserFormProps) {
-  const schema = isEditing ? baseSchema : createSchema;
+  const schema = isEditing ? editSchema : createSchema;
   
   const form = useForm<UserFormValues>({
     resolver: zodResolver(schema as any),
     defaultValues: {
-      // Garantimos que o ID seja uma string vazia se for undefined, para evitar a string "undefined"
       id: defaultValues?.id || "", 
       email: defaultValues?.email || "",
       password: "",
@@ -69,13 +71,15 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
 
   const handleSubmit = (values: UserFormValues) => {
     if (isEditing) {
-      // Para edição, garantimos que o ID seja uma string não vazia
-      if (!values.id) {
+      const userId = defaultValues?.id; 
+      
+      if (!userId) {
         console.error("Erro: ID do usuário ausente no modo de edição.");
         return;
       }
       onSubmit({
-        id: values.id,
+        id: userId,
+        email: values.email, // Incluindo email na submissão de edição
         first_name: values.first_name,
         last_name: values.last_name,
         role: values.role,
@@ -89,35 +93,33 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="email@exemplo.com" {...field} disabled={isSubmitting} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         {!isEditing && (
-          <>
-            <FormField
-              control={form.control}
-              name="email"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Email</FormLabel>
-                  <FormControl>
-                    <Input placeholder="email@exemplo.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Senha</FormLabel>
-                  <FormControl>
-                    <Input type="password" placeholder="Mínimo 6 caracteres" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </>
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Senha</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="Mínimo 6 caracteres" {...field} disabled={isSubmitting} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         )}
         <div className="grid grid-cols-2 gap-4">
           <FormField
@@ -127,7 +129,7 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
               <FormItem>
                 <FormLabel>Nome</FormLabel>
                 <FormControl>
-                  <Input placeholder="Primeiro nome" {...field} />
+                  <Input placeholder="Primeiro nome" {...field} disabled={isSubmitting} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -140,7 +142,7 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
               <FormItem>
                 <FormLabel>Sobrenome (Opcional)</FormLabel>
                 <FormControl>
-                  <Input placeholder="Sobrenome" {...field} />
+                  <Input placeholder="Sobrenome" {...field} disabled={isSubmitting} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -153,7 +155,7 @@ export function UserForm({ onSubmit, isSubmitting, defaultValues, isEditing }: U
           render={({ field }) => (
             <FormItem>
               <FormLabel>Função</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a função" />

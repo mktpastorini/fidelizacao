@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, email, password, first_name, last_name, user_id } = await req.json();
+    const { action, email, password, first_name, last_name, user_id, new_email } = await req.json();
     
     // 1. Autenticação do Superadmin (via token)
     const userClient = createClient(
@@ -85,6 +85,19 @@ serve(async (req) => {
       if (updateError) throw updateError;
       
       return new Response(JSON.stringify({ success: true, message: "Senha atualizada com sucesso." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+    
+    else if (action === 'UPDATE_EMAIL') {
+      if (!user_id || !new_email) throw new Error("ID do usuário e novo email são obrigatórios para atualizar o email.");
+      
+      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, { email: new_email, email_confirm: true });
+      
+      if (updateError) throw updateError;
+      
+      return new Response(JSON.stringify({ success: true, message: "Email atualizado com sucesso." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
