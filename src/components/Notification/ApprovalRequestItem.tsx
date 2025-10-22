@@ -20,14 +20,22 @@ const roleLabels: Record<UserRole, string> = {
   cozinha: 'Cozinha',
 };
 
+// Função auxiliar para obter o objeto de relacionamento, seja ele um objeto direto ou o primeiro elemento de um array
+function getRelationshipObject<T>(data: T | T[] | null | undefined): T | null {
+  if (!data) return null;
+  if (Array.isArray(data)) {
+    return data.length > 0 ? data[0] : null;
+  }
+  return data;
+}
+
 export function ApprovalRequestItem({ request, onProcess, isProcessing }: ApprovalRequestItemProps) {
   
   // Adicionando log para debug
   console.log("Dados da Solicitação:", request);
   
   // Acessando dados do solicitante
-  // O PostgREST retorna relações como arrays, então acessamos o primeiro elemento
-  const requesterProfile = request.requester?.[0];
+  const requesterProfile = getRelationshipObject(request.requester);
   
   // Construindo o nome completo do solicitante
   const firstName = requesterProfile?.first_name || '';
@@ -42,9 +50,10 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   let IconComponent: React.ElementType = Clock;
   let iconColor = "text-yellow-500";
 
-  // Acessando os dados da relação (que são arrays devido ao PostgREST)
-  const mesaNumero = request.mesa?.[0]?.numero;
-  const itemPedido = request.item_pedido?.[0];
+  // Acessando os dados da relação
+  const mesa = getRelationshipObject(request.mesa);
+  const itemPedido = getRelationshipObject(request.item_pedido);
+  const mesaNumero = mesa?.numero;
 
   // Construindo a descrição detalhada
   const requesterDetail = `${fullName} (${requesterRole})`;
