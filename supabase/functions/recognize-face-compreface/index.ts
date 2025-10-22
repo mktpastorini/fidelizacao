@@ -38,11 +38,17 @@ serve(async (req) => {
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
-      // Tenta obter o usuário usando o token fornecido (para usuários logados no painel)
+      // Usar supabaseAdmin para validar o token do usuário logado
       const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
       
       if (userError || !user) {
-        console.log(`[recognize-face] Falha na validação do token: ${userError?.message || "Usuário não encontrado."}`);
+        // Se falhar a autenticação do usuário, tentamos o fallback da mesa se houver
+        if (mesa_id) {
+            console.log("[recognize-face] Falha na autenticação do token do usuário. Tentando buscar user_id pela mesa...");
+        } else {
+            // Se não há mesa_id e a autenticação falhou, lançamos o erro
+            throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
+        }
       } else {
         userId = user.id;
         console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin/Garçom): ${userId}`);

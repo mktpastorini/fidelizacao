@@ -35,14 +35,9 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      // Cria um cliente Supabase com o token de autenticação do usuário
-      const userClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      
-      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      const token = authHeader.replace('Bearer ', '');
+      // Usar supabaseAdmin para validar o token do usuário logado
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
       
       if (userError || !user) {
         throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
