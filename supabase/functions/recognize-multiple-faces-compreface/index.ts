@@ -6,39 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função auxiliar para buscar as configurações do CompreFace
-// Agora busca as configurações do Superadmin/Admin principal, ignorando o userId do chamador
+// Função auxiliar para buscar as configurações do CompreFace do usuário 1 fixo
 async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log("[recognize-multiple-faces] Buscando configurações globais do CompreFace (Superadmin/Admin)...");
-  
-  // 1. Encontra o ID de um Superadmin ou Admin
-  const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .in('role', ['superadmin', 'admin'])
-    .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  console.log("[recognize-multiple-faces] Buscando configurações globais do CompreFace do usuário 1 (Superadmin principal)...");
 
-  if (adminProfileError || !adminProfile) {
-    console.error("[recognize-multiple-faces] Nenhum Superadmin/Admin encontrado para configurações.");
-    return { settings: null, error: new Error("Nenhum Superadmin ou Admin configurado no sistema.") };
-  }
-
-  // 2. Busca as configurações desse Admin
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('user_settings')
     .select('compreface_url, compreface_api_key')
-    .eq('id', adminProfile.id)
-    .maybeSingle();
-    
-  if (settingsError && settingsError.code !== 'PGRST116') {
-    console.error("[recognize-multiple-faces] Erro ao buscar configurações do Admin:", settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações de sistema.") };
+    .eq('id', '1')
+    .single();
+
+  if (settingsError) {
+    console.error("[recognize-multiple-faces] Erro ao buscar configurações do usuário 1:", settingsError);
+    return { settings: null, error: new Error("Falha ao carregar configurações globais do sistema.") };
   }
-  
+
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Administrador.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin principal.") };
   }
 
   return { settings, error: null };
@@ -69,13 +53,11 @@ serve(async (req) => {
 
     let userId: string | null = null;
     const authHeader = req.headers.get('Authorization');
-    
-    // 2. Determinar o ID do usuário (dono do estabelecimento)
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
-      // Tenta validar o token do usuário logado (Painel Admin/Garçom)
       const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-      
+
       if (user && !userError) {
         userId = user.id;
         console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userId}`);
@@ -86,23 +68,23 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
     }
 
-    // 3. Buscando configurações do CompreFace (AGORA IGNORA userId)
-    console.log("[recognize-multiple-faces] 3/6: Buscando configurações do CompreFace...");
+    // Ignora o userId autenticado e usa o usuário 1 para configurações
+    const fixedUserId = '1';
+
+    console.log("[recognize-multiple-faces] 3/6: Buscando configurações do CompreFace do usuário 1...");
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
-      // Se houver erro na busca de configurações, retorna 400 para o frontend
       return new Response(JSON.stringify({ error: settingsError.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
-    
+
     console.log("[recognize-multiple-faces] 3/6: Configurações carregadas.");
 
     const payload = { file: imageData };
     console.log("[recognize-multiple-faces] 4/6: Enviando para CompreFace para reconhecimento de múltiplas faces...");
-    // Usar limit=0 para obter todos os rostos detectados
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=0`, {
       method: 'POST',
       headers: {
@@ -124,31 +106,30 @@ serve(async (req) => {
 
     const data = await response.json();
     const recognizedFaces = [];
-    const minSimilarity = 0.85; // Limiar de similaridade para considerar um match
+    const minSimilarity = 0.85;
 
     if (data.result && Array.isArray(data.result)) {
       for (const faceResult of data.result) {
         const bestSubject = faceResult.subjects?.[0];
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
           console.log(`[recognize-multiple-faces] Match encontrado - Subject: ${bestSubject.subject}, Similaridade: ${bestSubject.similarity}`);
-          
-          // Buscar dados do cliente (USANDO SUPABASE ADMIN)
+
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
-            .select('id, nome, avatar_url, gostos, casado_com, visitas') // Selecionar informações adicionais
+            .select('id, nome, avatar_url, gostos, casado_com, visitas')
             .eq('id', bestSubject.subject)
-            .eq('user_id', userId) // Adiciona filtro de segurança
+            .eq('user_id', fixedUserId)
             .single();
 
           if (clientError) {
             console.error(`Erro ao buscar dados do cliente ${bestSubject.subject}: ${clientError.message}`);
-            continue; // Pular este rosto se não conseguir buscar o cliente
+            continue;
           }
 
           recognizedFaces.push({
             client: client,
             similarity: bestSubject.similarity,
-            box: faceResult.box, // Incluir a caixa delimitadora
+            box: faceResult.box,
           });
         }
       }

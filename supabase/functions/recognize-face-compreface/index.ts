@@ -6,44 +6,28 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função auxiliar para buscar as configurações do CompreFace
-// Agora busca as configurações do Superadmin/Admin principal, ignorando o userId do chamador
+// Função auxiliar para buscar as configurações do CompreFace do usuário 1 fixo
 async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log("[recognize-face] Buscando configurações globais do CompreFace (Superadmin/Admin)...");
-  
-  // 1. Encontra o ID de um Superadmin ou Admin
-  const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
-    .from('profiles')
-    .select('id')
-    .in('role', ['superadmin', 'admin'])
-    .order('id', { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  console.log("[recognize-face] Buscando configurações globais do CompreFace do usuário 1 (Superadmin principal)...");
 
-  if (adminProfileError || !adminProfile) {
-    console.error("[recognize-face] Nenhum Superadmin/Admin encontrado para configurações.");
-    return { settings: null, error: new Error("Nenhum Superadmin ou Admin configurado no sistema.") };
-  }
-
-  // 2. Busca as configurações desse Admin
+  // Busca as configurações do usuário 1 diretamente
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('user_settings')
     .select('compreface_url, compreface_api_key')
-    .eq('id', adminProfile.id)
-    .maybeSingle();
-    
-  if (settingsError && settingsError.code !== 'PGRST116') {
-    console.error("[recognize-face] Erro ao buscar configurações do Admin:", settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações de sistema.") };
+    .eq('id', '1')
+    .single();
+
+  if (settingsError) {
+    console.error("[recognize-face] Erro ao buscar configurações do usuário 1:", settingsError);
+    return { settings: null, error: new Error("Falha ao carregar configurações globais do sistema.") };
   }
-  
+
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Administrador.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin principal.") };
   }
 
   return { settings, error: null };
 }
-
 
 serve(async (req) => {
   console.log("--- [recognize-face] INICIANDO EXECUÇÃO ---");
@@ -70,58 +54,20 @@ serve(async (req) => {
       console.log("[recognize-face] Prefixo data:image removido do base64.");
     }
 
-    let userId: string | null = null;
-    const authHeader = req.headers.get('Authorization');
-    
-    // 2. Determinar o ID do usuário (dono do estabelecimento)
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.replace('Bearer ', '');
-      
-      // Tenta validar o token do usuário logado (Painel Admin/Garçom)
-      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-      
-      if (user && !userError) {
-        userId = user.id;
-        console.log(`[recognize-face] 2/7: Usuário autenticado (Painel): ${userId}`);
-      } else if (mesa_id) {
-        console.log("[recognize-face] Falha na autenticação do token do usuário. Tentando buscar user_id pela mesa...");
-      } else {
-        // Se não há mesa_id e a autenticação falhou, lançamos o erro
-        throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Token inválido ou expirado."}`);
-      }
-    } 
-    
-    if (!userId && mesa_id) {
-      // Se ainda não temos userId, e temos mesa_id (Menu Público ou fallback)
-      const { data: mesa, error: mesaError } = await supabaseAdmin
-        .from('mesas')
-        .select('user_id')
-        .eq('id', mesa_id)
-        .maybeSingle(); // Usando maybeSingle para evitar erro PGRST116
+    // Ignora o usuário logado, pois sempre usa configurações do usuário 1
+    const userId = '1';
 
-      if (mesaError || !mesa?.user_id) {
-        throw new Error(`Mesa ID inválido ou usuário da mesa não encontrado: ${mesaError?.message}`);
-      }
-      userId = mesa.user_id;
-      console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID: ${userId}`);
-    } 
-    
-    if (!userId) {
-      throw new Error("ID do usuário ou da mesa é obrigatório para o reconhecimento.");
-    }
-
-    // 3. Buscando configurações do CompreFace (AGORA IGNORA userId)
-    console.log("[recognize-face] 3/7: Buscando configurações do CompreFace...");
+    // 3. Buscando configurações do CompreFace do usuário 1
+    console.log("[recognize-face] 3/7: Buscando configurações do CompreFace do usuário 1...");
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
-      // Se houver erro na busca de configurações, retorna 400 para o frontend
       return new Response(JSON.stringify({ error: settingsError.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
-    
+
     console.log("[recognize-face] 3/7: Configurações carregadas.");
 
     const payload = { file: imageData };
@@ -150,15 +96,15 @@ serve(async (req) => {
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
-      
-      // 7. Buscar dados do cliente (USANDO SUPABASE ADMIN)
+
+      // Buscar dados do cliente usando user_id = '1' para garantir acesso
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', userId) // Adiciona filtro de segurança
+        .eq('user_id', userId)
         .single();
-        
+
       if (clientError) {
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
@@ -173,7 +119,6 @@ serve(async (req) => {
     console.error("--- [recognize-face] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
     console.error("Stack:", error.stack);
-    // Garante que a resposta de erro seja 500 e contenha a mensagem de erro
     return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
