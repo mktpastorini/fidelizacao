@@ -7,56 +7,38 @@ const corsHeaders = {
 }
 
 // Função auxiliar para buscar as configurações do CompreFace
-async function getComprefaceSettings(supabaseAdmin: any, userId: string | null) {
-  let settings = null;
-  let settingsError = null;
+// Agora busca as configurações do Superadmin/Admin principal, ignorando o userId do chamador
+async function getComprefaceSettings(supabaseAdmin: any) {
+  console.log("[recognize-multiple-faces] Buscando configurações globais do CompreFace (Superadmin/Admin)...");
+  
+  // 1. Encontra o ID de um Superadmin ou Admin
+  const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .in('role', ['superadmin', 'admin'])
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
-  // 1. Tenta buscar as configurações do usuário atual (se houver userId)
-  if (userId) {
-    const { data, error } = await supabaseAdmin
-      .from('user_settings')
-      .select('compreface_url, compreface_api_key')
-      .eq('id', userId)
-      .single();
-    
-    settings = data;
-    settingsError = error;
+  if (adminProfileError || !adminProfile) {
+    console.error("[recognize-multiple-faces] Nenhum Superadmin/Admin encontrado para configurações.");
+    return { settings: null, error: new Error("Nenhum Superadmin ou Admin configurado no sistema.") };
   }
 
-  // 2. Se as configurações do usuário atual estiverem incompletas ou não existirem, busca as do Superadmin/Admin
-  if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    console.log("[recognize-multiple-faces] Configurações do usuário atual incompletas. Buscando fallback (Superadmin/Admin)...");
+  // 2. Busca as configurações desse Admin
+  const { data: settings, error: settingsError } = await supabaseAdmin
+    .from('user_settings')
+    .select('compreface_url, compreface_api_key')
+    .eq('id', adminProfile.id)
+    .maybeSingle();
     
-    // Primeiro, encontra o ID de um Superadmin ou Admin
-    const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .in('role', ['superadmin', 'admin'])
-      .limit(1)
-      .single();
-
-    if (adminProfileError || !adminProfile) {
-      console.error("[recognize-multiple-faces] Nenhum Superadmin/Admin encontrado para fallback.");
-      return { settings: null, error: new Error("Configurações do CompreFace não encontradas. Configure um Superadmin/Admin.") };
-    }
-
-    // Segundo, busca as configurações desse Admin
-    const { data: adminSettings, error: adminSettingsError } = await supabaseAdmin
-      .from('user_settings')
-      .select('compreface_url, compreface_api_key')
-      .eq('id', adminProfile.id)
-      .single();
-      
-    if (adminSettingsError) {
-      console.error("[recognize-multiple-faces] Erro ao buscar configurações do Admin:", adminSettingsError);
-      return { settings: null, error: new Error("Falha ao carregar configurações de fallback.") };
-    }
-    
-    settings = adminSettings;
+  if (settingsError && settingsError.code !== 'PGRST116') {
+    console.error("[recognize-multiple-faces] Erro ao buscar configurações do Admin:", settingsError);
+    return { settings: null, error: new Error("Falha ao carregar configurações de sistema.") };
   }
   
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas em nenhum perfil de administrador.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Administrador.") };
   }
 
   return { settings, error: null };
@@ -104,9 +86,9 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
     }
 
-    // 3. Buscando configurações do CompreFace (USANDO FUNÇÃO AUXILIAR)
+    // 3. Buscando configurações do CompreFace (AGORA IGNORA userId)
     console.log("[recognize-multiple-faces] 3/6: Buscando configurações do CompreFace...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin, userId);
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
       throw settingsError;
