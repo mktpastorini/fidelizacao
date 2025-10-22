@@ -23,7 +23,12 @@ const roleLabels: Record<UserRole, string> = {
 export function ApprovalRequestItem({ request, onProcess, isProcessing }: ApprovalRequestItemProps) {
   // Acessando dados do solicitante
   const requesterProfile = request.requester?.[0];
-  const requesterName = requesterProfile?.first_name || 'Usuário';
+  
+  // Usando nome e sobrenome, ou 'Usuário' como fallback
+  const firstName = requesterProfile?.first_name || '';
+  const lastName = requesterProfile?.last_name || '';
+  const fullName = (firstName + ' ' + lastName).trim() || 'Usuário';
+  
   const requesterRole = roleLabels[request.requester_role] || 'Desconhecido';
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { locale: ptBR, addSuffix: true });
 
@@ -37,7 +42,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   const itemPedido = request.item_pedido?.[0];
 
   // Construindo a descrição detalhada
-  const requesterDetail = `${requesterName} (${requesterRole})`;
+  const requesterDetail = `${fullName} (${requesterRole})`;
 
   switch (request.action_type) {
     case 'free_table':
@@ -77,7 +82,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
       <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-3">
         <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            <span>Solicitado por: {requesterName} ({requesterRole})</span>
+            <span>Solicitado por: {fullName} ({requesterRole})</span>
         </div>
         <span>{timeAgo}</span>
       </div>
