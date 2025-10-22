@@ -81,31 +81,36 @@ export function ApprovalAlertModal() {
       return { currentRequest: null, otherPendingRequests: [] };
     }
 
-    const uniqueRequests = new Map<string, ApprovalRequest>();
-    const duplicates: ApprovalRequest[] = [];
+    // Map para rastrear a solicitação mais antiga (primeira) para cada ação/alvo
+    const uniqueRequestsMap = new Map<string, ApprovalRequest>();
+    
+    // Lista para armazenar todas as solicitações que não são a principal
+    const allOtherRequests: ApprovalRequest[] = [];
 
-    // A lista já está ordenada por created_at ascendente (mais antigo primeiro)
+    // 1. Encontra a solicitação mais antiga para cada ação/alvo
     allPendingRequests.forEach(request => {
       const key = `${request.action_type}-${request.target_id}`;
       
-      if (!uniqueRequests.has(key)) {
-        // Se for a primeira vez que vemos esta ação/alvo, ela é a principal (mais antiga)
-        uniqueRequests.set(key, request);
-      } else {
-        // Se já existe, é uma duplicata
-        duplicates.push(request);
+      if (!uniqueRequestsMap.has(key)) {
+        // Como a lista está ordenada por created_at ascendente, a primeira que encontramos é a mais antiga
+        uniqueRequestsMap.set(key, request);
       }
     });
 
-    // Pega a primeira solicitação única como a principal a ser exibida
-    const firstUniqueRequest = Array.from(uniqueRequests.values())[0] || null;
-    
-    // Filtra as duplicatas que não são a solicitação principal
-    const otherRequests = allPendingRequests.filter(req => req.id !== firstUniqueRequest?.id);
+    // 2. Encontra a solicitação principal (a mais antiga de todas as solicitações únicas)
+    const uniqueRequests = Array.from(uniqueRequestsMap.values());
+    const firstUniqueRequest = uniqueRequests[0] || null;
+
+    // 3. Popula a lista de outras solicitações (todas as que não são a principal)
+    allPendingRequests.forEach(request => {
+        if (request.id !== firstUniqueRequest?.id) {
+            allOtherRequests.push(request);
+        }
+    });
 
     return {
       currentRequest: firstUniqueRequest,
-      otherPendingRequests: otherRequests,
+      otherPendingRequests: allOtherRequests,
     };
   }, [allPendingRequests]);
 
