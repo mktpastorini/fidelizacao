@@ -17,6 +17,7 @@ import { Copy, RefreshCw, Send, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useState, useEffect } from "react"; // CORREÇÃO: Importando useState e useEffect
 
 type UserData = {
   templates: MessageTemplate[];
@@ -298,7 +299,7 @@ export default function ConfiguracoesPage() {
         <TabsContent value="acesso" className="mt-6">
           <Card>
             <CardHeader><CardTitle>Chave de API Pessoal</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
-            <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerar Nova Chave" : "Gerar Nova Chave"}</Button></div>)}</CardContent>
+            <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
           </Card>
         </TabsContent>
         
