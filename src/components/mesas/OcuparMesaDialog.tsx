@@ -72,17 +72,20 @@ export function OcuparMesaDialog({
     initialData: [], // Provide initial data to avoid undefined during first render
   });
 
+  // Garante que ocupantesAtuais é um array vazio se for undefined
+  const currentOccupants = ocupantesAtuais || [];
+
   useEffect(() => {
     if (isOpen && mesa?.cliente_id) {
       setClientePrincipalId(mesa.cliente_id);
-      // Filter out the main client from acompanhantes if it's already in ocupantesAtuais
-      setAcompanhanteIds(ocupantesAtuais.filter(id => id !== mesa.cliente_id));
+      // Filter out the main client from acompanhantes if it's already in currentOccupants
+      setAcompanhanteIds(currentOccupants.filter(id => id !== mesa.cliente_id));
     } else if (isOpen && !mesa?.cliente_id) {
       // If mesa is free, reset selections
       setClientePrincipalId(null);
       setAcompanhanteIds([]);
     }
-  }, [isOpen, mesa, ocupantesAtuais]);
+  }, [isOpen, mesa, currentOccupants]); // Dependência atualizada para currentOccupants
 
   const addCompanionMutation = useMutation({
     mutationFn: async (newCliente: any) => {
@@ -118,7 +121,7 @@ export function OcuparMesaDialog({
 
   const handleSubmit = () => {
     if (clientePrincipalId) {
-      onSubmit(clientePrincipalId, acompanhanteIds, ocupantesAtuais || []); // Pass currentOccupantIds
+      onSubmit(clientePrincipalId, acompanhanteIds, currentOccupants); // Pass currentOccupants
     }
   };
 
