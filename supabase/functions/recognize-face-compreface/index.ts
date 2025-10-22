@@ -36,23 +36,13 @@ serve(async (req) => {
     // 2. Determinar o ID do usuário (dono do estabelecimento)
     const authHeader = req.headers.get('Authorization');
     
-    if (authHeader && authHeader !== `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
       // Tenta obter o usuário usando o token fornecido (para usuários logados no painel)
-      const userClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-        { global: { headers: { Authorization: authHeader } } }
-      );
-      
-      const { data: { user }, error: userError } = await userClient.auth.getUser();
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
       
       if (userError || !user) {
-        // Se falhar a autenticação do usuário, tentamos o fallback da mesa se houver
-        if (mesa_id) {
-            console.log("[recognize-face] Falha na autenticação do token do usuário. Tentando buscar user_id pela mesa...");
-        } else {
-            throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
-        }
+        console.log(`[recognize-face] Falha na validação do token: ${userError?.message || "Usuário não encontrado."}`);
       } else {
         userId = user.id;
         console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin/Garçom): ${userId}`);
@@ -76,7 +66,7 @@ serve(async (req) => {
       throw new Error("ID do usuário ou da mesa é obrigatório para o reconhecimento.");
     }
 
-    // 3. Buscando configurações do CompreFace
+    // 3. Buscando configurações do CompreFace (USANDO SUPABASE ADMIN)
     console.log("[recognize-face] 3/7: Buscando configurações do CompreFace...");
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
@@ -119,7 +109,7 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
       
-      // 7. Buscar dados do cliente (usando o ID do cliente e o ID do usuário dono da mesa para RLS)
+      // 7. Buscar dados do cliente (USANDO SUPABASE ADMIN)
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
