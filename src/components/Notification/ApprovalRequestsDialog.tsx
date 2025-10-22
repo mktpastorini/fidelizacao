@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { ShieldAlert, Loader2 } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { ApprovalRequestItem } from "./ApprovalRequestItem"; // Importado o novo componente
+import { Badge } from "@/components/ui/badge"; // IMPORTAÇÃO CORRIGIDA
 
 // Função de busca
 async function fetchPendingApprovalRequests(userRole: UserRole): Promise<ApprovalRequest[]> {
