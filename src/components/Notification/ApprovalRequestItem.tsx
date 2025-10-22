@@ -21,7 +21,9 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export function ApprovalRequestItem({ request, onProcess, isProcessing }: ApprovalRequestItemProps) {
-  const requesterName = request.requester?.[0]?.first_name || 'Usuário';
+  // Acessando dados do solicitante
+  const requesterProfile = request.requester?.[0];
+  const requesterName = requesterProfile?.first_name || 'Usuário';
   const requesterRole = roleLabels[request.requester_role] || 'Desconhecido';
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { locale: ptBR, addSuffix: true });
 
@@ -34,16 +36,23 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   const mesaNumero = request.mesa?.[0]?.numero;
   const itemPedido = request.item_pedido?.[0];
 
+  // Construindo a descrição detalhada
+  const requesterDetail = `${requesterName} (${requesterRole})`;
+
   switch (request.action_type) {
     case 'free_table':
       title = `Liberar Mesa ${mesaNumero || '?'}`;
-      description = `Solicitado liberar a mesa.`;
+      description = `${requesterDetail} solicitou liberar a Mesa ${mesaNumero || '?'}.`;
       IconComponent = Table;
       iconColor = "text-blue-500";
       break;
     case 'apply_discount':
-      title = `Desconto de ${request.payload.desconto_percentual}%`;
-      description = `Item: ${itemPedido?.nome_produto || 'Item do Pedido'}. Motivo: ${request.payload.desconto_motivo || 'N/A'}`;
+      const itemNome = itemPedido?.nome_produto || 'Item do Pedido';
+      const desconto = request.payload.desconto_percentual;
+      const motivo = request.payload.desconto_motivo || 'N/A';
+      
+      title = `Desconto de ${desconto}% em ${itemNome}`;
+      description = `${requesterDetail} solicitou um desconto de ${desconto}% no item "${itemNome}". Motivo: ${motivo}`;
       IconComponent = Tag;
       iconColor = "text-green-500";
       break;
@@ -58,7 +67,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
           </div>
           <div>
             <h5 className="font-semibold text-base">{title}</h5>
-            <p className="text-xs text-muted-foreground max-w-xs truncate">{description}</p>
+            <p className="text-xs text-muted-foreground max-w-xs">{description}</p> {/* Removido 'truncate' para exibir a descrição completa */}
           </div>
         </div>
       </div>
@@ -66,7 +75,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
       <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-3">
         <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            <span>{requesterName} ({requesterRole})</span>
+            <span>Solicitado por: {requesterName} ({requesterRole})</span>
         </div>
         <span>{timeAgo}</span>
       </div>
