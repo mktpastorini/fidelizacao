@@ -27,14 +27,14 @@ async function fetchPendingApprovalRequests(userRole: UserRole): Promise<Approva
     return [];
   }
   
-  // Usando os novos nomes de coluna para os joins
+  // CORREÇÃO: Usando a sintaxe de join explícita para as colunas FK
   const { data, error } = await supabase
     .from("approval_requests")
     .select(`
       *,
       requester:profiles(first_name, last_name, role),
-      mesa:mesas_id_fk(numero),
-      item_pedido:item_pedido_id_fk(*)
+      mesa:mesas!mesa_id_fk(numero),
+      item_pedido:itens_pedido!item_pedido_id_fk(*)
     `)
     .eq("status", "pending")
     .order("created_at", { ascending: true });
