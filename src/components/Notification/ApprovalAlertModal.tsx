@@ -117,7 +117,7 @@ export function ApprovalAlertModal() {
 
   let title = "Solicitação de Aprovação";
   let description = "";
-  let icon: React.ElementType = ShieldAlert;
+  let IconComponent: React.ElementType = ShieldAlert; // Renomeado para IconComponent
   let iconColor = "text-yellow-500";
 
   // Acessando os dados da relação através dos novos nomes de coluna
@@ -128,13 +128,13 @@ export function ApprovalAlertModal() {
     case 'free_table':
       title = `Liberar Mesa ${mesaNumero || '?'}`;
       description = `O usuário ${requesterName} (${requesterRole}) solicitou a liberação da Mesa ${mesaNumero || '?'}. Isso irá CANCELAR o pedido aberto e remover todos os ocupantes.`;
-      icon = Table;
+      IconComponent = Table;
       iconColor = "text-blue-500";
       break;
     case 'apply_discount':
       title = `Aplicar Desconto de ${request.payload.desconto_percentual}%`;
       description = `O usuário ${requesterName} (${requesterRole}) solicitou um desconto de ${request.payload.desconto_percentual}% no item "${itemPedido?.nome_produto || 'Item do Pedido'}". Motivo: ${request.payload.desconto_motivo || 'N/A'}`;
-      icon = Tag;
+      IconComponent = Tag;
       iconColor = "text-green-500";
       break;
   }
@@ -150,7 +150,7 @@ export function ApprovalAlertModal() {
             </div>
           </div>
           <AlertDialogTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
-            <icon.type className={cn("w-6 h-6", iconColor)} />
+            <IconComponent className={cn("w-6 h-6", iconColor)} /> {/* CORREÇÃO AQUI */}
             {title}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-center text-base pt-2">
