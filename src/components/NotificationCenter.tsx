@@ -13,6 +13,7 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { ScrollArea } from "./ui/scroll-area"; // Importando ScrollArea
 
 type BirthdayClient = {
   nome: string;
@@ -172,99 +173,103 @@ export function NotificationCenter() {
             </p>
           </div>
           
-          {/* Alertas de Aprovação (Apenas para Gerentes/Admins) */}
-          {shouldShowRequests && (
-            <>
-              <div className="space-y-2">
-                <h5 className="flex items-center font-semibold text-warning"><ShieldAlert className="w-4 h-4 mr-2" /> Aprovações Pendentes ({requestCount})</h5>
-                {isLoadingRequests ? (
-                    <div className="flex items-center justify-center p-4"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Carregando...</div>
-                ) : (
-                    <div className="grid gap-2">
-                        {pendingRequests?.map((request) => (
-                            <ApprovalRequestCard 
-                                key={request.id} 
-                                request={request} 
-                                onProcess={handleProcessRequest} 
-                                isProcessing={isProcessing}
-                            />
-                        ))}
-                    </div>
-                )}
-              </div>
-              {(shouldShowOrderItems || shouldShowLowStock || shouldShowBirthdays) && <Separator />}
-            </>
-          )}
-
-          {/* Alertas de Pedidos Pendentes/Em Preparo (Para Garçons/Balcões/Gerentes) */}
-          {shouldShowOrderItems && (
-            <>
-              <div className="space-y-2">
-                <h5 className="flex items-center font-semibold text-primary"><Utensils className="w-4 h-4 mr-2" /> Pedidos em Aberto ({orderItemCount})</h5>
-                <div className="grid gap-2">
-                  {pendingOrderItems?.map((item) => (
-                    <div key={item.id} className="grid gap-1 text-sm p-2 rounded-md bg-secondary">
-                      <p className="font-medium leading-none flex justify-between items-center">
-                        <span>{item.nome_produto} (x{item.quantidade})</span>
-                        <Badge variant="outline" className={cn(item.status === 'pendente' ? 'bg-warning/20 text-warning-foreground' : 'bg-primary/20 text-primary')}>
-                          {item.status === 'pendente' ? 'Novo' : 'Preparo'}
-                        </Badge>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Mesa {item.mesa?.numero || '?'}{item.cliente?.nome && ` | Consumidor: ${item.cliente.nome}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground flex items-center">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {formatDistanceToNow(new Date(item.created_at), { locale: ptBR, addSuffix: true })}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {(shouldShowLowStock || shouldShowBirthdays) && <Separator />}
-            </>
-          )}
-
-          {/* Alertas de Estoque Baixo */}
-          {shouldShowLowStock && (
-            <>
-              <div className="space-y-2">
-                <h5 className="flex items-center font-semibold text-warning"><AlertTriangle className="w-4 h-4 mr-2" /> Estoque Baixo ({lowStockCount})</h5>
-                <div className="grid gap-2">
-                  {lowStockProducts?.map((product) => (
-                    <div key={product.id} className="grid gap-1 text-sm">
-                      <p className="font-medium leading-none">{product.nome}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Estoque: {product.estoque_atual} (Alerta em: {product.alerta_estoque_baixo})
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              {shouldShowBirthdays && <Separator />}
-            </>
-          )}
-
-          {/* Alertas de Aniversário */}
-          {shouldShowBirthdays && (
-            <div className="space-y-2">
-              <h5 className="flex items-center font-semibold text-pink-500"><Cake className="w-4 h-4 mr-2" /> Aniversariantes ({birthdayCount})</h5>
-              <div className="grid gap-2">
-                {birthdayClients?.map((client) => (
-                  <div key={client.nome} className="grid gap-1 text-sm">
-                    <p className="font-medium leading-none">{client.nome}</p>
-                    <p className="text-xs text-muted-foreground flex items-center">
-                      <Phone className="w-3 h-3 mr-2" /> {client.whatsapp || "Sem telefone"}
-                    </p>
+          <ScrollArea className="max-h-[70vh] pr-4"> {/* Adicionado ScrollArea aqui */}
+            <div className="grid gap-4">
+              {/* Alertas de Aprovação (Apenas para Gerentes/Admins) */}
+              {shouldShowRequests && (
+                <>
+                  <div className="space-y-2">
+                    <h5 className="flex items-center font-semibold text-warning"><ShieldAlert className="w-4 h-4 mr-2" /> Aprovações Pendentes ({requestCount})</h5>
+                    {isLoadingRequests ? (
+                        <div className="flex items-center justify-center p-4"><Loader2 className="w-4 h-4 animate-spin mr-2" /> Carregando...</div>
+                    ) : (
+                        <div className="grid gap-2">
+                            {pendingRequests?.map((request) => (
+                                <ApprovalRequestCard 
+                                    key={request.id} 
+                                    request={request} 
+                                    onProcess={handleProcessRequest} 
+                                    isProcessing={isProcessing}
+                                />
+                            ))}
+                        </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                  {(shouldShowOrderItems || shouldShowLowStock || shouldShowBirthdays) && <Separator />}
+                </>
+              )}
 
-          {totalCount === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhuma notificação no momento.</p>
-          )}
+              {/* Alertas de Pedidos Pendentes/Em Preparo (Para Garçons/Balcões/Gerentes) */}
+              {shouldShowOrderItems && (
+                <>
+                  <div className="space-y-2">
+                    <h5 className="flex items-center font-semibold text-primary"><Utensils className="w-4 h-4 mr-2" /> Pedidos em Aberto ({orderItemCount})</h5>
+                    <div className="grid gap-2">
+                      {pendingOrderItems?.map((item) => (
+                        <div key={item.id} className="grid gap-1 text-sm p-2 rounded-md bg-secondary">
+                          <p className="font-medium leading-none flex justify-between items-center">
+                            <span>{item.nome_produto} (x{item.quantidade})</span>
+                            <Badge variant="outline" className={cn(item.status === 'pendente' ? 'bg-warning/20 text-warning-foreground' : 'bg-primary/20 text-primary')}>
+                              {item.status === 'pendente' ? 'Novo' : 'Preparo'}
+                            </Badge>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Mesa {item.pedido?.mesa?.numero || '?'}{item.cliente?.nome && ` | Consumidor: ${item.cliente.nome}`}
+                          </p>
+                          <p className="text-xs text-muted-foreground flex items-center">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {formatDistanceToNow(new Date(item.created_at), { locale: ptBR, addSuffix: true })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {(shouldShowLowStock || shouldShowBirthdays) && <Separator />}
+                </>
+              )}
+
+              {/* Alertas de Estoque Baixo */}
+              {shouldShowLowStock && (
+                <>
+                  <div className="space-y-2">
+                    <h5 className="flex items-center font-semibold text-warning"><AlertTriangle className="w-4 h-4 mr-2" /> Estoque Baixo ({lowStockCount})</h5>
+                    <div className="grid gap-2">
+                      {lowStockProducts?.map((product) => (
+                        <div key={product.id} className="grid gap-1 text-sm">
+                          <p className="font-medium leading-none">{product.nome}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Estoque: {product.estoque_atual} (Alerta em: {product.alerta_estoque_baixo})
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {shouldShowBirthdays && <Separator />}
+                </>
+              )}
+
+              {/* Alertas de Aniversário */}
+              {shouldShowBirthdays && (
+                <div className="space-y-2">
+                  <h5 className="flex items-center font-semibold text-pink-500"><Cake className="w-4 h-4 mr-2" /> Aniversariantes ({birthdayCount})</h5>
+                  <div className="grid gap-2">
+                    {birthdayClients?.map((client) => (
+                      <div key={client.nome} className="grid gap-1 text-sm">
+                        <p className="font-medium leading-none">{client.nome}</p>
+                        <p className="text-xs text-muted-foreground flex items-center">
+                          <Phone className="w-3 h-3 mr-2" /> {client.whatsapp || "Sem telefone"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {totalCount === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhuma notificação no momento.</p>
+              )}
+            </div>
+          </ScrollArea>
         </div>
       </PopoverContent>
     </Popover>
