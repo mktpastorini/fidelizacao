@@ -2,13 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Bell, Phone, AlertTriangle, Cake, ShieldAlert, Loader2, Utensils, Clock } from "lucide-react";
+import { Bell, Phone, AlertTriangle, Cake, Utensils, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { LowStockProduct, ApprovalRequest, UserRole, ItemPedido } from "@/types/supabase";
+import { LowStockProduct, ItemPedido } from "@/types/supabase";
 import { Separator } from "@/components/ui/separator";
 import { useSettings } from "@/contexts/SettingsContext";
-import { showError, showSuccess } from "@/utils/toast";
-import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -35,8 +33,6 @@ async function fetchLowStockProducts(): Promise<LowStockProduct[]> {
   if (error) throw new Error(error.message);
   return data || [];
 }
-
-// Removendo a função fetchPendingApprovalRequests, pois o modal fará a busca.
 
 async function fetchPendingOrderItems(): Promise<PendingOrderItem[]> {
   const { data, error } = await supabase
@@ -78,8 +74,6 @@ export function NotificationCenter() {
     refetchInterval: 60000,
   });
 
-  // Removendo a query de pendingRequests
-
   const { data: pendingOrderItems } = useQuery({
     queryKey: ["pendingOrderItems"],
     queryFn: fetchPendingOrderItems,
@@ -87,14 +81,12 @@ export function NotificationCenter() {
     refetchInterval: 10000,
   });
 
-  // Removendo a mutation de processRequestMutation e handleProcessRequest
-
   const birthdayCount = birthdayClients?.length || 0;
   const lowStockCount = lowStockProducts?.length || 0;
   const orderItemCount = pendingOrderItems?.length || 0;
 
   // Garçons/Balcões só veem Pedidos e Aniversários
-  // Gerentes/Admins veem Estoque, Pedidos e Aniversários (Aprovação é via Modal agora)
+  // Gerentes/Admins veem Estoque, Pedidos e Aniversários
   const totalCount = isManagerOrAdmin 
     ? birthdayCount + lowStockCount + orderItemCount
     : isSaloonStaff
@@ -126,8 +118,6 @@ export function NotificationCenter() {
           
           <ScrollArea className="max-h-[70vh] pr-4">
             <div className="grid gap-4">
-              {/* Alertas de Aprovação REMOVIDOS - Agora são tratados pelo modal */}
-
               {/* Alertas de Pedidos Pendentes/Em Preparo (Para Garçons/Balcões/Gerentes) */}
               {shouldShowOrderItems && (
                 <>
