@@ -21,13 +21,16 @@ const roleLabels: Record<UserRole, string> = {
 };
 
 export function ApprovalRequestItem({ request, onProcess, isProcessing }: ApprovalRequestItemProps) {
-  // Acessando dados do solicitante
+  // Acessando dados do solicitante (requester é um array de 1 elemento ou vazio)
   const requesterProfile = request.requester?.[0];
   
   // Construindo o nome completo do solicitante
   const firstName = requesterProfile?.first_name || '';
   const lastName = requesterProfile?.last_name || '';
-  const fullName = (firstName + ' ' + lastName).trim() || 'Usuário Desconhecido';
+  const fullName = (firstName + ' ' + lastName).trim();
+  
+  // Se o nome completo estiver vazio, usamos "Usuário"
+  const requesterDisplayName = fullName || 'Usuário';
   
   const requesterRole = roleLabels[request.requester_role] || 'Desconhecido';
   const timeAgo = formatDistanceToNow(new Date(request.created_at), { locale: ptBR, addSuffix: true });
@@ -42,19 +45,20 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   const itemPedido = request.item_pedido?.[0];
 
   // Construindo a descrição detalhada
-  const requesterDetail = `${fullName} (${requesterRole})`;
+  const requesterDetail = `${requesterDisplayName} (${requesterRole})`;
 
   switch (request.action_type) {
     case 'free_table':
-      // Se o número da mesa não vier, usamos o target_id (que é o ID da mesa) como fallback na descrição
-      const mesaDisplay = mesaNumero ? `Mesa ${mesaNumero}` : `Mesa ID: ${request.target_id.substring(0, 8)}...`;
+      // Usando o número da mesa da junção, ou o ID bruto como fallback
+      const mesaDisplay = mesaNumero ? `Mesa ${mesaNumero}` : `Mesa ID: ${request.mesa_id_fk?.substring(0, 8) || '?'}`;
       title = `Liberar Mesa ${mesaNumero || '?'}`;
       description = `${requesterDetail} solicitou liberar a mesa.`;
       IconComponent = Table;
       iconColor = "text-blue-500";
       break;
     case 'apply_discount':
-      const itemNome = itemPedido?.nome_produto || 'Item do Pedido';
+      // Usando o nome do item da junção, ou o ID bruto como fallback
+      const itemNome = itemPedido?.nome_produto || `Item ID: ${request.item_pedido_id_fk?.substring(0, 8) || '?'}`;
       const desconto = request.payload.desconto_percentual;
       const motivo = request.payload.desconto_motivo || 'N/A';
       
@@ -82,7 +86,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
       <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-3">
         <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
-            <span>Solicitado por: {fullName} ({requesterRole})</span>
+            <span>Solicitado por: {requesterDisplayName} ({requesterRole})</span>
         </div>
         <span>{timeAgo}</span>
       </div>
