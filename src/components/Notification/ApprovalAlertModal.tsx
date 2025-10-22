@@ -69,17 +69,45 @@ export function ApprovalAlertModal() {
   
   const isManagerOrAdmin = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
-  const { data: pendingRequests, isLoading: isLoadingRequests } = useQuery({
+  const { data: allPendingRequests, isLoading: isLoadingRequests } = useQuery({
     queryKey: ["pending_approval_requests"],
     queryFn: () => fetchPendingApprovalRequests(userRole!),
     enabled: isManagerOrAdmin && !isLoadingSettings,
-    // Remoção do refetchInterval para depender da invalidação forçada
   });
 
-  // Usamos o primeiro item da lista como o item atual a ser exibido
-  const currentRequest = useMemo(() => {
-    return pendingRequests?.[0] || null;
-  }, [pendingRequests]);
+  // Lógica para agrupar e selecionar a solicitação mais antiga (primeira na lista ordenada)
+  const { currentRequest, otherPendingRequests } = useMemo(() => {
+    if (!allPendingRequests || allPendingRequests.length === 0) {
+      return { currentRequest: null, otherPendingRequests: [] };
+    }
+
+    const uniqueRequests = new Map<string, ApprovalRequest>();
+    const duplicates: ApprovalRequest[] = [];
+
+    // A lista já está ordenada por created_at ascendente (mais antigo primeiro)
+    allPendingRequests.forEach(request => {
+      const key = `${request.action_type}-${request.target_id}`;
+      
+      if (!uniqueRequests.has(key)) {
+        // Se for a primeira vez que vemos esta ação/alvo, ela é a principal (mais antiga)
+        uniqueRequests.set(key, request);
+      } else {
+        // Se já existe, é uma duplicata
+        duplicates.push(request);
+      }
+    });
+
+    // Pega a primeira solicitação única como a principal a ser exibida
+    const firstUniqueRequest = Array.from(uniqueRequests.values())[0] || null;
+    
+    // Filtra as duplicatas que não são a solicitação principal
+    const otherRequests = allPendingRequests.filter(req => req.id !== firstUniqueRequest?.id);
+
+    return {
+      currentRequest: firstUniqueRequest,
+      otherPendingRequests: otherRequests,
+    };
+  }, [allPendingRequests]);
 
   const processRequestMutation = useMutation({
     mutationFn: async ({ requestId, action }: { requestId: string; action: 'approve' | 'reject' }) => {
@@ -117,7 +145,7 @@ export function ApprovalAlertModal() {
 
   let title = "Solicitação de Aprovação";
   let description = "";
-  let IconComponent: React.ElementType = ShieldAlert; // Renomeado para IconComponent
+  let IconComponent: React.ElementType = ShieldAlert;
   let iconColor = "text-yellow-500";
 
   // Acessando os dados da relação através dos novos nomes de coluna
@@ -150,7 +178,7 @@ export function ApprovalAlertModal() {
             </div>
           </div>
           <AlertDialogTitle className="text-2xl font-bold text-center flex items-center justify-center gap-2">
-            <IconComponent className={cn("w-6 h-6", iconColor)} /> {/* CORREÇÃO AQUI */}
+            <IconComponent className={cn("w-6 h-6", iconColor)} />
             {title}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-center text-base pt-2">
@@ -168,14 +196,14 @@ export function ApprovalAlertModal() {
         </div>
         
         {/* Exibe a lista de solicitações pendentes se houver mais de uma */}
-        {pendingRequests && pendingRequests.length > 1 && (
+        {otherPendingRequests && otherPendingRequests.length > 0 && (
             <div className="mt-4">
-                <h4 className="font-semibold text-sm mb-2">Outras {pendingRequests.length - 1} Solicitações Pendentes:</h4>
+                <h4 className="font-semibold text-sm mb-2">Outras {otherPendingRequests.length} Solicitações Pendentes:</h4>
                 <ScrollArea className="h-24 border rounded-md p-2">
                     <ul className="space-y-1 text-xs text-muted-foreground">
-                        {pendingRequests.slice(1).map((req, index) => (
+                        {otherPendingRequests.map((req, index) => (
                             <li key={req.id} className="truncate">
-                                {index + 2}. {roleLabels[req.requester_role]} - {req.action_type === 'free_table' ? `Liberar Mesa ${req.mesa?.[0]?.numero || '?'}` : `Desconto ${req.payload.desconto_percentual}%`}
+                                {index + 1}. {roleLabels[req.requester_role]} - {req.action_type === 'free_table' ? `Liberar Mesa ${req.mesa?.[0]?.numero || '?'}` : `Desconto ${req.payload.desconto_percentual}%`}
                             </li>
                         ))}
                     </ul>
