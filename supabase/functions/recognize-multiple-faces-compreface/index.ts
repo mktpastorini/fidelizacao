@@ -6,6 +6,62 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Função auxiliar para buscar as configurações do CompreFace
+async function getComprefaceSettings(supabaseAdmin: any, userId: string | null) {
+  let settings = null;
+  let settingsError = null;
+
+  // 1. Tenta buscar as configurações do usuário atual (se houver userId)
+  if (userId) {
+    const { data, error } = await supabaseAdmin
+      .from('user_settings')
+      .select('compreface_url, compreface_api_key')
+      .eq('id', userId)
+      .single();
+    
+    settings = data;
+    settingsError = error;
+  }
+
+  // 2. Se as configurações do usuário atual estiverem incompletas ou não existirem, busca as do Superadmin/Admin
+  if (!settings?.compreface_url || !settings?.compreface_api_key) {
+    console.log("[recognize-multiple-faces] Configurações do usuário atual incompletas. Buscando fallback (Superadmin/Admin)...");
+    
+    // Primeiro, encontra o ID de um Superadmin ou Admin
+    const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .in('role', ['superadmin', 'admin'])
+      .limit(1)
+      .single();
+
+    if (adminProfileError || !adminProfile) {
+      console.error("[recognize-multiple-faces] Nenhum Superadmin/Admin encontrado para fallback.");
+      return { settings: null, error: new Error("Configurações do CompreFace não encontradas. Configure um Superadmin/Admin.") };
+    }
+
+    // Segundo, busca as configurações desse Admin
+    const { data: adminSettings, error: adminSettingsError } = await supabaseAdmin
+      .from('user_settings')
+      .select('compreface_url, compreface_api_key')
+      .eq('id', adminProfile.id)
+      .single();
+      
+    if (adminSettingsError) {
+      console.error("[recognize-multiple-faces] Erro ao buscar configurações do Admin:", adminSettingsError);
+      return { settings: null, error: new Error("Falha ao carregar configurações de fallback.") };
+    }
+    
+    settings = adminSettings;
+  }
+  
+  if (!settings?.compreface_url || !settings?.compreface_api_key) {
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas em nenhum perfil de administrador.") };
+  }
+
+  return { settings, error: null };
+}
+
 serve(async (req) => {
   console.log("--- [recognize-multiple-faces] INICIANDO EXECUÇÃO ---");
 
@@ -48,20 +104,14 @@ serve(async (req) => {
       throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
     }
 
-    // 3. Buscando configurações do CompreFace (USANDO SUPABASE ADMIN)
+    // 3. Buscando configurações do CompreFace (USANDO FUNÇÃO AUXILIAR)
     console.log("[recognize-multiple-faces] 3/6: Buscando configurações do CompreFace...");
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from('user_settings')
-      .select('compreface_url, compreface_api_key')
-      .eq('id', userId)
-      .single();
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin, userId);
 
     if (settingsError) {
-      throw new Error(`Não foi possível recuperar as configurações do CompreFace: ${settingsError.message}`);
+      throw settingsError;
     }
-    if (!settings?.compreface_url || !settings?.compreface_api_key) {
-      throw new Error("URL ou Chave de API do CompreFace não configuradas.");
-    }
+    
     console.log("[recognize-multiple-faces] 3/6: Configurações carregadas.");
 
     const payload = { file: imageData };
