@@ -19,7 +19,7 @@ export function useApprovalRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !userRole) throw new Error("Usuário não autenticado.");
 
-      const insertionPayload = {
+      const insertionPayload: any = {
         user_id: user.id,
         requester_role: userRole,
         action_type: request.action_type,
@@ -27,6 +27,13 @@ export function useApprovalRequest() {
         payload: request.payload,
         status: 'pending',
       };
+      
+      // Preenche a coluna FK correta para o PostgREST
+      if (request.action_type === 'free_table') {
+        insertionPayload.mesa_id_fk = request.target_id;
+      } else if (request.action_type === 'apply_discount') {
+        insertionPayload.item_pedido_id_fk = request.target_id;
+      }
       
       console.log("[ApprovalRequest] Tentando inserir payload:", insertionPayload);
 

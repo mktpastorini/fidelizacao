@@ -27,13 +27,14 @@ async function fetchPendingApprovalRequests(userRole: UserRole): Promise<Approva
     return [];
   }
   
+  // Usando os novos nomes de coluna para os joins
   const { data, error } = await supabase
     .from("approval_requests")
     .select(`
       *,
       requester:profiles(first_name, last_name, role),
-      mesa:mesas(numero),
-      item_pedido:itens_pedido(*)
+      mesa:mesas_id_fk(numero),
+      item_pedido:item_pedido_id_fk(*)
     `)
     .eq("status", "pending")
     .order("created_at", { ascending: true });
@@ -72,7 +73,7 @@ export function ApprovalAlertModal() {
     queryKey: ["pending_approval_requests"],
     queryFn: () => fetchPendingApprovalRequests(userRole!),
     enabled: isManagerOrAdmin && !isLoadingSettings,
-    // Removendo refetchInterval para depender da invalidação forçada
+    // Remoção do refetchInterval para depender da invalidação forçada
   });
 
   // Usamos o primeiro item da lista como o item atual a ser exibido
@@ -119,16 +120,20 @@ export function ApprovalAlertModal() {
   let icon: React.ElementType = ShieldAlert;
   let iconColor = "text-yellow-500";
 
+  // Acessando os dados da relação através dos novos nomes de coluna
+  const mesaNumero = request.mesa?.[0]?.numero;
+  const itemPedido = request.item_pedido?.[0];
+
   switch (request.action_type) {
     case 'free_table':
-      title = `Liberar Mesa ${request.mesa?.numero || '?'}`;
-      description = `O usuário ${requesterName} (${requesterRole}) solicitou a liberação da Mesa ${request.mesa?.numero || '?'}. Isso irá CANCELAR o pedido aberto e remover todos os ocupantes.`;
+      title = `Liberar Mesa ${mesaNumero || '?'}`;
+      description = `O usuário ${requesterName} (${requesterRole}) solicitou a liberação da Mesa ${mesaNumero || '?'}. Isso irá CANCELAR o pedido aberto e remover todos os ocupantes.`;
       icon = Table;
       iconColor = "text-blue-500";
       break;
     case 'apply_discount':
       title = `Aplicar Desconto de ${request.payload.desconto_percentual}%`;
-      description = `O usuário ${requesterName} (${requesterRole}) solicitou um desconto de ${request.payload.desconto_percentual}% no item "${request.item_pedido?.nome_produto || 'Item do Pedido'}". Motivo: ${request.payload.desconto_motivo || 'N/A'}`;
+      description = `O usuário ${requesterName} (${requesterRole}) solicitou um desconto de ${request.payload.desconto_percentual}% no item "${itemPedido?.nome_produto || 'Item do Pedido'}". Motivo: ${request.payload.desconto_motivo || 'N/A'}`;
       icon = Tag;
       iconColor = "text-green-500";
       break;
@@ -170,7 +175,7 @@ export function ApprovalAlertModal() {
                     <ul className="space-y-1 text-xs text-muted-foreground">
                         {pendingRequests.slice(1).map((req, index) => (
                             <li key={req.id} className="truncate">
-                                {index + 2}. {roleLabels[req.requester_role]} - {req.action_type === 'free_table' ? `Liberar Mesa ${req.mesa?.numero || '?'}` : `Desconto ${req.payload.desconto_percentual}%`}
+                                {index + 2}. {roleLabels[req.requester_role]} - {req.action_type === 'free_table' ? `Liberar Mesa ${req.mesa?.[0]?.numero || '?'}` : `Desconto ${req.payload.desconto_percentual}%`}
                             </li>
                         ))}
                     </ul>

@@ -126,10 +126,15 @@ export type ApprovalRequest = {
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;
-  // Relações para facilitar o frontend
+  
+  // Novas colunas FK para PostgREST
+  mesa_id_fk: string | null;
+  item_pedido_id_fk: string | null;
+
+  // Relações para facilitar o frontend (retornam arrays devido ao PostgREST)
   requester?: { first_name: string | null; last_name: string | null; role: UserRole } | null;
-  mesa?: { numero: number } | null;
-  item_pedido?: ItemPedido | null;
+  mesa?: { numero: number }[] | null; // Alterado para array
+  item_pedido?: ItemPedido[] | null; // Alterado para array
 };
 
 export type UserRole = 'superadmin' | 'admin' | 'gerente' | 'balcao' | 'garcom' | 'cozinha';
