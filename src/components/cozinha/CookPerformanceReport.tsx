@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfDay, startOfDay } from "date-fns";
-import { Utensils, Clock, BarChart2, User, User as UserIcon } from "lucide-react"; // Importação corrigida
+import { Utensils, Clock, BarChart2, User, User as UserIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
 import { useSettings } from "@/contexts/SettingsContext";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { CookDetailsModal } from "./CookDetailsModal"; // Importado
 
 type CookStat = {
   cozinheiro_id: string;
@@ -47,6 +48,9 @@ export function CookPerformanceReport() {
     from: startOfMonth(getBrazilTime()),
     to: endOfDay(getBrazilTime()),
   });
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCook, setSelectedCook] = useState<{ id: string; name: string } | null>(null);
 
   const userIdToFetch = useMemo(() => {
     // Cozinha, Gerente, Admin e Superadmin usam o ID do Superadmin para buscar dados.
@@ -73,6 +77,11 @@ export function CookPerformanceReport() {
     const totalTime = cookStats.reduce((sum, stat) => sum + (stat.tempo_medio_preparo_min * stat.total_pratos_finalizados), 0);
     return totalTime / totalDishes;
   }, [cookStats, totalDishes]);
+  
+  const handleOpenDetails = (cookId: string, cookName: string) => {
+    setSelectedCook({ id: cookId, name: cookName });
+    setIsModalOpen(true);
+  };
 
   if (isLoadingSuperadminId || isLoading) {
     return <Skeleton className="h-96 w-full" />;
@@ -132,7 +141,11 @@ export function CookPerformanceReport() {
               </TableHeader>
               <TableBody>
                 {cookStats.map((stat) => (
-                  <TableRow key={stat.cozinheiro_id}>
+                  <TableRow 
+                    key={stat.cozinheiro_id} 
+                    className="cursor-pointer hover:bg-secondary/50 transition-colors"
+                    onClick={() => handleOpenDetails(stat.cozinheiro_id, stat.cozinheiro_nome || `ID: ${stat.cozinheiro_id.substring(0, 8)}...`)}
+                  >
                     <TableCell className="font-medium flex items-center">
                       <UserIcon className="w-4 h-4 mr-2 text-muted-foreground" />
                       {stat.cozinheiro_nome || `ID: ${stat.cozinheiro_id.substring(0, 8)}...`}
@@ -154,6 +167,15 @@ export function CookPerformanceReport() {
           )}
         </CardContent>
       </Card>
+      
+      <CookDetailsModal
+        isOpen={isModalOpen}
+        onOpenChange={setIsModalOpen}
+        cookId={selectedCook?.id || null}
+        cookName={selectedCook?.name || null}
+        userId={userIdToFetch}
+        dateRange={dateRange}
+      />
     </div>
   );
 }
