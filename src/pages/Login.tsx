@@ -1,18 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { LoginForm } from "@/components/login/LoginForm";
 import { VideoBackground } from "@/components/login/VideoBackground";
 import { FullscreenToggle } from "@/components/login/FullscreenToggle";
 
 // Lista de URLs de vídeo padrão.
-// Se você adicionar vídeos à sua pasta 'public' (ex: public/videos/fundo1.mp4),
-// adicione o caminho relativo aqui (ex: "/videos/fundo1.mp4").
 const DEFAULT_VIDEO_URLS = [
-  "/ia.mp4",
-  "/ia2.mp4",
-  "/ia4.mp4",
-  "/ia3.mp4"
+  "https://assets.mixkit.co/videos/preview/mixkit-restaurant-with-a-view-of-the-city-at-night-4416-large.mp4",
   // Adicione seus vídeos locais aqui:
   // "/videos/fundo1.mp4",
   // "/videos/fundo2.mp4",
@@ -26,7 +21,6 @@ function selectRandomVideoUrl(urlOrList: string | null | undefined): string {
     urls = urlOrList.split(',').map(url => url.trim()).filter(url => url.length > 0);
   }
   
-  // Se o usuário não configurou nada, usamos a lista padrão
   if (urls.length === 0) {
     urls = DEFAULT_VIDEO_URLS;
   }
@@ -39,7 +33,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [videoUrl, setVideoUrl] = useState('');
 
-  useEffect(() => {
+  const loadNextVideo = useCallback(() => {
     // Tenta obter a URL(s) salva(s) no localStorage
     const savedUrlOrList = localStorage.getItem('login_video_url');
     
@@ -48,7 +42,10 @@ const Login = () => {
     
     setVideoUrl(selectedUrl);
     console.log("Login Video: URL selecionada para exibição:", selectedUrl);
+  }, []);
 
+  useEffect(() => {
+    loadNextVideo(); // Carrega o primeiro vídeo na montagem
 
     const {
       data: { subscription },
@@ -61,13 +58,13 @@ const Login = () => {
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, loadNextVideo]);
 
   const isVideoUrlValid = !!videoUrl;
 
   return (
     <div className="relative flex items-center justify-center min-h-screen text-white">
-      {isVideoUrlValid && <VideoBackground videoUrl={videoUrl} />}
+      {isVideoUrlValid && <VideoBackground videoUrl={videoUrl} onVideoEnded={loadNextVideo} />}
       <FullscreenToggle />
       <LoginForm />
     </div>
