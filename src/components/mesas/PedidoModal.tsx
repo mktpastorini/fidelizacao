@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
@@ -27,6 +27,7 @@ import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
 import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -84,16 +85,25 @@ const calcularPrecoComDesconto = (item: ItemPedido) => {
   return precoTotal - desconto;
 };
 
+type ItemToPayWithQuantity = {
+  id: string;
+  quantidade: number;
+  isMesaItem: boolean;
+};
+
 export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const queryClient = useQueryClient();
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [clientePagando, setClientePagando] = useState<Cliente | null>(null);
+  const [clientePagandoIndividual, setClientePagandoIndividual] = useState<Cliente | null>(null);
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const [isResgateOpen, setIsResgateOpen] = useState(false);
   
-  // Novo estado para armazenar os itens da mesa que o cliente selecionou para pagar
-  const [mesaItemsToPay, setMesaItemsToPay] = useState<ItemPedido[]>([]);
-  const [isPartialDialogValid, setIsPartialDialogValid] = useState(false); // Estado para validar o pagamento parcial
+  // Novo estado para pagamento parcial de item da mesa
+  const [itemMesaToPay, setItemMesaToPay] = useState<ItemPedido | null>(null);
+  const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
+  const [clientePagandoMesaId, setClientePagandoMesaId] = useState<string | null>(null);
+  const [isMesaItemPartialPaymentOpen, setIsMesaItemPartialPaymentOpen] = useState(false);
+
 
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
@@ -185,9 +195,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       }
       
       // 3. Determinar o status inicial
-      // Todos os itens, mesmo os de venda direta sem preparo, começam como 'pendente'
-      // para que o Garçom/Balcão possa clicar em 'Entregar ao Cliente' no Kanban.
-      // A única exceção é o Pacote Rodízio, que é excluído do Kanban pelo nome.
       status = 'pendente'; 
 
       const { error: itemError } = await supabase.from("itens_pedido").insert({ 
@@ -227,7 +234,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   });
 
   const closePartialOrderMutation = useMutation({
-    mutationFn: async ({ clienteId, itemsToPayWithQuantity }: { clienteId: string, itemsToPayWithQuantity: { id: string, quantidade: number, isMesaItem: boolean }[] }) => {
+    mutationFn: async ({ clienteId, itemsToPayWithQuantity }: { clienteId: string, itemsToPayWithQuantity: ItemToPayWithQuantity[] }) => {
       if (!pedido) throw new Error("Pedido não encontrado.");
       
       const { data: { user } } = await supabase.auth.getUser();
@@ -322,7 +329,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar pontos
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
-      setClientePagando(null);
+      setClientePagandoIndividual(null);
+      setIsMesaItemPartialPaymentOpen(false); // Fecha o modal de pagamento parcial de item da mesa
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -390,10 +398,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     }
     
     // 3. Determinar o status inicial
-    // Todos os itens, mesmo os de venda direta sem preparo, começam como 'pendente'
-    // para que o Garçom/Balcão possa clicar em 'Entregar ao Cliente' no Kanban.
-    // A única exceção é o Pacote Rodízio, que é excluído do Kanban pelo nome.
-    let status: ItemPedido['status'] = 'pendente';
+    status = 'pendente';
 
     addItemMutation.mutate({ 
         ...values, 
@@ -403,16 +408,114 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     });
   };
   
-  // Função para abrir o modal de pagamento parcial
+  // Função para abrir o modal de pagamento individual
   const handlePartialPaymentOpen = (cliente: Cliente) => {
-    setClientePagando(cliente);
-    
-    // Valida se há itens para pagar (individuais + mesa, se for o principal)
     const items = getItemsToPayIndividual(cliente.id);
-    const itemsMesa = itensMesaGeral;
-    
-    // A validação agora é se há itens individuais OU itens da mesa.
-    setIsPartialDialogValid(items.length > 0 || itemsMesa.length > 0);
+    if (items.length === 0) {
+        showError(`O cliente ${cliente.nome} não possui itens individuais para pagar.`);
+        return;
+    }
+    setClientePagandoIndividual(cliente);
+  };
+  
+  // Função para abrir o modal de pagamento parcial de item da mesa
+  const handleMesaItemPartialPaymentOpen = (item: ItemPedido) => {
+    if (!ocupantes || ocupantes.length === 0) {
+        showError("Não há clientes ocupando a mesa para atribuir o pagamento.");
+        return;
+    }
+    setItemMesaToPay(item);
+    setQuantidadePagarMesa(1);
+    setClientePagandoMesaId(ocupantes[0].id); // Default para o primeiro ocupante
+    setIsMesaItemPartialPaymentOpen(true);
+  };
+  
+  // Mutação para pagamento parcial de item da mesa
+  const payMesaItemPartialMutation = useMutation({
+    mutationFn: async ({ itemId, quantidade, clienteId }: { itemId: string, quantidade: number, clienteId: string }) => {
+      if (!pedido) throw new Error("Pedido não encontrado.");
+      
+      const originalItem = itensMesaGeral.find(i => i.id === itemId);
+      if (!originalItem) throw new Error("Item da mesa não encontrado.");
+      if (quantidade > originalItem.quantidade) throw new Error("Quantidade a pagar excede a quantidade restante.");
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado.");
+
+      // 1. Criar um novo pedido "recibo" (usando o cliente que está pagando)
+      const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
+        user_id: user.id, 
+        cliente_id: clienteId, 
+        status: 'pago', 
+        closed_at: new Date().toISOString(), 
+        mesa_id: mesa!.id, 
+        acompanhantes: pedido.acompanhantes,
+      }).select("id").single();
+      if (newPedidoError) throw newPedidoError;
+      const newPedidoId = newPedido.id;
+
+      const quantityRemaining = originalItem.quantidade - quantidade;
+
+      // 2a. Criar o item pago (para o recibo)
+      const { error: insertError } = await supabase.from("itens_pedido").insert({
+        ...originalItem,
+        id: undefined, // Deixa o banco gerar um novo ID
+        pedido_id: newPedidoId,
+        quantidade: quantidade,
+        consumido_por_cliente_id: clienteId,
+        created_at: new Date().toISOString(), // Atualiza o timestamp
+        updated_at: new Date().toISOString(),
+      });
+      if (insertError) throw insertError;
+
+      // 2b. Atualizar a quantidade restante no item original (no pedido aberto)
+      if (quantityRemaining > 0) {
+        const { error: updateError } = await supabase.from("itens_pedido")
+          .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
+          .eq("id", originalItem.id);
+        if (updateError) throw updateError;
+      } else {
+        // Se a quantidade restante for 0, deleta o item original do pedido aberto
+        const { error: deleteError } = await supabase.from("itens_pedido")
+          .delete()
+          .eq("id", originalItem.id);
+        if (deleteError) throw deleteError;
+      }
+      
+      // 3. Verificar se o pedido original ficou vazio e fechar se necessário
+      const { count: remainingItemsCount } = await supabase.from("itens_pedido")
+        .select('*', { count: 'exact', head: true })
+        .eq("pedido_id", pedido.id);
+        
+      if (remainingItemsCount === 0) {
+        await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
+        // Se o pedido fechar, liberamos a mesa (cliente_id = null) e removemos ocupantes
+        await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
+        await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id);
+      }
+    },
+    onSuccess: (_, { clienteId }) => {
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["ocupantes", mesa?.id] });
+      queryClient.invalidateQueries({ queryKey: ["mesas"] });
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      const cliente = ocupantes?.find(o => o.id === clienteId);
+      showSuccess(`Pagamento parcial de item da mesa atribuído a ${cliente?.nome || 'cliente'}!`);
+      setIsMesaItemPartialPaymentOpen(false);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+  
+  const handleConfirmMesaItemPayment = () => {
+    if (itemMesaToPay && clientePagandoMesaId && quantidadePagarMesa > 0) {
+        payMesaItemPartialMutation.mutate({
+            itemId: itemMesaToPay.id,
+            quantidade: quantidadePagarMesa,
+            clienteId: clientePagandoMesaId,
+        });
+    }
   };
 
   return (
@@ -478,7 +581,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                       <p>R$ {precoOriginal.toFixed(2)}</p>
                                     )}
                                   </div>
-                                  {/* Ações para itens da mesa */}
+                                  {/* Botão de Pagamento Parcial para Item da Mesa */}
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => handleMesaItemPartialPaymentOpen(item)}
+                                  >
+                                    <DollarSign className="w-4 h-4" />
+                                  </Button>
+                                  {/* Dropdown de Ações */}
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -646,22 +758,104 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Modal de Pagamento de Itens Individuais */}
       <FinalizarContaParcialDialog
-        isOpen={!!clientePagando}
-        onOpenChange={() => setClientePagando(null)}
-        cliente={clientePagando}
-        itensIndividuais={getItemsToPayIndividual(clientePagando?.id || '')}
-        itensMesaGeral={itensMesaGeral}
+        isOpen={!!clientePagandoIndividual}
+        onOpenChange={() => setClientePagandoIndividual(null)}
+        cliente={clientePagandoIndividual}
+        itensIndividuais={getItemsToPayIndividual(clientePagandoIndividual?.id || '')}
         clientePrincipalId={clientePrincipal?.id || null}
-        onConfirm={(itemsToPayWithQuantity) => clientePagando && closePartialOrderMutation.mutate({ clienteId: clientePagando.id, itemsToPayWithQuantity })}
+        onConfirm={(itemsToPayWithQuantity) => clientePagandoIndividual && closePartialOrderMutation.mutate({ clienteId: clientePagandoIndividual.id, itemsToPayWithQuantity })}
         isSubmitting={closePartialOrderMutation.isPending}
-        isPartialDialogValid={isPartialDialogValid}
       />
+      
+      {/* Modal de Pagamento Parcial de Item da Mesa */}
+      <AlertDialog open={isMesaItemPartialPaymentOpen} onOpenChange={setIsMesaItemPartialPaymentOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pagar Item da Mesa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione a quantidade e o cliente que está pagando o item: <span className="font-semibold">{itemMesaToPay?.nome_produto}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {itemMesaToPay && ocupantes && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="cliente-pagando-mesa">Cliente Pagando</Label>
+                <Select 
+                  value={clientePagandoMesaId || ''} 
+                  onValueChange={setClientePagandoMesaId}
+                  disabled={ocupantes.length === 0 || payMesaItemPartialMutation.isPending}
+                >
+                  <SelectTrigger id="cliente-pagando-mesa" className="mt-1">
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ocupantes.map(cliente => (
+                      <SelectItem key={cliente.id} value={cliente.id}>
+                        {cliente.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="quantidade-pagar">Quantidade a Pagar (Máx: {itemMesaToPay.quantidade})</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setQuantidadePagarMesa(prev => Math.max(1, prev - 1))} 
+                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialMutation.isPending}
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    max={itemMesaToPay.quantidade}
+                    value={quantidadePagarMesa} 
+                    onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.quantidade, parseInt(e.target.value) || 1)))} 
+                    className="w-16 text-center"
+                    disabled={payMesaItemPartialMutation.isPending}
+                  />
+                  <Button 
+                    size="icon" 
+                    onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.quantidade, prev + 1))} 
+                    disabled={quantidadePagarMesa >= itemMesaToPay.quantidade || payMesaItemPartialMutation.isPending}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
+                <span>Total a Pagar:</span>
+                <span>{formatCurrency(calcularPrecoComDesconto({ ...itemMesaToPay, quantidade: 1 }) * quantidadePagarMesa)}</span>
+              </div>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={payMesaItemPartialMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmMesaItemPayment} 
+              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialMutation.isPending}
+            >
+              {payMesaItemPartialMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       <AplicarDescontoDialog
         isOpen={!!itemParaDesconto}
         onOpenChange={() => setItemParaDesconto(null)}
         item={itemParaDesconto}
-        onDiscountRequested={handleDiscountRequested} // Passando a nova função de callback
+        onDiscountRequested={handleDiscountRequested}
       />
       {/* NOVO MODAL DE RESGATE */}
       <ResgatePontosDialog
