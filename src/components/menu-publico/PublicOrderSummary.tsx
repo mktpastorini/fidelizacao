@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, DollarSign } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area"; // Importado ScrollArea
 
 type PedidoComItens = Pedido & { itens_pedido: ItemPedido[] };
 
@@ -72,33 +73,35 @@ export function PublicOrderSummary({ isOpen, onOpenChange, mesaId }: PublicOrder
           <Skeleton className="h-64 w-full" />
         ) : data?.pedido?.itens_pedido.length ? (
           <div className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-secondary">
-                  <TableHead className="text-primary">Item</TableHead>
-                  <TableHead className="text-center text-primary">Qtd</TableHead>
-                  <TableHead className="text-primary">Consumidor</TableHead>
-                  <TableHead className="text-right text-primary">Preço</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.pedido.itens_pedido.map((item) => {
-                  const precoFinal = (item.preco || 0) * item.quantidade * (1 - (item.desconto_percentual || 0) / 100);
-                  const consumidorNome = item.consumido_por_cliente_id 
-                    ? ocupantesMap.get(item.consumido_por_cliente_id) 
-                    : ocupantesMap.get('mesa');
+            <ScrollArea className="max-h-[60vh]">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-secondary">
+                    <TableHead className="text-primary">Item</TableHead>
+                    <TableHead className="text-center text-primary">Qtd</TableHead>
+                    <TableHead className="text-primary">Consumidor</TableHead>
+                    <TableHead className="text-right text-primary">Preço</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.pedido.itens_pedido.map((item) => {
+                    const precoFinal = (item.preco || 0) * item.quantidade * (1 - (item.desconto_percentual || 0) / 100);
+                    const consumidorNome = item.consumido_por_cliente_id 
+                      ? ocupantesMap.get(item.consumido_por_cliente_id) 
+                      : ocupantesMap.get('mesa');
 
-                  return (
-                    <TableRow key={item.id} className="text-sm hover:bg-secondary/50">
-                      <TableCell className="font-medium">{item.nome_produto}</TableCell>
-                      <TableCell className="text-center">{item.quantidade}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{consumidorNome}</TableCell>
-                      <TableCell className="text-right font-semibold text-primary">{formatCurrency(precoFinal)}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                    return (
+                      <TableRow key={item.id} className="text-sm hover:bg-secondary/50">
+                        <TableCell className="font-medium">{item.nome_produto}</TableCell>
+                        <TableCell className="text-center">{item.quantidade}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{consumidorNome}</TableCell>
+                        <TableCell className="text-right font-semibold text-primary">{formatCurrency(precoFinal)}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollArea>
             <div className="flex justify-between items-center pt-4 border-t border-border">
               <span className="text-lg font-bold flex items-center gap-2 text-primary"><DollarSign className="w-5 h-5" /> Total Parcial:</span>
               <span className="text-2xl font-extrabold text-foreground">{formatCurrency(totalPedido)}</span>
