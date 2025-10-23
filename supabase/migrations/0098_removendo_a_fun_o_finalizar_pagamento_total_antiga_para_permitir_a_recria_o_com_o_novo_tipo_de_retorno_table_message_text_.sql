@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.finalizar_pagamento_total(uuid, uuid);
