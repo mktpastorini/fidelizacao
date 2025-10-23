@@ -14,8 +14,6 @@ export const VideoBackground: React.FC<VideoBackgroundProps> = ({ videoUrl }) =>
                 className="absolute inset-0 min-w-full min-h-full object-cover w-auto h-auto"
                 autoPlay
                 loop
-                muted
-                playsInline
             >
                 <source src={videoUrl} type="video/mp4" />
                 Your browser does not support the video tag.
