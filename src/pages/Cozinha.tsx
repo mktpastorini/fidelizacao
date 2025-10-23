@@ -112,12 +112,12 @@ export default function CozinhaPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="mb-6">
+      <div className="mb-6 shrink-0">
         <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
         <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
       </div>
 
-      <Tabs defaultValue="kanban" className="flex-1 flex flex-col">
+      <Tabs defaultValue="kanban" className="flex-1 flex flex-col min-h-0">
         <TabsList className="grid w-full grid-cols-2 max-w-md shrink-0">
           <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
           <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
@@ -125,7 +125,7 @@ export default function CozinhaPage() {
         
         <TabsContent value="kanban" className="mt-6 flex-1 min-h-0">
           {isLoading ? (
-            <div className="flex-1 flex gap-4">
+            <div className="flex-1 flex gap-4 h-full">
               <Skeleton className="flex-1" />
               <Skeleton className="flex-1" />
               <Skeleton className="flex-1" />
