@@ -204,8 +204,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         const total_quantidade = items.reduce((sum, item) => sum + item.quantidade, 0);
         const subtotalItem = items.reduce((sum, item) => sum + calcularPrecoComDesconto(item), 0);
         
-        // Usamos o primeiro item como base para as propriedades
-        const baseItem = items[0];
+        // Usamos o item com o ID mais antigo como base para as propriedades (para manter a referência)
+        const baseItem = items.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
         
         const groupedItem: GroupedItem = {
           ...baseItem,
@@ -351,8 +351,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         const quantityToPay = itemToPay.quantidade;
         const quantityRemaining = originalGroupedItem.total_quantidade - quantityToPay;
         
-        // Se a quantidade a pagar for igual à quantidade total do item agrupado, movemos todos os itens originais
-        if (quantityRemaining === 0) {
+        // Se o item agrupado for composto por múltiplos itens originais, movemos todos
+        // (Isso só deve acontecer para itens individuais, onde o agrupamento é 1:1)
+        if (originalGroupedItem.original_ids.length > 1) {
+            // Move todos os itens originais para o novo pedido (recibo)
             const { error: updateError } = await supabase.from("itens_pedido")
                 .update({ 
                     pedido_id: newPedidoId, 
@@ -363,9 +365,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             if (updateError) throw updateError;
         } else {
             // Pagamento parcial de um item agrupado (só pode ser feito se o item agrupado for composto por um único item original)
-            if (originalGroupedItem.original_ids.length > 1) {
-                throw new Error(`Erro: Pagamento parcial de item agrupado com múltiplos IDs originais não suportado.`);
-            }
             
             const originalItemId = originalGroupedItem.original_ids[0];
             
@@ -375,22 +374,41 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                 id: undefined, // Deixa o Supabase gerar um novo ID
                 pedido_id: newPedidoId,
                 quantidade: quantityToPay,
+                preco: originalGroupedItem.preco, // Preço unitário original
                 consumido_por_cliente_id: clienteId,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
             });
             if (insertError) throw insertError;
 
-            // 2. Atualiza a quantidade restante no item original
-            const { error: updateError } = await supabase.from("itens_pedido")
-                .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
-                .eq("id", originalItemId);
-            if (updateError) throw updateError;
+            if (quantityRemaining > 0) {
+                // 2. Atualiza a quantidade restante no item original
+                const { error: updateError } = await supabase.from("itens_pedido")
+                    .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
+                    .eq("id", originalItemId);
+                if (updateError) throw updateError;
+            } else {
+                // 2. Se a quantidade restante for 0, DELETA o item original
+                const { error: deleteError } = await supabase.from("itens_pedido")
+                    .delete()
+                    .eq("id", originalItemId);
+                if (deleteError) throw deleteError;
+            }
         }
       }
 
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
+      // Verifica se o cliente que pagou ainda tem itens no pedido principal
+      const { count: remainingClientItems } = await supabase.from("itens_pedido")
+        .select('*', { count: 'exact', head: true })
+        .eq("pedido_id", pedido.id)
+        .eq("consumido_por_cliente_id", clienteId);
+        
+      // Se o cliente não tiver mais itens, remove-o da mesa
+      if (remainingClientItems === 0) {
+        await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
+      }
 
+      // Verifica se o pedido principal e a mesa devem ser fechados
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
@@ -591,15 +609,32 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         if (deleteError) throw deleteError;
       }
       
-      // 4. Verifica se o pedido principal e a mesa devem ser fechados
+      // 4. Verifica se o cliente que pagou ainda tem itens no pedido principal
+      const { count: remainingClientItems } = await supabase.from("itens_pedido")
+        .select('*', { count: 'exact', head: true })
+        .eq("pedido_id", pedido.id)
+        .eq("consumido_por_cliente_id", clienteId);
+        
+      // Se o cliente não tiver mais itens, remove-o da mesa
+      if (remainingClientItems === 0) {
+        await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
+      }
+
+      // 5. Verifica se o pedido principal e a mesa devem ser fechados
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
         
+      const { count: remainingOccupantsCount } = await supabase.from("mesa_ocupantes")
+        .select('*', { count: 'exact', head: true })
+        .eq("mesa_id", mesa!.id);
+
       if (remainingItemsCount === 0) {
         await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
+      }
+      
+      if (remainingOccupantsCount === 0) {
         await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
-        await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id);
       }
     },
     onSuccess: (_, { clienteId }) => {
@@ -626,6 +661,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         });
     }
   };
+  
+  // Variável calculada para o modal de pagamento parcial de item da mesa
+  const precoUnitarioComDescontoMesa = useMemo(() => {
+    if (!itemMesaToPay) return 0;
+    return itemMesaToPay.subtotal / itemMesaToPay.total_quantidade;
+  }, [itemMesaToPay]);
 
   return (
     <>
@@ -973,7 +1014,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
-                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || payMesaItemPartialMutation.isPending}
+                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || payMesaItemPartialPaymentOpen.isSubmitting}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -982,7 +1023,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               
               <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
                 <span>Total a Pagar:</span>
-                <span>{(precoUnitarioComDesconto * quantidadePagarMesa).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                <span>{(precoUnitarioComDescontoMesa * quantidadePagarMesa).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
             </div>
           )}
