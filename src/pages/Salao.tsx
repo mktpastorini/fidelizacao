@@ -20,7 +20,8 @@ import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useApprovalRequest } from "@/hooks/useApprovalRequest";
-import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
+import { useSettings } from "@/contexts/SettingsContext";
+import { useSuperadminId } from "@/hooks/useSuperadminId"; // Importado
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -30,7 +31,7 @@ type SalaoData = {
   mesas: MesaComOcupantes[];
   pedidosAbertos: PedidoAberto[];
   clientes: Cliente[];
-  settings: UserSettings | null;
+  settings: UserSettings | null; // Configurações do Superadmin
 };
 
 function getBrazilTime() {
@@ -39,7 +40,7 @@ function getBrazilTime() {
   return new Date(utc - (3 * 3600000));
 }
 
-async function fetchSalaoData(): Promise<SalaoData> {
+async function fetchSalaoData(superadminId: string | null): Promise<SalaoData> {
   const { data: { user } } = await supabase.auth.getUser();
 
   const { data: mesas, error: mesasError } = await supabase
@@ -57,8 +58,15 @@ async function fetchSalaoData(): Promise<SalaoData> {
   const { data: clientes, error: clientesError } = await supabase.from("clientes").select("*, filhos(*)");
   if (clientesError) throw new Error(clientesError.message);
 
-  const { data: settings, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", user!.id).single();
-  if (settingsError && settingsError.code !== 'PGRST116') throw new Error(settingsError.message);
+  let settings: UserSettings | null = null;
+  if (superadminId) {
+    // Busca as configurações do Superadmin para obter o status de fechamento e webhook
+    const { data: settingsData, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", superadminId).single();
+    if (settingsError && settingsError.code !== 'PGRST116') {
+      console.error("Erro ao buscar configurações do Superadmin:", settingsError);
+    }
+    settings = settingsData;
+  }
 
   return {
     mesas: mesas || [],
@@ -71,7 +79,9 @@ async function fetchSalaoData(): Promise<SalaoData> {
 export default function SalaoPage() {
   const queryClient = useQueryClient();
   const { requestApproval, isRequesting } = useApprovalRequest();
-  const { userRole } = useSettings(); // Usando useSettings para obter a função do usuário
+  const { userRole } = useSettings();
+  const { superadminId, isLoadingSuperadminId } = useSuperadminId(); // Usando o novo hook
+  
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -85,8 +95,9 @@ export default function SalaoPage() {
   >([]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["salaoData"],
-    queryFn: fetchSalaoData,
+    queryKey: ["salaoData", superadminId],
+    queryFn: () => fetchSalaoData(superadminId),
+    enabled: !isLoadingSuperadminId && !!superadminId, // Habilita apenas quando o ID do Superadmin estiver pronto
     refetchInterval: 30000,
   });
 
@@ -114,10 +125,10 @@ export default function SalaoPage() {
 
   const openDayMutation = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-
-      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", user.id);
+      if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+      
+      // Atualiza o status de fechamento no perfil do Superadmin
+      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", superadminId);
       if (updateError) throw updateError;
 
       const { error: functionError } = await supabase.functions.invoke('open-day');
@@ -375,7 +386,7 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingSuperadminId) {
     return <Skeleton className="h-screen w-full" />;
   }
   
