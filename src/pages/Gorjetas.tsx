@@ -5,9 +5,9 @@ import { StaffProfile } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
-import { startOfMonth, endOfDay, format } from "date-fns";
+import { startOfMonth, endOfDay, format, startOfDay } from "date-fns"; // Adicionado startOfDay
 import { ptBR } from "date-fns/locale";
-import { DollarSign, User, BarChart2, User as UserIcon } from "lucide-react"; // Adicionado UserIcon
+import { DollarSign, User, BarChart2, User as UserIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
@@ -62,10 +62,12 @@ export default function GorjetasPage() {
     return null;
   }, [userRole, superadminId]);
 
+  const isQueryEnabled = !!userIdToFetch && !!dateRange?.from && !!dateRange?.to && !isLoadingSuperadminId;
+
   const { data: tipStats, isLoading } = useQuery({
     queryKey: ["tipStats", userIdToFetch, dateRange],
     queryFn: () => fetchTipStats(userIdToFetch!, dateRange!),
-    enabled: !!userIdToFetch && !!dateRange?.from && !!dateRange?.to && !isLoadingSuperadminId,
+    enabled: isQueryEnabled,
   });
 
   const totalTips = useMemo(() => {
