@@ -71,9 +71,14 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
         }
     }
     
-    // Para itens que requerem preparo, ou para iniciar o preparo, exige reconhecimento
-    setPendingAction(action);
-    setIsModalOpen(true);
+    // Para itens que requerem preparo (start_prep ou finish_prep), exige reconhecimento
+    if (item.requer_preparo || action === 'start_prep') {
+        setPendingAction(action);
+        setIsModalOpen(true);
+    } else if (action === 'finish_prep' && isNonPrepItem && canDeliverNonPrep) {
+        // Fallback para garantir que itens sem preparo sejam entregues se o botão for clicado
+        onStatusChange(item.id, 'entregue', 'system');
+    }
   };
 
   return (
