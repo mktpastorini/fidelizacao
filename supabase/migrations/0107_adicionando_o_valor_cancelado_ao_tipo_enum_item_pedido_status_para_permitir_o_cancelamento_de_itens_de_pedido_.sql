@@ -1,0 +1,1 @@
+ALTER TYPE item_pedido_status ADD VALUE 'cancelado';
