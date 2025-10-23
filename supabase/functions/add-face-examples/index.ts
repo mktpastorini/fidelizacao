@@ -61,15 +61,20 @@ serve(async (req) => {
 
   try {
     console.log("[add-face-examples] 1/7: Parsing body da requisição...");
-    const { subject, image_urls } = await req.json();
-    console.log(`[add-face-examples] 1/7: Body recebido - subject: ${subject}, image_urls.length: ${image_urls?.length}`);
+    // Adicionando is_cook para prefixar o subject
+    const { subject, image_urls, is_cook } = await req.json();
+    console.log(`[add-face-examples] 1/7: Body recebido - subject: ${subject}, image_urls.length: ${image_urls?.length}, is_cook: ${is_cook}`);
     
     if (!subject || typeof subject !== 'string' || subject.trim() === '') {
-      throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente.`);
+      throw new Error(`Parâmetro 'subject' (ID do cliente/cozinheiro) inválido ou ausente.`);
     }
     if (!image_urls || !Array.isArray(image_urls) || image_urls.length === 0) {
       throw new Error("`image_urls` deve ser um array com pelo menos uma URL.");
     }
+
+    // Define o subject final com prefixo se for cozinheiro
+    const finalSubject = is_cook ? `cook_${subject}` : subject;
+    console.log(`[add-face-examples] Subject final para CompreFace: ${finalSubject}`);
 
     console.log("[add-face-examples] 2/7: Autenticando usuário logado...");
     const authHeader = req.headers.get('Authorization');
@@ -122,8 +127,8 @@ serve(async (req) => {
         const payload = { file: base64String };
         
         console.log(`${logPrefix} 5/7: Enviando para CompreFace...`);
-        // O subject é o ID do cliente, que é único.
-        const requestUrl = `${settings.compreface_url}/api/v1/recognition/faces?subject=${encodeURIComponent(subject)}`;
+        // Usando o finalSubject (com ou sem prefixo 'cook_')
+        const requestUrl = `${settings.compreface_url}/api/v1/recognition/faces?subject=${encodeURIComponent(finalSubject)}`;
         
         const response = await fetch(requestUrl, {
           method: 'POST',

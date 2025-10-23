@@ -13,21 +13,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { MultiImageCapture } from "@/components/clientes/MultiImageCapture";
 import { Loader2 } from "lucide-react";
+import { Cozinheiro } from "@/types/supabase";
 
 const formSchema = z.object({
-  first_name: z.string().min(1, "O nome é obrigatório."),
-  last_name: z.string().optional(),
-  email: z.string().email("Email inválido."),
-  password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres.").optional(),
+  nome: z.string().min(1, "O nome é obrigatório."),
+  email: z.string().email("Email inválido.").optional().or(z.literal("")),
   avatar_urls: z.array(z.string()).min(1, { message: "É necessário pelo menos uma foto para o reconhecimento." }),
 });
 
 type CozinheiroFormValues = z.infer<typeof formSchema> & { id?: string };
 
 type CozinheiroFormProps = {
-  onSubmit: (values: CozinheiroFormValues) => void;
+  onSubmit: (values: CozinheiroFormValues & { avatar_url: string | null }) => void;
   isSubmitting: boolean;
-  defaultValues?: Partial<CozinheiroFormValues>;
+  defaultValues?: Partial<Cozinheiro>;
   isEditing: boolean;
 };
 
@@ -35,22 +34,18 @@ export function CozinheiroForm({ onSubmit, isSubmitting, defaultValues, isEditin
   const form = useForm<CozinheiroFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      first_name: defaultValues?.first_name || "",
-      last_name: defaultValues?.last_name || "",
+      nome: defaultValues?.nome || "",
       email: defaultValues?.email || "",
-      password: "",
-      avatar_urls: defaultValues?.avatar_urls || [],
+      avatar_urls: defaultValues?.avatar_url ? [defaultValues.avatar_url] : [],
     },
   });
 
   const handleSubmit = (values: CozinheiroFormValues) => {
-    // Remove a senha se estiver vazia no modo de edição
-    if (isEditing && !values.password) {
-      const { password, ...rest } = values;
-      onSubmit(rest);
-    } else {
-      onSubmit(values);
-    }
+    const submissionData = {
+      ...values,
+      avatar_url: values.avatar_urls[0] || null,
+    };
+    onSubmit(submissionData);
   };
 
   return (
@@ -72,76 +67,33 @@ export function CozinheiroForm({ onSubmit, isSubmitting, defaultValues, isEditin
             </FormItem>
           )}
         />
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="first_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nome</FormLabel>
-                <FormControl>
-                  <Input placeholder="Primeiro nome" {...field} disabled={isSubmitting} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="last_name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Sobrenome (Opcional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="Sobrenome" {...field} disabled={isSubmitting} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
         <FormField
           control={form.control}
-          name="email"
+          name="nome"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Email</FormLabel>
+              <FormLabel>Nome</FormLabel>
               <FormControl>
-                <Input placeholder="email@cozinha.com" {...field} disabled={isSubmitting || isEditing} />
+                <Input placeholder="Nome do cozinheiro" {...field} disabled={isSubmitting} />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-        {!isEditing && (
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Senha</FormLabel>
-                <FormControl>
-                  <Input type="password" placeholder="Mínimo 6 caracteres" {...field} disabled={isSubmitting} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email (Opcional)</FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="email@contato.com" {...field} disabled={isSubmitting} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
           )}
-        {isEditing && (
-            <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Nova Senha (Deixe em branco para manter a atual)</FormLabel>
-                        <FormControl>
-                            <Input type="password" placeholder="Nova senha" {...field} disabled={isSubmitting} />
-                        </FormControl>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-        )}
+        />
+        
         <Button type="submit" disabled={isSubmitting} className="w-full">
           {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : (isEditing ? "Salvar Cozinheiro" : "Cadastrar Cozinheiro")}
         </Button>

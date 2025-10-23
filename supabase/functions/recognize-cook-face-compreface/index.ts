@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // Função auxiliar para buscar as configurações do Superadmin
 async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log(`[recognize-user-face] Buscando configurações do CompreFace do Superadmin principal...`);
+  console.log(`[recognize-cook-face] Buscando configurações do CompreFace do Superadmin principal...`);
 
   // 1. Buscar o ID do Superadmin
   const { data: superadminProfile, error: profileError } = await supabaseAdmin
@@ -19,12 +19,12 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError || !superadminProfile) {
-    console.error("[recognize-user-face] Erro ao buscar Superadmin:", profileError);
+    console.error("[recognize-cook-face] Erro ao buscar Superadmin:", profileError);
     return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
   }
   
   const superadminId = superadminProfile.id;
-  console.log(`[recognize-user-face] Superadmin ID encontrado: ${superadminId}`);
+  console.log(`[recognize-cook-face] Superadmin ID encontrado: ${superadminId}`);
 
   // 2. Buscar as configurações do Superadmin
   const { data: settings, error: settingsError } = await supabaseAdmin
@@ -34,7 +34,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .single();
 
   if (settingsError) {
-    console.error(`[recognize-user-face] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
+    console.error(`[recognize-cook-face] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
     return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
@@ -42,11 +42,11 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
-  return { settings, error: null };
+  return { settings, error: null, superadminId };
 }
 
 serve(async (req) => {
-  console.log("--- [recognize-user-face] INICIANDO EXECUÇÃO ---");
+  console.log("--- [recognize-cook-face] INICIANDO EXECUÇÃO ---");
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -58,7 +58,7 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[recognize-user-face] 1/7: Parsing body da requisição...");
+    console.log("[recognize-cook-face] 1/7: Parsing body da requisição...");
     const { image_url } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
 
@@ -67,7 +67,7 @@ serve(async (req) => {
       imageData = image_url.split(',')[1];
     }
 
-    // 2. Autenticação do usuário logado para obter o ID
+    // 2. Autenticação do usuário logado (apenas para garantir que a requisição é de um usuário válido)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error("Usuário não autenticado. O reconhecimento facial requer autenticação.");
@@ -75,12 +75,12 @@ serve(async (req) => {
     
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userId = user.id;
-    console.log(`[recognize-user-face] 2/7: Usuário autenticado: ${userId}`);
+    const userIdForClients = user.id;
+    console.log(`[recognize-cook-face] 2/7: Usuário autenticado: ${userIdForClients}`);
 
 
     // 3. Buscando configurações do CompreFace do Superadmin
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -89,12 +89,10 @@ serve(async (req) => {
       });
     }
 
-    console.log("[recognize-user-face] 3/7: Configurações carregadas.");
+    console.log("[recognize-cook-face] 3/7: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[recognize-user-face] 4/7: Enviando para CompreFace para reconhecimento...");
-    
-    // Usamos o endpoint de reconhecimento
+    console.log("[recognize-cook-face] 4/7: Enviando para CompreFace para reconhecimento...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
@@ -104,11 +102,11 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[recognize-user-face] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[recognize-cook-face] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
     if (!response.ok) {
       const errorBody = await response.json().catch(() => response.text());
       if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
-        console.log("[recognize-user-face] CompreFace não encontrou um rosto na imagem.");
+        console.log("[recognize-cook-face] CompreFace não encontrou um rosto.");
         return new Response(JSON.stringify({ match: null, distance: null, message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
       throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
@@ -118,35 +116,34 @@ serve(async (req) => {
     const bestMatch = data.result?.[0]?.subjects?.[0];
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
-      console.log(`[recognize-user-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      const subjectId = bestMatch.subject;
+      console.log(`[recognize-cook-face] 6/7: Match encontrado - Subject: ${subjectId}, Similaridade: ${bestMatch.similarity}`);
 
-      // 7. Verificar se o subject ID corresponde ao ID do usuário logado
-      if (bestMatch.subject === userId) {
-        // Busca o perfil do usuário para retornar o nome
-        const { data: profile, error: profileError } = await supabaseAdmin
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', userId)
-            .single();
+      // Verifica se o subject ID tem o prefixo 'cook_'
+      if (subjectId.startsWith('cook_')) {
+        const cookId = subjectId.replace('cook_', '');
         
-        if (profileError) throw profileError;
+        // 7. Buscar dados do cozinheiro na tabela 'cozinheiros'
+        const { data: cook, error: cookError } = await supabaseAdmin
+          .from('cozinheiros')
+          .select('id, nome, avatar_url')
+          .eq('id', cookId)
+          .eq('user_id', superadminId) // Garante que o cozinheiro pertence ao Superadmin
+          .single();
 
-        const fullName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim();
-
-        return new Response(JSON.stringify({ 
-            match: { id: userId, nome: fullName }, 
-            distance: 1 - bestMatch.similarity 
-        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-      } else {
-        console.log(`[recognize-user-face] Match encontrado, mas ID (${bestMatch.subject}) não corresponde ao usuário logado (${userId}).`);
+        if (cookError) {
+          throw new Error(`Match encontrado, mas erro ao buscar dados do cozinheiro: ${cookError.message}`);
+        }
+        console.log("[recognize-cook-face] Dados do cozinheiro recuperados com sucesso.");
+        return new Response(JSON.stringify({ match: cook, distance: 1 - bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
     }
 
-    console.log("[recognize-user-face] 6/7: Nenhum match encontrado com similaridade suficiente ou ID incorreto.");
+    console.log("[recognize-cook-face] 6/7: Nenhum match encontrado com similaridade suficiente ou não é um cozinheiro.");
     return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
-    console.error("--- [recognize-user-face] ERRO FATAL ---");
+    console.error("--- [recognize-cook-face] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
     console.error("Stack:", error.stack);
     return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
