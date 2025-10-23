@@ -19,7 +19,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError || !superadminProfile) {
-    console.error("[recognize-face] Erro ao buscar Superadmin:", profileError);
+    console.error("[recognize-face] Erro ao buscar Superadmin:", profileError?.message || "Perfil não encontrado.");
     return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
   }
   
@@ -34,7 +34,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .single();
 
   if (settingsError) {
-    console.error(`[recognize-face] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
+    console.error(`[recognize-face] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError.message);
     return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
@@ -71,6 +71,7 @@ serve(async (req) => {
     // 2. Autenticação do usuário logado para obter o ID
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        // Isso pode acontecer se o token expirar, mas o frontend não deveria chamar sem token.
         throw new Error("Usuário não autenticado. O reconhecimento facial requer autenticação.");
     }
     
@@ -110,6 +111,7 @@ serve(async (req) => {
         console.log("[recognize-face] CompreFace não encontrou um rosto na imagem.");
         return new Response(JSON.stringify({ match: null, distance: null, message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
+      // Lançar erro com detalhes da resposta
       throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
     }
 
@@ -119,8 +121,7 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      // 7. Buscar dados do cliente usando o ID do Superadmin (garantindo que todos os clientes sejam visíveis)
-      // NOTA: Estamos assumindo que todos os clientes pertencem ao Superadmin (multi-tenant simplificado)
+      // 7. Buscar dados do cliente usando o ID do Superadmin
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
@@ -129,6 +130,11 @@ serve(async (req) => {
         .single();
 
       if (clientError) {
+        // Se o cliente não for encontrado (ex: foi deletado do banco mas não do CompreFace)
+        if (clientError.code === 'PGRST116') {
+            console.warn(`[recognize-face] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
+            return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
       console.log("[recognize-face] Dados do cliente recuperados com sucesso.");
@@ -142,6 +148,7 @@ serve(async (req) => {
     console.error("--- [recognize-face] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
     console.error("Stack:", error.stack);
+    // Retorna 500 com a mensagem de erro para o frontend
     return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

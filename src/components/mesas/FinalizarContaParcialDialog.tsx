@@ -14,6 +14,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button"; // Importação adicionada
+import { Input } from "@/components/ui/input"; // Input também é usado
+import { Minus, Plus } from "lucide-react"; // Ícones também são usados
 
 type FinalizarContaParcialDialogProps = {
   isOpen: boolean;

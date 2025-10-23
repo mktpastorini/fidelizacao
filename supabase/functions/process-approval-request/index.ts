@@ -72,10 +72,14 @@ serve(async (req) => {
           
           if (rpcError) {
             // Se a função SQL levantar uma exceção (ex: itens em preparo), o erro é capturado aqui.
+            // O erro do RPC é um objeto com a mensagem de erro do PostgreSQL.
+            console.error("Erro RPC process_free_table_request:", rpcError);
             throw new Error(rpcError.message);
           }
           
-          message = rpcResult.message || `Mesa ${request.payload.mesa_numero} liberada.`;
+          // O RPC retorna um JSON, precisamos garantir que rpcResult seja tratado como tal.
+          const resultData = rpcResult as { message?: string };
+          message = resultData.message || `Mesa ${request.payload.mesa_numero} liberada.`;
           
           // O RPC já atualizou o status da solicitação para 'approved' e o payload com detalhes do cancelamento.
           // Pulamos a atualização de status no passo 5 para esta ação.
@@ -124,6 +128,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("Erro na função process-approval-request:", error.message);
+    // Retorna 500 com a mensagem de erro para o frontend
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
