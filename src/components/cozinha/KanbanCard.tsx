@@ -1,4 +1,4 @@
-import { ItemPedido, Cozinheiro } from "@/types/supabase";
+import { ItemPedido } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, User, Utensils, CheckCircle, AlertTriangle } from "lucide-react";
@@ -13,9 +13,8 @@ type KanbanCardProps = {
       mesa: { numero: number } | null;
     } | null;
     cliente: { nome: string } | null;
-    cozinheiro: Cozinheiro | null; // Adicionado cozinheiro
   };
-  onInitiateRecognition: (item: KanbanCardProps['item'], action: 'preparando' | 'entregue') => void; // Alterado para iniciar reconhecimento
+  onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue') => void;
 };
 
 // Função para obter data/hora no horário de Brasília
@@ -25,7 +24,7 @@ function getBrazilTime() {
   return new Date(utc - (3 * 3600000)); // GMT-3 para Brasília
 }
 
-export function KanbanCard({ item, onInitiateRecognition }: KanbanCardProps) {
+export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
   const { userRole } = useSettings();
   const now = getBrazilTime();
   const createdAt = new Date(item.created_at);
@@ -42,22 +41,6 @@ export function KanbanCard({ item, onInitiateRecognition }: KanbanCardProps) {
   // Garçons e Balcões podem marcar itens SEM PREPARO como entregues
   const canDeliverNonPrep = userRole && ['garcom', 'balcao', 'superadmin', 'admin', 'gerente'].includes(userRole);
 
-  const handleStatusChange = (action: 'preparando' | 'entregue') => {
-    // Se for item sem preparo, e o usuário puder entregar, faz a mudança direta (sem reconhecimento)
-    if (isNonPrepItem && action === 'entregue' && canDeliverNonPrep) {
-        // Chamamos a função de reconhecimento, mas passamos um ID de cozinheiro fictício
-        // para que o KanbanPage possa fazer a mutação direta sem abrir o modal.
-        onInitiateRecognition(item, action);
-        return;
-    }
-    
-    // Se for item que requer preparo, ou se for ação 'preparando', ou se for 'entregue' e o usuário for Cozinha/Gerência,
-    // aciona o modal de reconhecimento facial.
-    if (canManagePreparation || (isNonPrepItem && action === 'entregue')) {
-        onInitiateRecognition(item, action);
-    }
-  };
-
   return (
     <Card className="mb-4 bg-background shadow-md">
       <CardContent className="p-4 space-y-3">
@@ -70,12 +53,6 @@ export function KanbanCard({ item, onInitiateRecognition }: KanbanCardProps) {
             <User className="w-4 h-4 mr-2" />
             <span>{item.cliente?.nome || "Mesa (Geral)"}</span>
           </div>
-          {item.cozinheiro && (
-            <div className="flex items-center text-xs text-primary">
-                <ChefHat className="w-4 h-4 mr-2" />
-                <span>Responsável: {item.cozinheiro.nome}</span>
-            </div>
-          )}
           <div className={cn("flex items-center", isOverdue ? "text-destructive font-semibold" : "")}>
             <Clock className="w-4 h-4 mr-2" />
             <span>Há {tempoDesdePedido}</span>
@@ -89,7 +66,7 @@ export function KanbanCard({ item, onInitiateRecognition }: KanbanCardProps) {
                 size="sm" 
                 variant="outline" 
                 className="w-full bg-green-600 hover:bg-green-700 text-white" 
-                onClick={() => handleStatusChange('entregue')}
+                onClick={() => onStatusChange(item.id, 'entregue')}
                 disabled={!canDeliverNonPrep}
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
@@ -101,7 +78,7 @@ export function KanbanCard({ item, onInitiateRecognition }: KanbanCardProps) {
                 <Button 
                   size="sm" 
                   className="w-full" 
-                  onClick={() => handleStatusChange('preparando')}
+                  onClick={() => onStatusChange(item.id, 'preparando')}
                   disabled={!canManagePreparation}
                 >
                   <Utensils className="w-4 h-4 mr-2" />
@@ -121,8 +98,8 @@ export function KanbanCard({ item, onInitiateRecognition }: KanbanCardProps) {
             <Button 
               size="sm" 
               className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" 
-              onClick={() => handleStatusChange('entregue')}
-              disabled={!canManagePreparation || (item.cozinheiro_id && item.cozinheiro_id !== item.cozinheiro?.id)} // A validação do cozinheiro é feita no modal
+              onClick={() => onStatusChange(item.id, 'entregue')}
+              disabled={!canManagePreparation} // Também restringe a finalização do preparo
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               Pronto

@@ -31,10 +31,10 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) throw new Error("Usuário não autenticado.");
 
-    // 2. Buscar a solicitação pendente e o perfil do aprovador
+    // 2. Buscar a solicitação pendente
     const { data: request, error: requestError } = await supabaseAdmin
       .from('approval_requests')
-      .select('*, requester:profiles(role)')
+      .select('*')
       .eq('id', request_id)
       .eq('status', 'pending')
       .single();
@@ -42,10 +42,15 @@ serve(async (req) => {
     if (requestError || !request) {
       throw new Error("Solicitação não encontrada ou já processada.");
     }
-    
-    const approverRole = request.requester?.role;
 
-    if (!['superadmin', 'admin', 'gerente'].includes(approverRole)) {
+    // 3. Verificar a função do aprovador (apenas superadmin, admin, gerente podem aprovar)
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !['superadmin', 'admin', 'gerente'].includes(profile?.role)) {
       return new Response(JSON.stringify({ error: "Acesso negado. Sua função não permite aprovar solicitações." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
@@ -55,24 +60,66 @@ serve(async (req) => {
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
     let message = `Solicitação ${newStatus}.`;
 
-    // 3. Se aprovado, executar a ação
+    // 4. Se aprovado, executar a ação
     if (newStatus === 'approved') {
       switch (request.action_type) {
         case 'free_table': {
-          // Chama a função SQL que contém toda a lógica de verificação e cancelamento
-          const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('process_free_table_request', {
-            p_request_id: request_id,
-            p_approved_by: user.id,
-          }).single();
+          const mesaId = request.target_id;
           
-          if (rpcError) throw rpcError;
-          message = rpcData.message;
+          // Tenta encontrar o pedido aberto
+          const { data: openOrder, error: findError } = await supabaseAdmin
+            .from('pedidos')
+            .select('id, itens_pedido(*), acompanhantes')
+            .eq('mesa_id', mesaId)
+            .eq('status', 'aberto')
+            .maybeSingle();
           
-          // A função SQL já atualizou o status da solicitação, então pulamos a etapa 5.
-          return new Response(JSON.stringify({ success: true, message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
+          if (findError && findError.code !== 'PGRST116') throw findError;
+
+          let cancelledItems = [];
+          let occupants = [];
+
+          if (openOrder) {
+            // Captura os itens e ocupantes antes de cancelar
+            cancelledItems = openOrder.itens_pedido.map((item: any) => ({
+                nome: item.nome_produto,
+                quantidade: item.quantidade,
+                preco: item.preco,
+                consumidor_id: item.consumido_por_cliente_id,
+            }));
+            occupants = openOrder.acompanhantes || [];
+
+            // Cancela o pedido
+            const { error: updateError } = await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
+            if (updateError) throw updateError;
+          } else {
+            // Se não houver pedido, apenas busca os ocupantes atuais
+            const { data: currentOccupants, error: occError } = await supabaseAdmin
+                .from('mesa_ocupantes')
+                .select('cliente:clientes(id, nome)')
+                .eq('mesa_id', mesaId);
+            if (occError) throw occError;
+            
+            occupants = currentOccupants.map((o: any) => ({ id: o.cliente.id, nome: o.cliente.nome }));
+          }
+
+          // Atualiza o payload da solicitação com os detalhes do cancelamento
+          const updatedPayload = {
+              ...request.payload,
+              cancelled_items: cancelledItems,
+              occupants_at_cancellation: occupants,
+              cancellation_time: new Date().toISOString(),
+          };
+          
+          // Libera a mesa e remove ocupantes
+          await supabaseAdmin.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
+          await supabaseAdmin.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
+          
+          // Atualiza a solicitação com o novo payload
+          await supabaseAdmin.from('approval_requests').update({ payload: updatedPayload }).eq('id', request_id);
+
+          message = `Mesa ${request.payload.mesa_numero} liberada e pedido cancelado (se existia).`;
+          break;
         }
         case 'apply_discount': {
           const itemId = request.target_id;
@@ -92,7 +139,7 @@ serve(async (req) => {
       }
     }
 
-    // 5. Atualizar o status da solicitação (apenas para ações que não usaram a RPC, como 'apply_discount' ou 'reject')
+    // 5. Atualizar o status da solicitação
     const { error: updateError } = await supabaseAdmin
       .from('approval_requests')
       .update({ 
@@ -103,6 +150,7 @@ serve(async (req) => {
       .eq('id', request_id);
 
     if (updateError) {
+      // Se a atualização falhar, tentamos reverter a ação se ela foi executada
       console.error("Erro ao atualizar status da solicitação:", updateError);
       throw new Error("Ação executada, mas falha ao registrar o status. Contate o suporte.");
     }

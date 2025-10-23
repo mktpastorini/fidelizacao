@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog, UserPlus } from "lucide-react";
+import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,6 @@ const allNavItems = [
   { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha', 'garcom'] },
-  { to: "/cozinheiros", icon: UserPlus, label: "Gerenciar Cozinheiros", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
