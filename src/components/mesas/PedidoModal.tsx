@@ -260,15 +260,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         requerPreparo = false; // Pacote Rodízio nunca requer preparo
     }
     
-    // 2. Se for Item de Rodízio, ele não é prefixado, mas garantimos que não requer preparo (conforme regra de negócio)
+    // 2. Se for Item de Rodízio, usa o requer_preparo definido pelo usuário
     if (produtoSelecionado.tipo === 'componente_rodizio') {
-        requerPreparo = false;
+        // Usa o valor de requer_preparo do produto, que agora é configurável
+        requerPreparo = produtoSelecionado.requer_preparo; 
     }
 
-    // 3. Determinar o status inicial (sempre pendente, a menos que seja um item de venda sem preparo)
-    // Se o item não requer preparo, ele deve ser marcado como 'entregue' se for um item de VENDA (ex: água).
-    // Se for um item de RODÍZIO (componente), ele deve ser 'pendente' para aparecer no Kanban.
+    // 3. Determinar o status inicial
     let status: ItemPedido['status'] = 'pendente';
+    
+    // Se for item de Venda e não requer preparo, marca como entregue.
     if (produtoSelecionado.tipo === 'venda' && !requerPreparo) {
         status = 'entregue';
     }

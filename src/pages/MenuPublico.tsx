@@ -95,7 +95,7 @@ export default function MenuPublicoPage() {
 
   const handleInitiateOrder = (produto: Produto, quantidade: number, observacoes: string) => {
     if (!mesaId || !mesaData || !isMesaOcupada) {
-      showError("A mesa não está ocupada. Por favor, chame um atendente.");
+      showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
       return;
     }
     
@@ -117,7 +117,6 @@ export default function MenuPublicoPage() {
       return;
     }
 
-    // CORREÇÃO: Usar itemToIdentify
     const { produto, quantidade, observacoes } = itemToIdentify;
     const userId = mesaData.user_id;
 
@@ -136,14 +135,14 @@ export default function MenuPublicoPage() {
       if (pedidoAberto) {
         pedidoId = pedidoAberto.id;
       } else {
-        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa como fallback)
+        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
         const { data: novoPedido, error: novoPedidoError } = await supabase
           .from("pedidos")
           .insert({ 
             mesa_id: mesaId, 
             status: "aberto", 
             user_id: userId,
-            cliente_id: mesaData.cliente_id, // Usa o cliente principal da mesa
+            cliente_id: mesaData.cliente_id,
           })
           .select("id")
           .single();
@@ -157,15 +156,15 @@ export default function MenuPublicoPage() {
       let requerPreparo = produto.requer_preparo;
       let status: ItemPedido['status'] = 'pendente';
 
-      // Se for Pacote Rodízio, prefixamos e garantimos que não requer preparo.
+      // Se for Pacote Rodízio, prefixamos e forçamos requer_preparo: false.
       if (produto.tipo === 'rodizio') {
           nomeProdutoFinal = `[RODIZIO] ${nomeProdutoFinal}`;
           requerPreparo = false;
       }
       
-      // Se for Item de Rodízio, garantimos que não requer preparo.
+      // Se for Item de Rodízio, usamos o valor de requer_preparo do produto.
       if (produto.tipo === 'componente_rodizio') {
-          requerPreparo = false;
+          requerPreparo = produto.requer_preparo;
       }
       
       // Se for item de Venda e não requer preparo, marca como entregue.

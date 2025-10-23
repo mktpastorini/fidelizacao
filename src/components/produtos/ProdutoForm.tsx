@@ -76,8 +76,12 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
   });
 
   const produtoTipo = form.watch('tipo');
+  
+  // Desabilita estoque para AMBOS os tipos de rodízio
   const isInventoryDisabled = produtoTipo === 'rodizio' || produtoTipo === 'componente_rodizio';
-  const isRodizioType = isInventoryDisabled; // Usamos o mesmo flag para simplificar
+  
+  // Desabilita o toggle de preparo APENAS para o Pacote Rodízio (custo fixo)
+  const isPrepToggleDisabled = produtoTipo === 'rodizio'; 
 
   const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
     let cleanedValues = { ...values };
@@ -92,8 +96,8 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       };
     }
     
-    // FORÇA: Se for tipo Rodízio, não requer preparo.
-    if (isRodizioType) {
+    // FORÇA: Se for Pacote Rodízio, não requer preparo.
+    if (isPrepToggleDisabled) {
         cleanedValues.requer_preparo = false;
     }
 
@@ -196,7 +200,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
           )}
         />
         
-        <Accordion type="single" collapsible className="w-full">
+        <Accordion type="single" collapsible>
           <AccordionItem value="estoque" className="border rounded-lg px-4">
             <AccordionTrigger className="hover:no-underline">Gerenciamento de Estoque e Custo</AccordionTrigger>
             <AccordionContent className="pt-4 space-y-4">
@@ -297,17 +301,17 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                 <Switch
                   checked={field.value}
                   onCheckedChange={field.onChange}
-                  disabled={isRodizioType} // Desabilita o switch se for tipo rodízio
+                  disabled={isPrepToggleDisabled} // Desabilita o switch APENAS se for Pacote Rodízio
                 />
               </FormControl>
             </FormItem>
           )}
         />
-        {isRodizioType && (
+        {isPrepToggleDisabled && (
             <Alert variant="default">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                    O preparo é desabilitado automaticamente para produtos de Rodízio.
+                    O preparo é desabilitado automaticamente para o Pacote Rodízio.
                 </AlertDescription>
             </Alert>
         )}
