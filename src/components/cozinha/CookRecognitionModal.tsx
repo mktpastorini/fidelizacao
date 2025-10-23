@@ -21,7 +21,7 @@ type CookRecognitionModalProps = {
 export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCookRecognized }: CookRecognitionModalProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
-  const { isLoading: isScanning, error: recognitionError, recognize } = useCookRecognition();
+  const { isLoading: isRecognitionLoading, error: recognitionError, recognize } = useCookRecognition();
   
   const [match, setMatch] = useState<Cozinheiro | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
@@ -29,6 +29,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [lastScanTime, setLastScanTime] = useState(0);
 
   const isStartPrep = action === 'start_prep';
   const isFinishPrep = action === 'finish_prep';
@@ -38,6 +39,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
     setSnapshot(null);
     setStatusMessage("Aponte a câmera para o rosto");
     setCameraError(null);
+    setLastScanTime(0);
   }, []);
 
   useEffect(() => {
@@ -76,29 +78,47 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
   }, [recognitionError]);
 
   const performRecognition = useCallback(async (imageSrc: string) => {
+    // Só prossegue se não estiver carregando e nenhum match tiver sido encontrado
+    if (isRecognitionLoading || match) return; 
+    
     setStatusMessage("Analisando...");
     const result = await recognize(imageSrc);
     
     if (result?.cook) {
       setMatch(result.cook);
+      setSnapshot(imageSrc); // Salva snapshot no match
       setStatusMessage(`Cozinheiro(a) reconhecido(a): ${result.cook.nome}`);
     } else {
       setMatch(null);
       setStatusMessage("Cozinheiro(a) não encontrado(a).");
     }
-  }, [recognize]);
+  }, [recognize, isRecognitionLoading, match]);
 
-  const handleCapture = useCallback(() => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (imageSrc) {
-        setSnapshot(imageSrc);
-        performRecognition(imageSrc);
-      } else {
-        showError("Não foi possível capturar a imagem. Tente novamente.");
-      }
+  // --- Lógica de Varredura Automática ---
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (isOpen && !match && !cameraError && selectedDeviceId) {
+      interval = setInterval(() => {
+        const now = Date.now();
+        // Limita a varredura a cada 3 segundos
+        if (now - lastScanTime < 3000) return; 
+        
+        if (webcamRef.current) {
+          const imageSrc = webcamRef.current.getScreenshot();
+          if (imageSrc) {
+            setLastScanTime(now);
+            performRecognition(imageSrc);
+          }
+        }
+      }, 1000); // Verifica a cada 1 segundo se é hora de escanear
     }
-  }, [performRecognition]);
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isOpen, match, cameraError, selectedDeviceId, lastScanTime, performRecognition]);
+  // --- Fim Lógica de Varredura Automática ---
 
   const handleConfirm = () => {
     if (match) {
@@ -127,11 +147,11 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
       );
     }
 
-    if (isScanning) {
+    if (isRecognitionLoading) {
       return <div className="text-center h-24 flex flex-col justify-center items-center"><Loader2 className="w-8 h-8 animate-spin mb-2" /><p className="text-lg animate-pulse">{statusMessage}</p></div>;
     }
     
-    if (snapshot && match) {
+    if (match) {
       return (
         <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
           <p className="text-lg">Confirmar identidade:</p>
@@ -150,18 +170,8 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
       );
     }
     
-    if (snapshot && !match) {
-      return (
-        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
-          <p className="text-lg font-bold text-red-600">Cozinheiro(a) não encontrado(a).</p>
-          <div className="flex gap-2 justify-center pt-2">
-            <Button variant="outline" onClick={handleRetry}>Tentar Novamente</Button>
-          </div>
-        </div>
-      );
-    }
-    
-    return <div className="text-center h-24 flex flex-col justify-center items-center"><Button onClick={handleCapture} disabled={!!cameraError}><Camera className="w-4 h-4 mr-2" /> Capturar Rosto</Button></div>;
+    // Se não houver match e não estiver carregando, mostra a mensagem de status (Aponte a câmera)
+    return <div className="text-center h-24 flex flex-col justify-center items-center"><p className="text-lg text-muted-foreground">{statusMessage}</p></div>;
   };
 
   const title = isStartPrep ? "Iniciar Preparo" : "Finalizar Preparo";
@@ -201,7 +211,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
              />
             }
           </div>
-          {!snapshot && !cameraError && devices.length > 1 && (
+          {!match && !cameraError && devices.length > 1 && (
             <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
               <SelectTrigger className="w-full max-w-xs"><SelectValue placeholder="Selecione uma câmera" /></SelectTrigger>
               <SelectContent>{devices.map((device) => (<SelectItem key={device.deviceId} value={device.deviceId}>{device.label || `Câmera ${devices.indexOf(device) + 1}`}</SelectItem>))}</SelectContent>
@@ -210,7 +220,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
           {renderContent()}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isScanning}>Cancelar</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isRecognitionLoading}>Cancelar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
