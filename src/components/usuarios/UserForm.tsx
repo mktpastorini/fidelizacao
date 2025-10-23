@@ -37,7 +37,7 @@ const baseSchema = z.object({
 });
 
 const editSchema = baseSchema.extend({
-  email: z.string().email("Email inválido."), // Adicionando email ao esquema de edição
+  email: z.string().email("Email inválido."), // Email é obrigatório na edição
 });
 
 const createSchema = editSchema.extend({
