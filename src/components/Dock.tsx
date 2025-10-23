@@ -15,6 +15,7 @@ import {
   Settings,
   LogOut,
   UserCog,
+  UserPlus,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
@@ -28,6 +29,7 @@ const allNavItems = [
   { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha', 'garcom'] },
+  { to: "/cozinheiros", icon: UserPlus, label: "Gerenciar Cozinheiros", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin'] }, // Removido 'cozinha'
