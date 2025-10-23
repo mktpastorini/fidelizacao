@@ -117,8 +117,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
   const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
 
-  const { itensAgrupados, totalPedido } = useMemo(() => {
-    if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0 };
+  const { itensAgrupados, totalPedido, itensMesaGeral } = useMemo(() => {
+    if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0, itensMesaGeral: [] };
     
     const total = pedido.itens_pedido.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
     
@@ -127,16 +127,21 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     ocupantes.forEach(o => agrupados.set(o.id, { cliente: o, itens: [], subtotal: 0 }));
     agrupados.set('mesa', { cliente: { id: 'mesa', nome: 'Mesa (Geral)' }, itens: [], subtotal: 0 });
 
+    const mesaGeral: ItemPedido[] = [];
+
     pedido.itens_pedido.forEach(item => {
       const key = item.consumido_por_cliente_id || 'mesa';
       const grupo = agrupados.get(key);
       if (grupo) {
         grupo.itens.push(item);
         grupo.subtotal += calcularPrecoComDesconto(item);
+        if (key === 'mesa') {
+          mesaGeral.push(item);
+        }
       }
     });
 
-    return { itensAgrupados: agrupados, totalPedido: total };
+    return { itensAgrupados: agrupados, totalPedido: total, itensMesaGeral: mesaGeral };
   }, [pedido, ocupantes]);
 
   const addItemMutation = useMutation({
@@ -283,6 +288,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         requer_preparo: requerPreparo,
     });
   };
+  
+  // Função para obter os itens a serem pagos pelo cliente
+  const getItemsToPay = (clienteId: string) => {
+    const itensIndividuais = itensAgrupados.get(clienteId)?.itens || [];
+    
+    // Se o cliente for o principal, adiciona os itens da mesa geral
+    if (clientePrincipal?.id === clienteId) {
+      return [...itensIndividuais, ...itensMesaGeral];
+    }
+    
+    return itensIndividuais;
+  };
 
   return (
     <>
@@ -318,66 +335,137 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
               <div className="space-y-4 overflow-y-auto pr-2">
                 <h3 className="font-semibold">Itens do Pedido</h3>
-                {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => (
-                  (itens.length > 0) && (
-                    <div key={cliente.id} className="p-3 border rounded-lg">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-semibold">{cliente.nome}</h4>
-                        {cliente.id !== 'mesa' && (
+                {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => {
+                  // Se for o grupo 'Mesa (Geral)' e houver um cliente principal, pulamos a exibição
+                  // pois os itens da mesa serão pagos pelo cliente principal.
+                  if (cliente.id === 'mesa' && clientePrincipal) {
+                    return null;
+                  }
+                  
+                  // Se for o grupo 'Mesa (Geral)' e NÃO houver cliente principal, exibimos.
+                  if (cliente.id === 'mesa' && !clientePrincipal && itens.length > 0) {
+                    return (
+                      <div key={cliente.id} className="p-3 border rounded-lg bg-warning/10">
+                        <h4 className="font-semibold text-warning-foreground">Mesa (Geral) - Itens Pendentes</h4>
+                        <ul className="space-y-2 mt-2">
+                          {itens.map((item) => {
+                            const precoOriginal = (item.preco || 0) * item.quantidade;
+                            const precoFinal = calcularPrecoComDesconto(item);
+                            return (
+                              <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                                <div>
+                                  <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                                  {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                    <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="text-right">
+                                    {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                      <>
+                                        <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                        <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                      </>
+                                    ) : (
+                                      <p>R$ {precoOriginal.toFixed(2)}</p>
+                                    )}
+                                  </div>
+                                  {/* Ações para itens da mesa sem cliente principal */}
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                        <Tag className="h-4 w-4 mr-2" />
+                                        <span>Aplicar Desconto</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        <span>Remover Item</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
+                      </div>
+                    );
+                  }
+                  
+                  // Exibição normal para clientes individuais (incluindo o principal)
+                  if (cliente.id !== 'mesa' && itens.length > 0) {
+                    const isPrincipal = cliente.id === clientePrincipal?.id;
+                    const itensParaPagar = getItemsToPay(cliente.id);
+                    const subtotalParaPagar = itensParaPagar.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
+
+                    return (
+                      <div key={cliente.id} className="p-3 border rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-semibold">{cliente.nome} {isPrincipal && "(Principal)"}</h4>
                           <Button size="sm" variant="outline" onClick={() => setClientePagando(cliente as Cliente)}>
                             <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
                           </Button>
-                        )}
-                      </div>
-                      <ul className="space-y-2">
-                        {itens.map((item) => {
-                          const precoOriginal = (item.preco || 0) * item.quantidade;
-                          const precoFinal = calcularPrecoComDesconto(item);
-                          return (
-                            <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
-                              <div>
-                                <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
-                                {item.desconto_percentual && item.desconto_percentual > 0 && (
-                                  <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <div className="text-right">
-                                  {item.desconto_percentual && item.desconto_percentual > 0 ? (
-                                    <>
-                                      <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
-                                      <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
-                                    </>
-                                  ) : (
-                                    <p>R$ {precoOriginal.toFixed(2)}</p>
+                        </div>
+                        <ul className="space-y-2">
+                          {itensParaPagar.map((item) => {
+                            const precoOriginal = (item.preco || 0) * item.quantidade;
+                            const precoFinal = calcularPrecoComDesconto(item);
+                            const isMesaItem = item.consumido_por_cliente_id === null;
+                            
+                            return (
+                              <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                                <div>
+                                  <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                                  {isMesaItem && <Badge variant="outline" className="mt-1 bg-warning/20 text-warning-foreground">Mesa (Geral)</Badge>}
+                                  {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                    <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
                                   )}
                                 </div>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-6 w-6">
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
-                                      <Tag className="h-4 w-4 mr-2" />
-                                      <span>Aplicar Desconto</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      <span>Remover Item</span>
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                      <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
-                    </div>
-                  )
-                ))}
+                                <div className="flex items-center gap-1">
+                                  <div className="text-right">
+                                    {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                      <>
+                                        <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                        <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                      </>
+                                    ) : (
+                                      <p>R$ {precoOriginal.toFixed(2)}</p>
+                                    )}
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                        <Tag className="h-4 w-4 mr-2" />
+                                        <span>Aplicar Desconto</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        <span>Remover Item</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotalParaPagar.toFixed(2)}</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
               </div>
 
               <div className="p-4 border rounded-lg">
@@ -457,7 +545,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         isOpen={!!clientePagando}
         onOpenChange={() => setClientePagando(null)}
         cliente={clientePagando}
-        itens={itensAgrupados.get(clientePagando?.id || '')?.itens || []}
+        itens={getItemsToPay(clientePagando?.id || '')} // Passa a lista correta de itens
         onConfirm={() => clientePagando && closePartialOrderMutation.mutate(clientePagando.id)}
         isSubmitting={closePartialOrderMutation.isPending}
       />
