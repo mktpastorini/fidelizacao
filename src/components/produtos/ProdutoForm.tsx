@@ -75,6 +75,7 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
 
   const produtoTipo = form.watch('tipo');
   const isInventoryDisabled = produtoTipo === 'rodizio' || produtoTipo === 'componente_rodizio';
+  const isRodizioType = isInventoryDisabled; // Usamos o mesmo flag para simplificar
 
   const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
     let cleanedValues = { ...values };
@@ -89,6 +90,11 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
       };
     }
     
+    // FORÇA: Se for tipo Rodízio, não requer preparo.
+    if (isRodizioType) {
+        cleanedValues.requer_preparo = false;
+    }
+
     onSubmit(cleanedValues);
   };
 
@@ -289,11 +295,20 @@ export function ProdutoForm({ onSubmit, isSubmitting, defaultValues, categorias 
                 <Switch
                   checked={field.value}
                   onCheckedChange={field.onChange}
+                  disabled={isRodizioType} // Desabilita o switch se for tipo rodízio
                 />
               </FormControl>
             </FormItem>
           )}
         />
+        {isRodizioType && (
+            <Alert variant="default">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                    O preparo é desabilitado automaticamente para produtos de Rodízio.
+                </AlertDescription>
+            </Alert>
+        )}
 
         <FormField
           control={form.control}
