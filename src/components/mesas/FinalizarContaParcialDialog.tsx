@@ -89,21 +89,24 @@ export function FinalizarContaParcialDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         
-        <ScrollArea className="max-h-60 my-4 pr-2">
-          <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
-          <ul className="space-y-1 text-sm mb-4 p-2 border rounded-md bg-secondary">
-            {itensIndividuais.map(item => (
-              <li key={item.id} className="flex justify-between">
-                <span>{item.nome_produto} (x{item.quantidade})</span>
-                <span>{formatCurrency(calcularPrecoComDesconto(item))}</span>
-              </li>
-            ))}
-          </ul>
-          
-          {itensIndividuais.length === 0 && (
-            <p className="text-center text-muted-foreground py-4">Nenhum item individual para pagar.</p>
-          )}
-        </ScrollArea>
+        {/* Usando div em vez de aninhar diretamente em AlertDialogDescription */}
+        <div className="max-h-60 my-4 pr-2">
+          <ScrollArea className="h-full">
+            <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
+            <ul className="space-y-1 text-sm mb-4 p-2 border rounded-md bg-secondary">
+              {itensIndividuais.map(item => (
+                <li key={item.id} className="flex justify-between">
+                  <span>{item.nome_produto} (x{item.quantidade})</span>
+                  <span>{formatCurrency(calcularPrecoComDesconto(item))}</span>
+                </li>
+              ))}
+            </ul>
+            
+            {itensIndividuais.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">Nenhum item individual para pagar.</p>
+            )}
+          </ScrollArea>
+        </div>
         
         <div className="flex justify-between items-center text-lg font-bold pt-4 border-t">
             <span>Total a Pagar:</span>
