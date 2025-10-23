@@ -245,9 +245,40 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
   const onSubmit = (values: z.infer<typeof itemSchema>) => {
     const produtoSelecionado = produtos?.find(p => p.nome === values.nome_produto);
-    const requerPreparo = produtoSelecionado?.requer_preparo ?? true;
-    const status = 'pendente';
-    addItemMutation.mutate({ ...values, status, requer_preparo: requerPreparo });
+    
+    if (!produtoSelecionado) {
+        showError("Produto não encontrado.");
+        return;
+    }
+
+    let nomeProdutoFinal = values.nome_produto;
+    
+    // 1. Adicionar prefixo se for Rodízio ou Componente Rodízio
+    if (produtoSelecionado.tipo === 'rodizio' || produtoSelecionado.tipo === 'componente_rodizio') {
+        nomeProdutoFinal = `[RODIZIO] ${values.nome_produto}`;
+    }
+
+    // 2. Determinar se requer preparo (já definido no ProdutoForm, mas garantimos aqui)
+    const requerPreparo = produtoSelecionado.requer_preparo;
+    
+    // 3. Determinar o status inicial
+    const status = requerPreparo ? 'pendente' : 'entregue'; // Se não requer preparo, já vai como entregue (para não aparecer no Kanban)
+
+    // Se o item não requer preparo, ele não deve ir para o Kanban.
+    // Se o usuário quer que ele apareça no Kanban Pendente, mas vá direto para Entregue,
+    // precisamos que ele seja inserido como 'pendente' e o Garçom/Balcão o marque como 'entregue'.
+    // No entanto, a lógica atual do KanbanCard já trata itens sem preparo que estão 'pendente'.
+    
+    // Vamos manter a inserção como 'pendente' se for um item de venda sem preparo,
+    // para que o Garçom/Balcão possa confirmar a entrega.
+    // Se for Rodízio, ele não deve ir para o Kanban, então o prefixo [RODIZIO] cuidará disso.
+
+    addItemMutation.mutate({ 
+        ...values, 
+        nome_produto: nomeProdutoFinal, // Usando o nome final
+        status: 'pendente', // Sempre começa como pendente
+        requer_preparo: requerPreparo,
+    });
   };
 
   return (
@@ -330,7 +361,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                       <span>Aplicar Desconto</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item.id)}>
-                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      <Trash2 className="w-4 h-4 mr-2" />
                                       <span>Remover Item</span>
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
@@ -367,6 +398,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                               const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
                               form.setValue("nome_produto", produto.nome);
                               form.setValue("preco", preco);
+                              form.setValue("requer_preparo", produto.requer_preparo); // Define requer_preparo
                               setPopoverOpen(false);
                             }}>
                               <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
