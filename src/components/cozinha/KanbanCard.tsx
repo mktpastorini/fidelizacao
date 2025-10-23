@@ -6,7 +6,7 @@ import { formatDistanceToNow, differenceInMinutes } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CookRecognitionModal } from "./CookRecognitionModal"; // Importado
 import { showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client"; // Importado supabase
