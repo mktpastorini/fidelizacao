@@ -7,26 +7,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ID fixo do Superadmin principal
-const SUPERADMIN_ID = '1';
-
-// Função auxiliar para buscar as configurações globais do usuário 1 fixo
-async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log("[add-face-examples] Buscando configurações globais do CompreFace do usuário 1 (Superadmin principal)...");
+// Função auxiliar para buscar as configurações do usuário logado
+async function getComprefaceSettings(supabaseAdmin: any, userId: string) {
+  console.log(`[add-face-examples] Buscando configurações do CompreFace para o usuário: ${userId}`);
 
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('user_settings')
     .select('compreface_url, compreface_api_key')
-    .eq('id', SUPERADMIN_ID)
+    .eq('id', userId)
     .single();
 
   if (settingsError) {
-    console.error("[add-face-examples] Erro ao buscar configurações do usuário 1:", settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações globais do sistema.") };
+    console.error(`[add-face-examples] Erro ao buscar configurações do usuário ${userId}:`, settingsError);
+    return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin principal.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
   return { settings, error: null };
@@ -58,16 +55,19 @@ serve(async (req) => {
     }
 
     console.log("[add-face-examples] 2/7: Autenticando usuário logado...");
-    // Apenas verifica se o usuário está logado, mas não usa o ID dele para configurações do CompreFace
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error("Falha na autenticação do usuário: Token de autorização ausente.");
     }
-    console.log(`[add-face-examples] 2/7: Token de autorização presente.`);
+    
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
+    const userId = user.id;
+    console.log(`[add-face-examples] 2/7: Usuário autenticado: ${userId}`);
 
-    // 3. Buscando configurações do CompreFace do usuário 1 (Superadmin principal)
-    console.log("[add-face-examples] 3/7: Buscando configurações globais do CompreFace...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    // 3. Buscando configurações do CompreFace do usuário logado
+    console.log("[add-face-examples] 3/7: Buscando configurações do CompreFace...");
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin, userId);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
