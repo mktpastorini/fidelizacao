@@ -28,10 +28,30 @@ function personalizeMessage(content: string, client: any): string {
   return personalized;
 }
 
+// Função auxiliar para buscar o ID do Superadmin
+async function getSuperadminId(supabaseAdmin: any) {
+  const { data: superadminProfile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'superadmin')
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError || !superadminProfile) {
+    throw new Error("Falha ao encontrar o Superadmin principal.");
+  }
+  return superadminProfile.id;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
+
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
 
   try {
     const { template_id, client_ids } = await req.json();
@@ -39,41 +59,42 @@ serve(async (req) => {
       throw new Error("`template_id` e um array de `client_ids` são obrigatórios.");
     }
 
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    // 1. Autenticar o usuário logado (para garantir que a requisição é válida)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error("Usuário não autenticado.");
+    }
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw userError || new Error("Usuário não autenticado.");
+    
+    // 2. Obter o ID do Superadmin (contexto global)
+    const superadminId = await getSuperadminId(supabaseAdmin);
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
+    // 3. Buscar configurações (webhook_url) usando o ID do Superadmin
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('webhook_url')
-      .eq('id', user.id)
+      .eq('id', superadminId)
       .single();
     if (settingsError || !settings?.webhook_url) {
-      throw new Error('URL de Webhook não configurada.');
+      throw new Error('URL de Webhook não configurada no perfil do Superadmin.');
     }
 
+    // 4. Buscar o template (que já deve pertencer ao Superadmin, mas verificamos)
     const { data: template, error: templateError } = await supabaseAdmin
       .from('message_templates')
       .select('conteudo')
       .eq('id', template_id)
+      .eq('user_id', superadminId) // Garante que o template é do Superadmin
       .single();
     if (templateError || !template) throw templateError || new Error("Template não encontrado.");
 
+    // 5. Buscar clientes (que pertencem ao Superadmin)
     const { data: clients, error: clientsError } = await supabaseAdmin
       .from('clientes')
       .select('id, nome, casado_com, indicacoes, gostos, whatsapp')
       .in('id', client_ids)
-      .eq('user_id', user.id);
+      .eq('user_id', superadminId); // Garante que os clientes são do Superadmin
     if (clientsError) throw clientsError;
 
     const validClients = clients.filter(c => c.whatsapp);
@@ -81,8 +102,9 @@ serve(async (req) => {
       throw new Error("Nenhum dos clientes selecionados possui um número de WhatsApp válido.");
     }
 
+    // 6. Criar logs (associados ao Superadmin, pois é o contexto global)
     const logsToInsert = validClients.map(client => ({
-      user_id: user.id,
+      user_id: superadminId, // Log associado ao Superadmin
       cliente_id: client.id,
       template_id: template_id,
       trigger_event: 'manual',
@@ -95,6 +117,7 @@ serve(async (req) => {
       .select('id, cliente_id');
     if (logError || !insertedLogs) throw logError || new Error("Falha ao criar logs de mensagem.");
 
+    // 7. Preparar e enviar para o webhook
     const recipients = validClients.map(client => {
       const log = insertedLogs.find(l => l.cliente_id === client.id);
       return {
