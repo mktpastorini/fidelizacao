@@ -67,10 +67,26 @@ export default function CozinhaPage() {
 
   // Filtra itens de rodízio/componente de rodízio (que geralmente têm nome_produto começando com [RESGATE] ou [RODIZIO])
   // E também filtra itens que já foram entregues, mas que não requerem preparo (para evitar duplicidade se o garçom já entregou)
-  const filteredItems = items?.filter(item => 
-    !item.nome_produto.startsWith('[RESGATE]') && 
-    !item.nome_produto.startsWith('[RODIZIO]')
-  ) || [];
+  const filteredItems = items?.filter(item => {
+    const nome = item.nome_produto.toUpperCase();
+    
+    // 1. Exclui itens de Resgate e Rodízio (pacote ou componente)
+    if (nome.startsWith('[RESGATE]') || nome.startsWith('[RODIZIO]')) {
+      return false;
+    }
+    
+    // 2. Mantém todos os itens pendentes ou em preparo
+    if (item.status === 'pendente' || item.status === 'preparando') {
+      return true;
+    }
+    
+    // 3. Mantém itens entregues recentemente (para a coluna "Pronto/Entregue")
+    if (item.status === 'entregue') {
+      return true;
+    }
+    
+    return false;
+  }) || [];
 
   const pendingItems = filteredItems.filter(item => item.status === 'pendente');
   const preparingItems = filteredItems.filter(item => item.status === 'preparando');
