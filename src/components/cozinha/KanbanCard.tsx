@@ -15,7 +15,6 @@ type KanbanCardProps = {
       mesa: { numero: number } | null;
     } | null;
     cliente: { nome: string } | null;
-    cozinheiro: { nome: string } | null; // Adicionado cozinheiro
   };
   onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue', imageUrl?: string) => void;
   isUpdating: boolean;
@@ -83,10 +82,10 @@ export function KanbanCard({ item, onStatusChange, isUpdating }: KanbanCardProps
               <Clock className="w-4 h-4 mr-2" />
               <span>Há {tempoDesdePedido}</span>
             </div>
-            {item.cozinheiro && item.status === 'preparando' && (
+            {item.cozinheiro_id && item.status === 'preparando' && (
                 <div className="text-xs text-primary font-semibold">
                     <Utensils className="w-4 h-4 mr-2 inline" />
-                    Em preparo por: {item.cozinheiro.nome}
+                    Em preparo por: {item.cozinheiro_id.substring(0, 8)}...
                 </div>
             )}
           </div>

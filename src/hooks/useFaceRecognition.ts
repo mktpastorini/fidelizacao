@@ -11,7 +11,7 @@ export function useFaceRecognition() {
     setIsLoading(true);
     setError(null);
     try {
-      // Não passamos token de autenticação, pois o Edge Function agora usa a Service Role Key
+      // Não passamos mesa_id aqui, o Edge Function usará o token de autenticação do usuário logado
       const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
         body: { image_url: imageSrc },
       });

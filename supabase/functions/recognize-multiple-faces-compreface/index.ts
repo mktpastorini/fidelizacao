@@ -8,6 +8,8 @@ const corsHeaders = {
 
 // Função auxiliar para buscar as configurações do Superadmin
 async function getComprefaceSettings(supabaseAdmin: any) {
+  console.log("[recognize-multiple-faces] Buscando configurações do CompreFace do Superadmin principal...");
+
   // 1. Buscar o ID do Superadmin
   const { data: superadminProfile, error: profileError } = await supabaseAdmin
     .from('profiles')
@@ -17,10 +19,12 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError || !superadminProfile) {
+    console.error("[recognize-multiple-faces] Erro ao buscar Superadmin:", profileError);
     return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
   }
   
   const superadminId = superadminProfile.id;
+  console.log(`[recognize-multiple-faces] Superadmin ID encontrado: ${superadminId}`);
 
   // 2. Buscar as configurações do Superadmin
   const { data: settings, error: settingsError } = await supabaseAdmin
@@ -30,6 +34,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .single();
 
   if (settingsError) {
+    console.error(`[recognize-multiple-faces] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
     return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
@@ -41,6 +46,8 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 }
 
 serve(async (req) => {
+  console.log("--- [recognize-multiple-faces] INICIANDO EXECUÇÃO ---");
+
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -51,15 +58,28 @@ serve(async (req) => {
   );
 
   try {
+    console.log("[recognize-multiple-faces] 1/6: Parsing body da requisição...");
     const { image_url } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
+    console.log("[recognize-multiple-faces] 1/6: Body recebido.");
 
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
     }
+
+    // 2. Autenticação do usuário logado para obter o ID (necessário para buscar os clientes dele)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
+    }
     
-    // 2. Buscando configurações do CompreFace do Superadmin
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
+    const userIdForClients = user.id;
+    console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userIdForClients}`);
+    
+    // 3. Buscando configurações do CompreFace do Superadmin
     const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
@@ -69,7 +89,10 @@ serve(async (req) => {
       });
     }
 
+    console.log("[recognize-multiple-faces] 3/6: Configurações carregadas.");
+
     const payload = { file: imageData };
+    console.log("[recognize-multiple-faces] 4/6: Enviando para CompreFace para reconhecimento de múltiplas faces...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=0`, {
       method: 'POST',
       headers: {
@@ -79,18 +102,14 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
+    console.log(`[recognize-multiple-faces] 5/6: Resposta recebida do CompreFace com status: ${response.status}`);
     if (!response.ok) {
       const errorBody = await response.json().catch(() => response.text());
       if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
+        console.log("[recognize-multiple-faces] CompreFace não encontrou nenhum rosto na imagem.");
         return new Response(JSON.stringify({ matches: [], message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
-      
-      const errorDetail = typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody);
-      
-      return new Response(JSON.stringify({ error: `Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${errorDetail}` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
     }
 
     const data = await response.json();
@@ -101,16 +120,18 @@ serve(async (req) => {
       for (const faceResult of data.result) {
         const bestSubject = faceResult.subjects?.[0];
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
+          console.log(`[recognize-multiple-faces] Match encontrado - Subject: ${bestSubject.subject}, Similaridade: ${bestSubject.similarity}`);
+
           // Buscar dados do cliente usando o ID do Superadmin
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
             .select('id, nome, avatar_url, gostos, casado_com, visitas')
             .eq('id', bestSubject.subject)
-            .eq('user_id', superadminId)
+            .eq('user_id', superadminId) // <--- USANDO O ID DO SUPERADMIN AQUI
             .single();
 
           if (clientError) {
-            // Se o cliente não for encontrado, apenas ignora este match
+            console.error(`Erro ao buscar dados do cliente ${bestSubject.subject}: ${clientError.message}`);
             continue;
           }
 
@@ -123,11 +144,14 @@ serve(async (req) => {
       }
     }
 
+    console.log(`[recognize-multiple-faces] 6/6: ${recognizedFaces.length} cliente(s) reconhecido(s).`);
     return new Response(JSON.stringify({ matches: recognizedFaces }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return new Response(JSON.stringify({ error: `Erro interno na função: ${errorMessage}` }), {
+    console.error("--- [recognize-multiple-faces] ERRO FATAL ---");
+    console.error("Mensagem:", error.message);
+    console.error("Stack:", error.stack);
+    return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });

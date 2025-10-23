@@ -21,7 +21,6 @@ export function useMultiFaceRecognition() {
     setIsLoading(true);
     setError(null);
     try {
-      // Não passamos token de autenticação, pois o Edge Function agora usa a Service Role Key
       const { data, error: functionError } = await supabase.functions.invoke('recognize-multiple-faces-compreface', {
         body: { image_url: imageSrc },
       });
