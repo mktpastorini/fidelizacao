@@ -28,23 +28,25 @@ export function useApprovalRequest() {
         status: 'pending',
       };
       
-      // CRITICAL FIX: Preenche a coluna FK correta para o PostgREST
       if (request.action_type === 'free_table') {
         insertionPayload.mesa_id_fk = request.target_id;
       } else if (request.action_type === 'apply_discount') {
         insertionPayload.item_pedido_id_fk = request.target_id;
       }
       
-      console.log("[ApprovalRequest] Tentando inserir payload:", insertionPayload);
-
-      const { error } = await supabase.from("approval_requests").insert(insertionPayload);
+      const { data: insertedRequest, error } = await supabase
+        .from("approval_requests")
+        .insert(insertionPayload)
+        .select('id')
+        .single();
+        
       if (error) {
         console.error("[ApprovalRequest] Erro ao inserir solicitação:", error);
         throw error;
       }
+      return insertedRequest.id;
     },
     onSuccess: () => {
-      // FORÇA A ATUALIZAÇÃO INSTANTÂNEA DO MODAL DO ADMINISTRADOR
       queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
       showSuccess("Solicitação enviada para aprovação!");
     },
@@ -52,60 +54,66 @@ export function useApprovalRequest() {
   });
 
   const executeActionDirectly = async (request: RequestPayload) => {
-    // Esta função simula a execução direta da ação (para admins/gerentes)
-    const { action_type, target_id, payload } = request;
+    // 1. Cria a solicitação (temporariamente como 'pending')
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !userRole) {
+        showError("Usuário não autenticado.");
+        return false;
+    }
     
+    const insertionPayload: any = {
+        user_id: user.id,
+        requester_role: userRole,
+        action_type: request.action_type,
+        target_id: request.target_id,
+        payload: request.payload,
+        status: 'pending',
+    };
+    
+    if (request.action_type === 'free_table') {
+        insertionPayload.mesa_id_fk = request.target_id;
+    } else if (request.action_type === 'apply_discount') {
+        insertionPayload.item_pedido_id_fk = request.target_id;
+    }
+
+    const { data: insertedRequest, error: insertError } = await supabase
+        .from("approval_requests")
+        .insert(insertionPayload)
+        .select('id')
+        .single();
+        
+    if (insertError) {
+        showError(`Falha ao criar solicitação de execução: ${insertError.message}`);
+        return false;
+    }
+    const requestId = insertedRequest.id;
+
+    // 2. Chama o Edge Function de processamento para aprovar e executar imediatamente
     try {
-        switch (action_type) {
-            case 'free_table': {
-                const mesaId = target_id;
-                
-                // 1. Tenta cancelar o pedido aberto (se existir)
-                const { data: openOrder, error: findError } = await supabase.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').maybeSingle();
-                if (findError && findError.code !== 'PGRST116') throw findError;
+        const { data, error: executionError } = await supabase.functions.invoke('process-approval-request', {
+            body: { request_id: requestId, action: 'approve' },
+        });
+        
+        if (executionError) throw executionError;
+        if (!data.success) throw new Error(data.error || "Falha na execução da ação.");
 
-                let orderWasCancelled = false;
-                if (openOrder) {
-                    const { error: updateError } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
-                    if (updateError) throw updateError;
-                    orderWasCancelled = true;
-                }
-
-                // 2. Libera a mesa e remove ocupantes
-                await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
-                await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
-                
-                queryClient.invalidateQueries({ queryKey: ["mesas"] });
-                queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-                queryClient.invalidateQueries({ queryKey: ["clientes"] });
-                
-                if (orderWasCancelled) {
-                    showSuccess("Mesa liberada e pedido cancelado!");
-                } else {
-                    showSuccess("Mesa liberada!");
-                }
-                break;
-            }
-            case 'apply_discount': {
-                const itemId = target_id;
-                const { desconto_percentual, desconto_motivo } = payload;
-                
-                const { error: updateError } = await supabase.from("itens_pedido").update({ desconto_percentual, desconto_motivo }).eq("id", itemId);
-                if (updateError) throw updateError;
-                
-                queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
-                queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-                queryClient.invalidateQueries({ queryKey: ["mesas"] });
-                
-                showSuccess("Desconto aplicado com sucesso!");
-                break;
-            }
-            default:
-                throw new Error("Ação desconhecida.");
-        }
+        // 3. Invalida queries relevantes
+        queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
+        queryClient.invalidateQueries({ queryKey: ["mesas"] });
+        queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+        queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
+        queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
+        
+        showSuccess(data.message || "Ação executada com sucesso!");
         return true;
+        
     } catch (error: any) {
+        // Se falhar, o status da requisição no banco deve ser 'rejected' ou o erro do RPC
+        // O Edge Function process-approval-request já deve ter lidado com a atualização do status para 'rejected' em caso de falha.
         showError(`Falha ao executar ação: ${error.message}`);
+        
+        // Invalida para garantir que o status 'rejected' seja refletido
+        queryClient.invalidateQueries({ queryKey: ["pending_approval_requests"] });
         return false;
     }
   };
@@ -118,14 +126,12 @@ export function useApprovalRequest() {
     
     const rolesThatRequireApproval: UserRole[] = ['balcao', 'garcom', 'cozinha'];
     
-    console.log(`[ApprovalCheck] Usuário: ${userRole}. Requer aprovação? ${rolesThatRequireApproval.includes(userRole)}`);
-
     if (rolesThatRequireApproval.includes(userRole)) {
-      // Se for um usuário que precisa de aprovação, cria a solicitação
+      // Se for um usuário que precisa de aprovação, cria a solicitação (status pending)
       createRequestMutation.mutate(request);
       return false; // Indica que a ação não foi executada diretamente
     } else {
-      // Se for Admin/Gerente/Superadmin, executa a ação diretamente
+      // Se for Admin/Gerente/Superadmin, executa a ação diretamente via server-side logic
       return executeActionDirectly(request);
     }
   };

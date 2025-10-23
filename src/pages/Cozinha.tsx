@@ -4,6 +4,7 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AlertTriangle } from "lucide-react";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -43,10 +44,23 @@ export default function CozinhaPage() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ itemId, newStatus }: { itemId: string; newStatus: 'preparando' | 'entregue' }) => {
+    mutationFn: async ({ itemId, newStatus, cookId }: { itemId: string; newStatus: 'preparando' | 'entregue'; cookId: string }) => {
+      const updatePayload: Partial<ItemPedido> = { status: newStatus };
+      
+      if (newStatus === 'preparando') {
+        updatePayload.cozinheiro_id = cookId;
+        updatePayload.hora_inicio_preparo = new Date().toISOString();
+      } else if (newStatus === 'entregue') {
+        updatePayload.hora_entrega = new Date().toISOString();
+        // Se o item já tinha um cozinheiro_id, mantemos. Se não, usamos o ID do cozinheiro que finalizou (para itens sem preparo).
+        if (!items?.find(i => i.id === itemId)?.cozinheiro_id) {
+            updatePayload.cozinheiro_id = cookId;
+        }
+      }
+      
       const { error } = await supabase
         .from("itens_pedido")
-        .update({ status: newStatus })
+        .update(updatePayload)
         .eq("id", itemId);
       if (error) throw error;
     },
@@ -55,13 +69,15 @@ export default function CozinhaPage() {
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       // Invalida também os pedidos pendentes do sininho
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
+      // Invalida dados do salão para atualizar o status da mesa (se for o último item)
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       showSuccess("Status do item atualizado!");
     },
     onError: (err: Error) => showError(err.message),
   });
 
-  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue') => {
-    updateStatusMutation.mutate({ itemId, newStatus });
+  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string) => {
+    updateStatusMutation.mutate({ itemId, newStatus, cookId });
   };
 
   // Filtra itens para o Kanban
@@ -73,14 +89,17 @@ export default function CozinhaPage() {
       return false;
     }
     
-    // 2. Inclui itens que estão pendentes ou em preparo (requer preparo ou não)
-    if (item.status === 'pendente' || item.status === 'preparando') {
+    // 2. Inclui itens que estão pendentes ou em preparo E que requerem preparo
+    if ((item.status === 'pendente' || item.status === 'preparando') && item.requer_preparo) {
       return true;
     }
     
-    // 3. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
-    // NOTA: Itens de venda direta que não requerem preparo são marcados como 'entregue' na inserção.
-    // Se quisermos que eles apareçam na coluna 'Pronto/Entregue' por 30 minutos, mantemos esta lógica.
+    // 3. Inclui itens de venda direta (requer_preparo=false) que estão pendentes (para Garçom/Balcão entregar)
+    if (item.status === 'pendente' && !item.requer_preparo) {
+        return true;
+    }
+    
+    // 4. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
     if (item.status === 'entregue') {
       return true;
     }
