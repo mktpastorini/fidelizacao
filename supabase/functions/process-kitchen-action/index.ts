@@ -88,27 +88,18 @@ serve(async (req) => {
       throw new Error("`itemId`, `newStatus` e `image_url` são obrigatórios.");
     }
     
-    // 1. Autenticação do usuário logado (para obter o ID do estabelecimento)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error("Usuário não autenticado.");
-    }
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userId = user.id;
-
-    // 2. Buscar configurações do CompreFace do Superadmin
+    // 1. Buscando configurações do CompreFace do Superadmin
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
     if (settingsError) throw settingsError;
 
-    // 3. Reconhecimento Facial do Cozinheiro
+    // 2. Reconhecimento Facial do Cozinheiro
     const match = await recognizeCook(settings, image_url);
     if (!match) {
         throw new Error("Cozinheiro não reconhecido ou similaridade insuficiente. Tente novamente.");
     }
     const recognizedCookId = match.cookId;
 
-    // 4. Verificar se o ID reconhecido é um Cozinheiro válido
+    // 3. Verificar se o ID reconhecido é um Cozinheiro válido
     const { data: cook, error: cookError } = await supabaseAdmin
         .from('cozinheiros')
         .select('id, nome')
@@ -120,7 +111,7 @@ serve(async (req) => {
     }
     const cookName = cook.nome;
 
-    // 5. Buscar o item atual e verificar regras
+    // 4. Buscar o item atual e verificar regras
     const { data: item, error: itemError } = await supabaseAdmin
         .from('itens_pedido')
         .select('status, cozinheiro_id, pedido:pedidos(mesa_id)')
@@ -135,7 +126,7 @@ serve(async (req) => {
     const currentCookId = item.cozinheiro_id;
     const mesaId = item.pedido?.mesa_id;
 
-    // Regra 5a: Se for para 'preparando', o cozinheiro_id deve ser nulo
+    // Regra 4a: Se for para 'preparando', o cozinheiro_id deve ser nulo
     if (newStatus === 'preparando' && currentStatus === 'pendente') {
         // OK. Atualiza status e cozinheiro_id
         const { error: updateError } = await supabaseAdmin
@@ -144,11 +135,9 @@ serve(async (req) => {
             .eq('id', itemId);
         if (updateError) throw updateError;
         
-        // Regra 5b: Travar a mesa (impedir liberação) se o pedido for para 'preparando'
+        // Regra 4b: Travar a mesa (impedir liberação) se o pedido for para 'preparando'
         if (mesaId) {
-            // NOTA: Não há um campo 'travado' na tabela mesas. 
             // A regra de negócio será implementada no frontend/Edge Function de liberação de mesa.
-            // A função 'process-approval-request' (free_table) precisará verificar se há itens 'preparando'.
         }
         
         return new Response(JSON.stringify({ success: true, message: `Preparo iniciado por ${cookName}.` }), {
@@ -157,7 +146,7 @@ serve(async (req) => {
         });
     } 
     
-    // Regra 5c: Se for para 'entregue', o cozinheiro_id deve ser o mesmo
+    // Regra 4c: Se for para 'entregue', o cozinheiro_id deve ser o mesmo
     else if (newStatus === 'entregue' && currentStatus === 'preparando') {
         if (currentCookId !== recognizedCookId) {
             throw new Error(`Apenas ${cookName} (o cozinheiro que iniciou o preparo) pode finalizar este item.`);
