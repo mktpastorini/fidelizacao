@@ -95,7 +95,7 @@ export default function MenuPublicoPage() {
 
   const handleInitiateOrder = (produto: Produto, quantidade: number, observacoes: string) => {
     if (!mesaId || !mesaData || !isMesaOcupada) {
-      showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
+      showError("A mesa não está ocupada. Por favor, chame um atendente.");
       return;
     }
     
@@ -117,7 +117,8 @@ export default function MenuPublicoPage() {
       return;
     }
 
-    const { produto, quantidade, observacoes } = itemToOrder;
+    // CORREÇÃO: Usar itemToIdentify
+    const { produto, quantidade, observacoes } = itemToIdentify;
     const userId = mesaData.user_id;
 
     try {
@@ -135,14 +136,14 @@ export default function MenuPublicoPage() {
       if (pedidoAberto) {
         pedidoId = pedidoAberto.id;
       } else {
-        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
+        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa como fallback)
         const { data: novoPedido, error: novoPedidoError } = await supabase
           .from("pedidos")
           .insert({ 
             mesa_id: mesaId, 
             status: "aberto", 
             user_id: userId,
-            cliente_id: mesaData.cliente_id,
+            cliente_id: mesaData.cliente_id, // Usa o cliente principal da mesa
           })
           .select("id")
           .single();
