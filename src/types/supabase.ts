@@ -22,6 +22,14 @@ export type Cliente = {
   pontos: number; // NOVO CAMPO
 };
 
+export type Cozinheiro = {
+  id: string;
+  user_id: string;
+  nome: string;
+  avatar_url: string | null;
+  created_at: string;
+};
+
 export type Mesa = {
   id: string;
   numero: number;
@@ -83,6 +91,7 @@ export type ItemPedido = {
   requer_preparo: boolean;
   created_at: string;
   updated_at: string;
+  cozinheiro_id: string | null; // NOVO CAMPO
 };
 
 export type Categoria = {

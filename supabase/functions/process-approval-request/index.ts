@@ -66,7 +66,34 @@ serve(async (req) => {
         case 'free_table': {
           const mesaId = request.target_id;
           
-          // Tenta encontrar o pedido aberto
+          // 4a. Verificar se há itens em preparo (TRAVAMENTO)
+          const { data: preparingItems, count: preparingCount, error: prepError } = await supabaseAdmin
+            .from('itens_pedido')
+            .select('id', { count: 'exact', head: true })
+            .eq('pedido:pedidos(mesa_id)', mesaId)
+            .eq('status', 'preparando');
+            
+          if (prepError) throw prepError;
+
+          if (preparingCount > 0) {
+            // Se houver itens em preparo, a mesa está travada. Rejeita a aprovação.
+            await supabaseAdmin
+              .from('approval_requests')
+              .update({ 
+                status: 'rejected', 
+                approved_by: user.id, 
+                approved_at: new Date().toISOString(),
+                payload: { ...request.payload, rejection_reason: "Mesa travada: Itens em preparo." }
+              })
+              .eq('id', request_id);
+              
+            return new Response(JSON.stringify({ success: false, message: `Rejeitado: Mesa ${request.payload.mesa_numero} está travada com ${preparingCount} itens em preparo.` }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400,
+            });
+          }
+          
+          // 4b. Tenta encontrar o pedido aberto
           const { data: openOrder, error: findError } = await supabaseAdmin
             .from('pedidos')
             .select('id, itens_pedido(*), acompanhantes')
@@ -78,6 +105,7 @@ serve(async (req) => {
 
           let cancelledItems = [];
           let occupants = [];
+          let orderWasCancelled = false;
 
           if (openOrder) {
             // Captura os itens e ocupantes antes de cancelar
@@ -89,9 +117,10 @@ serve(async (req) => {
             }));
             occupants = openOrder.acompanhantes || [];
 
-            // Cancela o pedido
+            // Cancela o pedido (status 'cancelado')
             const { error: updateError } = await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
             if (updateError) throw updateError;
+            orderWasCancelled = true;
           } else {
             // Se não houver pedido, apenas busca os ocupantes atuais
             const { data: currentOccupants, error: occError } = await supabaseAdmin
@@ -118,7 +147,7 @@ serve(async (req) => {
           // Atualiza a solicitação com o novo payload
           await supabaseAdmin.from('approval_requests').update({ payload: updatedPayload }).eq('id', request_id);
 
-          message = `Mesa ${request.payload.mesa_numero} liberada e pedido cancelado (se existia).`;
+          message = `Mesa ${request.payload.mesa_numero} liberada. Pedido ${orderWasCancelled ? 'cancelado' : 'não encontrado'}.`;
           break;
         }
         case 'apply_discount': {
@@ -150,7 +179,6 @@ serve(async (req) => {
       .eq('id', request_id);
 
     if (updateError) {
-      // Se a atualização falhar, tentamos reverter a ação se ela foi executada
       console.error("Erro ao atualizar status da solicitação:", updateError);
       throw new Error("Ação executada, mas falha ao registrar o status. Contate o suporte.");
     }
@@ -161,7 +189,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error("Erro na função process-approval-request:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

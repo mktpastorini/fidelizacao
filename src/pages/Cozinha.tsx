@@ -1,15 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { ItemPedido } from "@/types/supabase";
+import { ItemPedido, Cozinheiro } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CookRecognitionModal } from "@/components/cozinha/CookRecognitionModal";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { UserCog } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useSettings } from "@/contexts/SettingsContext";
 
 type KitchenItem = ItemPedido & {
   pedido: {
     mesa: { numero: number } | null;
   } | null;
   cliente: { nome: string } | null;
+  cozinheiro: Cozinheiro | null;
 };
 
 async function fetchKitchenItems(): Promise<KitchenItem[]> {
@@ -24,7 +31,8 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
     .select(`
       *,
       pedido:pedidos!inner(status, mesa:mesas(numero)),
-      cliente:clientes!consumido_por_cliente_id(nome)
+      cliente:clientes!consumido_por_cliente_id(nome),
+      cozinheiro:cozinheiros(nome)
     `)
     .or(orFilter)
     .order("created_at", { ascending: true });
@@ -35,6 +43,12 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { userRole } = useSettings();
+  
+  const [isRecognitionOpen, setIsRecognitionOpen] = useState(false);
+  const [itemToProcess, setItemToProcess] = useState<KitchenItem | null>(null);
+  const [targetStatus, setTargetStatus] = useState<'preparando' | 'entregue'>('preparando');
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
@@ -42,45 +56,85 @@ export default function CozinhaPage() {
     refetchInterval: 15000, // Atualiza a cada 15 segundos
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ itemId, newStatus }: { itemId: string; newStatus: 'preparando' | 'entregue' }) => {
-      const { error } = await supabase
-        .from("itens_pedido")
-        .update({ status: newStatus })
-        .eq("id", itemId);
-      if (error) throw error;
+  const processKitchenActionMutation = useMutation({
+    mutationFn: async ({ itemId, newStatus, image_url }: { itemId: string; newStatus: 'preparando' | 'entregue'; image_url: string }) => {
+      // Se for Garçom/Balcão e for item sem preparo, não precisa de reconhecimento facial
+      const item = items?.find(i => i.id === itemId);
+      const isNonPrepByStaff = item && !item.requer_preparo && ['garcom', 'balcao'].includes(userRole!);
+      
+      if (isNonPrepByStaff) {
+        // Ação direta (sem reconhecimento facial)
+        const { error } = await supabase
+          .from("itens_pedido")
+          .update({ status: 'entregue' })
+          .eq("id", itemId);
+        if (error) throw error;
+        return { message: "Item entregue ao cliente (sem preparo)." };
+      }
+      
+      // Ação que requer reconhecimento facial (Cozinha/Gerência ou item com preparo)
+      const { data, error } = await supabase.functions.invoke('process-kitchen-action', {
+        body: { itemId, newStatus, image_url },
+      });
+      if (error) throw new Error(error.message);
+      return data;
     },
-    onSuccess: () => {
-      // Força o refetch para atualizar o Kanban imediatamente
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      // Invalida também os pedidos pendentes do sininho
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
-      showSuccess("Status do item atualizado!");
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] }); // Invalida para atualizar o travamento
+      showSuccess(data.message || "Status do item atualizado!");
+      setIsRecognitionOpen(false);
+      setItemToProcess(null);
     },
     onError: (err: Error) => showError(err.message),
   });
+  
+  const handleInitiateRecognition = (item: KitchenItem, status: 'preparando' | 'entregue') => {
+    const isNonPrepByStaff = !item.requer_preparo && ['garcom', 'balcao'].includes(userRole!);
+    
+    if (isNonPrepByStaff) {
+      // Se for Garçom/Balcão e item sem preparo, executa a mutação diretamente (passando uma URL dummy)
+      processKitchenActionMutation.mutate({ itemId: item.id, newStatus: 'entregue', image_url: 'dummy' });
+    } else {
+      // Se for Cozinha/Gerência ou item com preparo, abre o modal de reconhecimento
+      setItemToProcess(item);
+      setTargetStatus(status);
+      setIsRecognitionOpen(true);
+    }
+  };
 
-  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue') => {
-    updateStatusMutation.mutate({ itemId, newStatus });
+  const handleCookConfirmed = (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string) => {
+    // O modal de reconhecimento já capturou a imagem.
+    // Agora, chamamos a mutação com a imagem capturada (snapshot)
+    const snapshot = (document.getElementById('cook-recognition-snapshot') as HTMLImageElement)?.src;
+    
+    if (!snapshot) {
+        showError("Falha ao capturar a imagem para confirmação.");
+        return;
+    }
+    
+    // O Edge Function 'process-kitchen-action' fará o reconhecimento novamente e a validação do cookId.
+    // Aqui, apenas passamos a imagem capturada.
+    processKitchenActionMutation.mutate({ itemId, newStatus, image_url: snapshot });
   };
 
   // Filtra itens para o Kanban
   const filteredItems = items?.filter(item => {
     const nome = item.nome_produto.toUpperCase();
     
-    // 1. Exclui itens de Resgate e Rodízio (pacote ou componente)
+    // Exclui itens de Resgate e Pacote Rodízio (o pacote rodízio não é um item de preparo)
     if (nome.startsWith('[RESGATE]') || nome.startsWith('[RODIZIO]')) {
       return false;
     }
     
-    // 2. Inclui itens que estão pendentes ou em preparo (requer preparo ou não)
+    // Itens de Rodízio (componente_rodizio) devem ser incluídos se requer_preparo for true
+    // Se requer_preparo for false, eles são tratados como itens de venda direta (entregues pelo garçom)
     if (item.status === 'pendente' || item.status === 'preparando') {
       return true;
     }
     
-    // 3. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
-    // NOTA: Itens de venda direta que não requerem preparo são marcados como 'entregue' na inserção.
-    // Se quisermos que eles apareçam na coluna 'Pronto/Entregue' por 30 minutos, mantemos esta lógica.
+    // Inclui itens que foram entregues recentemente
     if (item.status === 'entregue') {
       return true;
     }
@@ -91,12 +145,21 @@ export default function CozinhaPage() {
   const pendingItems = filteredItems.filter(item => item.status === 'pendente');
   const preparingItems = filteredItems.filter(item => item.status === 'preparando');
   const deliveredItems = filteredItems.filter(item => item.status === 'entregue');
+  
+  const canManageCozinheiros = userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
   return (
     <div className="h-full flex flex-col">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
-        <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <div>
+          <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
+          <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
+        </div>
+        {canManageCozinheiros && (
+          <Button variant="outline" onClick={() => navigate('/cozinheiros')}>
+            <UserCog className="w-4 h-4 mr-2" /> Gerenciar Cozinheiros
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -108,12 +171,21 @@ export default function CozinhaPage() {
       ) : isError ? (
         <p className="text-destructive">Erro ao carregar os pedidos.</p>
       ) : (
-        <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
-          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
-          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
+        <div className="flex-1 flex gap-6 min-h-0">
+          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleInitiateRecognition} borderColor="border-warning" />
+          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleInitiateRecognition} borderColor="border-primary" />
+          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleInitiateRecognition} borderColor="border-success" />
         </div>
       )}
+      
+      <CookRecognitionModal
+        isOpen={isRecognitionOpen}
+        onOpenChange={setIsRecognitionOpen}
+        item={itemToProcess}
+        targetStatus={targetStatus}
+        onCookConfirmed={handleCookConfirmed}
+        isSubmitting={processKitchenActionMutation.isPending}
+      />
     </div>
   );
 }
