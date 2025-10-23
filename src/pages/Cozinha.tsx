@@ -19,6 +19,9 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
   // A query agora busca:
   // 1. Itens pendentes OU em preparo E que requerem preparo.
   // 2. OU Itens entregues (independentemente de requerer preparo, se foram atualizados recentemente).
+  // A sintaxe foi compactada para evitar o erro 400 do PostgREST.
+  const orFilter = `and(status.in.("pendente","preparando"),requer_preparo.eq.true),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`;
+
   const { data, error } = await supabase
     .from("itens_pedido")
     .select(`
@@ -26,10 +29,7 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
       pedido:pedidos!inner(status, mesa:mesas(numero)),
       cliente:clientes!consumido_por_cliente_id(nome)
     `)
-    .or(`
-      and(status.in.("pendente","preparando"),requer_preparo.eq.true),
-      and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})
-    `)
+    .or(orFilter)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
