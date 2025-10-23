@@ -15,6 +15,7 @@ type KitchenItem = ItemPedido & {
     mesa: { numero: number } | null;
   } | null;
   cliente: { nome: string } | null;
+  cozinheiro: { nome: string } | null; // NOVO CAMPO
 };
 
 async function fetchKitchenItems(): Promise<KitchenItem[]> {
@@ -29,7 +30,8 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
     .select(`
       *,
       pedido:pedidos!inner(status, mesa:mesas(numero)),
-      cliente:clientes!consumido_por_cliente_id(nome)
+      cliente:clientes!consumido_por_cliente_id(nome),
+      cozinheiro:cozinheiros(nome)
     `)
     .or(orFilter)
     .order("created_at", { ascending: true });
