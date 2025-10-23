@@ -33,9 +33,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  const { clientId, userId } = await req.json()
-  if (!clientId || !userId) {
-    return new Response(JSON.stringify({ error: "clientId e userId são obrigatórios." }), {
+  const { pedidoId, userId } = await req.json()
+  if (!pedidoId || !userId) {
+    return new Response(JSON.stringify({ error: "pedidoId e userId são obrigatórios." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });
@@ -47,8 +47,22 @@ serve(async (req) => {
   )
 
   let logId: string | null = null;
+  let clientId: string | null = null;
 
   try {
+    // 1. Buscar o cliente principal do pedido
+    const { data: pedido, error: pedidoError } = await supabaseAdmin
+      .from('pedidos')
+      .select('cliente_id')
+      .eq('id', pedidoId)
+      .single();
+    
+    if (pedidoError || !pedido?.cliente_id) {
+        throw new Error('Cliente principal não encontrado para este pedido.');
+    }
+    clientId = pedido.cliente_id;
+
+
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('webhook_url, pagamento_template_id')

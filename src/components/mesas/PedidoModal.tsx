@@ -209,19 +209,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      const acompanhantesData = ocupantes.map(o => ({ id: o.id, nome: o.nome }));
+      // 1. Chamar a nova função RPC para fechar o pedido e liberar a mesa
+      const { error: rpcError } = await supabase.rpc('finalizar_pagamento_total', {
+        p_pedido_id: pedido.id,
+        p_mesa_id: mesa.id,
+      });
+      if (rpcError) throw rpcError;
 
-      await supabase.from("pedidos").update({ 
-        status: "pago", 
-        closed_at: new Date().toISOString(),
-        acompanhantes: acompanhantesData,
-      }).eq("id", pedido.id);
-
-      await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesa.id);
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa.id);
-
-      if (mesa.cliente_id) {
-        const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { body: { clientId: mesa.cliente_id, userId: user.id } });
+      // 2. Enviar webhook de confirmação de pagamento (usando o pedidoId)
+      if (pedido.cliente_id) {
+        const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { 
+          body: { pedidoId: pedido.id, userId: user.id } 
+        });
         if (functionError) showError(`Conta fechada, mas falha ao enviar webhook: ${functionError.message}`);
       }
     },
