@@ -9,8 +9,9 @@ type KanbanColumnProps = {
       mesa: { numero: number } | null;
     } | null;
     cliente: { nome: string } | null;
+    cozinheiro: { nome: string } | null;
   })[];
-  onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue') => void;
+  onStatusChange: (item: any, newStatus: 'preparando' | 'entregue') => void; // Tipo ajustado para corresponder ao uso
   borderColor: string;
 };
 
@@ -21,7 +22,12 @@ export function KanbanColumn({ title, items, onStatusChange, borderColor }: Kanb
       <div className="flex-1 overflow-y-auto -mr-4 pr-4">
         {items.length > 0 ? (
           items.map(item => (
-            <KanbanCard key={item.id} item={item} onStatusChange={onStatusChange} />
+            <KanbanCard 
+              key={item.id} 
+              item={item} 
+              onInitiateRecognition={onStatusChange} 
+              isProcessing={false} // O estado de processamento é gerenciado no CozinhaPage
+            />
           ))
         ) : (
           <div className="flex items-center justify-center h-full">
