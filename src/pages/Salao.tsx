@@ -95,10 +95,17 @@ export default function SalaoPage() {
     { client: Cliente; timestamp: number }[]
   >([]);
 
+  // Determina se o usuário logado é um dos roles que precisa do ID do Superadmin para o botão de fechar
+  const needsSuperadminId = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
+  
+  // Se o usuário precisar do ID do Superadmin, esperamos que ele carregue. Caso contrário, passamos null.
+  const idForFetch = needsSuperadminId ? superadminId : null;
+  const shouldWait = needsSuperadminId && isLoadingSuperadminId;
+
   const { data, isLoading } = useQuery({
-    queryKey: ["salaoData", superadminId],
-    queryFn: () => fetchSalaoData(superadminId),
-    enabled: !isLoadingSuperadminId && !!superadminId, // Habilita apenas quando o ID do Superadmin estiver pronto
+    queryKey: ["salaoData", idForFetch],
+    queryFn: () => fetchSalaoData(idForFetch),
+    enabled: !shouldWait, // Só espera se for um dos roles que precisa do ID
     refetchInterval: 30000,
   });
 
@@ -114,9 +121,6 @@ export default function SalaoPage() {
 
   const closeDayMutation = useMutation({
     mutationFn: async () => {
-      // A função close-day usa o token do usuário logado para autenticação, mas o userId
-      // para buscar as estatísticas. No entanto, a atualização do status 'establishment_is_closed'
-      // deve ser feita no perfil do Superadmin.
       if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
       
       // 1. Executa a função Edge (que calcula stats e envia webhook)
@@ -398,7 +402,7 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
-  if (isLoading || isLoadingSuperadminId) {
+  if (isLoading || shouldWait) {
     return <Skeleton className="h-screen w-full" />;
   }
   
