@@ -130,6 +130,9 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
   const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
   const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
+  
+  // Verifica se há ocupantes ativos na mesa
+  const hasActiveOccupants = ocupantes && ocupantes.length > 0;
 
   const { itensAgrupados, totalPedido, itensMesaGeral } = useMemo(() => {
     if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0, itensMesaGeral: [] };
@@ -138,7 +141,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     
     const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: 'Mesa' }; itens: ItemPedido[]; subtotal: number }>();
     
+    // Adiciona todos os ocupantes atuais
     ocupantes.forEach(o => agrupados.set(o.id, { cliente: o, itens: [], subtotal: 0 }));
+    
+    // Garante que o cliente principal original (se não for um ocupante atual) ainda possa ser referenciado
+    // Embora o cliente principal possa ter saído, o ID dele ainda está no pedido.
+    // Para fins de exibição, vamos focar apenas nos ocupantes atuais e na Mesa Geral.
     agrupados.set('mesa', { cliente: { id: 'mesa', nome: 'Mesa (Geral)' }, itens: [], subtotal: 0 });
 
     const mesaGeral: ItemPedido[] = [];
@@ -151,6 +159,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         grupo.subtotal += calcularPrecoComDesconto(item);
         if (key === 'mesa') {
           mesaGeral.push(item);
+        }
+      } else if (key !== 'mesa') {
+        // Caso um item esteja atribuído a um cliente que já saiu (não está em ocupantes),
+        // movemos o item para a Mesa Geral para que seja pago no fechamento total.
+        // Isso é uma correção de contingência, mas o fluxo normal deve evitar isso.
+        const mesaGrupo = agrupados.get('mesa');
+        if (mesaGrupo) {
+            mesaGrupo.itens.push(item);
+            mesaGrupo.subtotal += calcularPrecoComDesconto(item);
+            mesaGeral.push(item);
         }
       }
     });
@@ -398,7 +416,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     }
     
     // 3. Determinar o status inicial
-    status = 'pendente';
+    let status: ItemPedido['status'] = 'pendente';
 
     addItemMutation.mutate({ 
         ...values, 
@@ -421,6 +439,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   // Função para abrir o modal de pagamento parcial de item da mesa
   const handleMesaItemPartialPaymentOpen = (item: ItemPedido) => {
     if (!ocupantes || ocupantes.length === 0) {
+        // Este erro não deve ocorrer se o botão estiver desabilitado, mas é uma segurança.
         showError("Não há clientes ocupando a mesa para atribuir o pagamento.");
         return;
     }
@@ -587,6 +606,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                     variant="outline" 
                                     className="h-8 bg-green-600 hover:bg-green-700 text-white"
                                     onClick={() => handleMesaItemPartialPaymentOpen(item)}
+                                    disabled={!hasActiveOccupants} {/* DESABILITA SE NÃO HOUVER OCUPANTES */}
                                   >
                                     <DollarSign className="w-4 h-4" />
                                   </Button>
