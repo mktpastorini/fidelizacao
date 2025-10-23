@@ -4,6 +4,13 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { KitchenConfirmationDialog } from "@/components/cozinha/KitchenConfirmationDialog";
+import { useSettings } from "@/contexts/SettingsContext";
+import { Button } from "@/components/ui/button";
+import { UserPlus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { CozinheiroManager } from "@/components/cozinha/CozinheiroManager";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -35,6 +42,12 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
+  const { userRole } = useSettings();
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [isManagerOpen, setIsManagerOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ itemId: string; newStatus: 'preparando' | 'entregue' } | null>(null);
+
+  const isManagerOrAdmin = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
@@ -51,18 +64,39 @@ export default function CozinhaPage() {
       if (error) throw error;
     },
     onSuccess: () => {
-      // Força o refetch para atualizar o Kanban imediatamente
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      // Invalida também os pedidos pendentes do sininho
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess("Status do item atualizado!");
+      setPendingAction(null);
     },
-    onError: (err: Error) => showError(err.message),
+    onError: (err: Error) => {
+      showError(err.message);
+      setPendingAction(null);
+    },
   });
 
+  // Função chamada pelo KanbanCard para iniciar a ação (se for item sem preparo, executa direto)
   const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue') => {
+    // Para itens SEM preparo, Garçom/Balcão/Gerência pode executar diretamente
     updateStatusMutation.mutate({ itemId, newStatus });
   };
+
+  // Função chamada pelo KanbanCard para iniciar o fluxo de confirmação facial
+  const handleConfirmAction = (itemId: string, newStatus: 'preparando' | 'entregue') => {
+    setPendingAction({ itemId, newStatus });
+    setIsConfirmationOpen(true);
+  };
+
+  // Função chamada pelo modal após a confirmação facial
+  const handleConfirmed = (confirmedUserId: string) => {
+    if (pendingAction) {
+      // O modal já garantiu que o rosto corresponde ao usuário logado.
+      updateStatusMutation.mutate(pendingAction);
+    }
+  };
+  
+  const { data: user } = supabase.auth.getUser();
+  const currentUserId = user?.user?.id || '';
 
   // Filtra itens para o Kanban
   const filteredItems = items?.filter(item => {
@@ -79,8 +113,6 @@ export default function CozinhaPage() {
     }
     
     // 3. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
-    // NOTA: Itens de venda direta que não requerem preparo são marcados como 'entregue' na inserção.
-    // Se quisermos que eles apareçam na coluna 'Pronto/Entregue' por 30 minutos, mantemos esta lógica.
     if (item.status === 'entregue') {
       return true;
     }
@@ -94,9 +126,16 @@ export default function CozinhaPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
-        <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Painel da Cozinha</h1>
+          <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
+        </div>
+        {isManagerOrAdmin && (
+          <Button onClick={() => setIsManagerOpen(true)}>
+            <UserPlus className="w-4 h-4 mr-2" /> Gerenciar Cozinheiros
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -109,11 +148,48 @@ export default function CozinhaPage() {
         <p className="text-destructive">Erro ao carregar os pedidos.</p>
       ) : (
         <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
-          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
-          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
+          <KanbanColumn 
+            title="Pendente" 
+            items={pendingItems} 
+            onStatusChange={handleStatusChange} 
+            onConfirmAction={handleConfirmAction}
+            borderColor="border-warning" 
+          />
+          <KanbanColumn 
+            title="Em Preparo" 
+            items={preparingItems} 
+            onStatusChange={handleStatusChange} 
+            onConfirmAction={handleConfirmAction}
+            borderColor="border-primary" 
+          />
+          <KanbanColumn 
+            title="Pronto/Entregue" 
+            items={deliveredItems} 
+            onStatusChange={handleStatusChange} 
+            onConfirmAction={handleConfirmAction}
+            borderColor="border-success" 
+          />
         </div>
       )}
+      
+      {/* Modal de Confirmação Facial */}
+      <KitchenConfirmationDialog
+        isOpen={isConfirmationOpen}
+        onOpenChange={setIsConfirmationOpen}
+        onConfirmed={handleConfirmed}
+        isSubmitting={updateStatusMutation.isPending}
+        targetUserId={currentUserId}
+      />
+      
+      {/* Modal de Gerenciamento de Cozinheiros */}
+      <Dialog open={isManagerOpen} onOpenChange={setIsManagerOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Gerenciar Cozinheiros</DialogTitle>
+          </DialogHeader>
+          <CozinheiroManager />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
