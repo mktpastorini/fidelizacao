@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { AuthLayout } from "./components/AuthLayout";
 import { SettingsProvider } from "./contexts/SettingsContext";
@@ -21,10 +21,33 @@ import NotFound from "./pages/NotFound";
 import MenuPublicoPage from "./pages/MenuPublico";
 import UsuariosPage from "./pages/Usuarios";
 import CozinheirosPage from "./pages/Cozinheiros";
-import GorjetasPage from "./pages/Gorjetas"; // Importado
+import GorjetasPage from "./pages/Gorjetas";
 import { PageActionsProvider } from "./contexts/PageActionsContext";
+import InstallationPage from "./pages/InstallationPage";
+import { useInstaller } from "./hooks/useInstaller";
+import { Skeleton } from "./components/ui/skeleton";
 
 const queryClient = new QueryClient();
+
+// Componente Wrapper para verificar o status da instalação
+const InstallationWrapper = () => {
+  const { isInstalled, isLoading } = useInstaller();
+
+  if (isLoading) {
+    return <Skeleton className="h-screen w-full" />;
+  }
+
+  if (!isInstalled) {
+    return <InstallationPage />;
+  }
+  
+  // Se instalado, permite o fluxo normal de autenticação
+  return (
+    <SettingsProvider>
+      <AuthLayout />
+    </SettingsProvider>
+  );
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,24 +56,21 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            {/* Rota Pública para o Menu, agora envolvida por SettingsProvider */}
+            {/* Rota Pública para o Menu */}
             <Route path="/menu-publico/:mesaId" element={
               <SettingsProvider>
                 <MenuPublicoPage />
               </SettingsProvider>
             } />
             
-            {/* Rotas de Autenticação */}
+            {/* Rota de Login (Acessível mesmo se não estiver instalado, mas redireciona se não estiver) */}
             <Route path="/login" element={<Login />} />
             
-            {/* Rotas Protegidas */}
-            <Route
-              element={
-                <SettingsProvider>
-                  <AuthLayout />
-                </SettingsProvider>
-              }
-            >
+            {/* Rota de Instalação (Ponto de entrada principal) */}
+            <Route path="/install" element={<InstallationPage />} />
+            
+            {/* Rotas Protegidas (Envolvidas pelo InstallationWrapper) */}
+            <Route element={<InstallationWrapper />}>
               <Route element={
                 <PageActionsProvider>
                   <Layout />
@@ -62,22 +82,16 @@ const App = () => (
                 <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
                 <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
                 <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
-                
-                {/* Cozinha: Acesso exclusivo ou compartilhado */}
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha', 'garcom']}><Cozinha /></RoleGuard>} />
-                
-                {/* Gerenciamento de Cozinheiros: Apenas Gerência */}
                 <Route path="/cozinheiros" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><CozinheirosPage /></RoleGuard>} />
-                
-                {/* Restringindo acesso a Gerência */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
-                <Route path="/gorjetas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'garcom']}><GorjetasPage /></RoleGuard>} /> {/* ATUALIZADO */}
+                <Route path="/gorjetas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'garcom']}><GorjetasPage /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
-                
-                {/* Configurações: Apenas Superadmin e Admin */}
                 <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin']}><Configuracoes /></RoleGuard>} />
-                
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
+                
+                {/* Redirecionamento da raiz para a página principal se instalado */}
+                <Route path="/" element={<Navigate to="/" replace />} />
               </Route>
             </Route>
             <Route path="*" element={<NotFound />} />
