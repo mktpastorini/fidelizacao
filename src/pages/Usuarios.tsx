@@ -42,9 +42,8 @@ async function fetchAllUsers(): Promise<UserProfile[]> {
     id: u.id,
     email: u.email,
     role: u.role,
-    // Acessando user_metadata de forma segura
-    first_name: u.user_metadata?.first_name || u.first_name || null, 
-    last_name: u.user_metadata?.last_name || u.last_name || null, 
+    first_name: u.user_metadata.first_name || u.first_name || null, // Usar user_metadata como fallback
+    last_name: u.user_metadata.last_name || u.last_name || null, // Usar user_metadata como fallback
   }));
 }
 
