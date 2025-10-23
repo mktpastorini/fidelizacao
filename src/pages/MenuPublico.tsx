@@ -98,7 +98,11 @@ export default function MenuPublicoPage() {
       showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
       return;
     }
-    if (produto.estoque_atual <= 0) {
+    
+    const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
+    
+    // Verifica estoque APENAS se for produto de venda
+    if (!isRodizioType && (produto.estoque_atual ?? 0) <= 0) {
       showError(`O produto "${produto.nome}" está indisponível no momento.`);
       return;
     }
@@ -113,7 +117,7 @@ export default function MenuPublicoPage() {
       return;
     }
 
-    const { produto, quantidade, observacoes } = itemToIdentify;
+    const { produto, quantidade, observacoes } = itemToOrder;
     const userId = mesaData.user_id;
 
     try {
@@ -147,13 +151,34 @@ export default function MenuPublicoPage() {
       }
 
       // 3. Insere o item no pedido
+      
+      let nomeProdutoFinal = produto.nome + (observacoes ? ` (${observacoes})` : '');
+      let requerPreparo = produto.requer_preparo;
+      let status: ItemPedido['status'] = 'pendente';
+
+      // Se for Pacote Rodízio, prefixamos e garantimos que não requer preparo.
+      if (produto.tipo === 'rodizio') {
+          nomeProdutoFinal = `[RODIZIO] ${nomeProdutoFinal}`;
+          requerPreparo = false;
+      }
+      
+      // Se for Item de Rodízio, garantimos que não requer preparo.
+      if (produto.tipo === 'componente_rodizio') {
+          requerPreparo = false;
+      }
+      
+      // Se for item de Venda e não requer preparo, marca como entregue.
+      if (produto.tipo === 'venda' && !requerPreparo) {
+          status = 'entregue';
+      }
+
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
-        nome_produto: produto.nome + (observacoes ? ` (${observacoes})` : ''),
+        nome_produto: nomeProdutoFinal,
         quantidade: quantidade,
         preco: produto.preco,
-        status: "pendente",
-        requer_preparo: produto.requer_preparo,
+        status: status,
+        requer_preparo: requerPreparo,
         user_id: userId,
         consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
       });
@@ -225,14 +250,19 @@ export default function MenuPublicoPage() {
         {/* Lista de Produtos */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           {filteredProdutos.length > 0 ? (
-            filteredProdutos.map((produto) => (
-              <PublicMenuProductCard 
-                key={produto.id} 
-                produto={produto} 
-                onInitiateOrder={handleInitiateOrder} 
-                disabled={produto.estoque_atual <= 0} 
-              />
-            ))
+            filteredProdutos.map((produto) => {
+              const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
+              const isUnavailable = !isRodizioType && (produto.estoque_atual ?? 0) <= 0;
+              
+              return (
+                <PublicMenuProductCard 
+                  key={produto.id} 
+                  produto={produto} 
+                  onInitiateOrder={handleInitiateOrder} 
+                  disabled={isUnavailable} // Passa a disponibilidade correta
+                />
+              );
+            })
           ) : (
             <p className="col-span-full text-center text-gray-400 py-10">Nenhum produto nesta categoria.</p>
           )}

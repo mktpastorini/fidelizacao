@@ -24,8 +24,12 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
   const [quantidade, setQuantidade] = useState(1);
   const [observacoes, setObservacoes] = useState("");
 
+  // Lógica de disponibilidade: Se for tipo venda E estoque for 0, está indisponível.
+  const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
+  const isUnavailable = !isRodizioType && (produto.estoque_atual ?? 0) <= 0;
+
   const handleOrderClick = () => {
-    if (disabled) {
+    if (isUnavailable) {
       showError("Produto indisponível no momento.");
       return;
     }
@@ -56,8 +60,8 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
       <div
         className={cn(
           "relative rounded-lg border border-gray-300 bg-white shadow-lg cursor-pointer overflow-hidden transition-all duration-300 h-40",
+          isUnavailable && "opacity-50 cursor-not-allowed", // Usando isUnavailable aqui
           isHovered ? "scale-[1.02] shadow-xl" : "scale-100",
-          disabled && "opacity-50 cursor-not-allowed"
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -83,8 +87,8 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
             <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4 text-white">
                 <h3 className="text-xl font-bold text-center">{produto.nome}</h3>
                 <p className="text-lg font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
-                {disabled && <p className="text-red-400 font-semibold mt-2">Indisponível</p>}
-                {!disabled && <p className="text-sm mt-2">Clique para Pedir</p>}
+                {isUnavailable && <p className="text-red-400 font-semibold mt-2">Indisponível</p>}
+                {!isUnavailable && <p className="text-sm mt-2">Clique para Pedir</p>}
             </div>
         </div>
 
@@ -108,7 +112,7 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
             <h3 className="text-base font-semibold text-gray-900 truncate">{produto.nome}</h3>
             <p className="text-sm text-gray-600 truncate">{produto.descricao || 'Sem descrição'}</p>
             <p className="text-sm font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
-            {disabled && <p className="text-red-500 font-semibold mt-1">Indisponível</p>}
+            {isUnavailable && <p className="text-red-500 font-semibold mt-1">Indisponível</p>}
           </div>
         </div>
       </div>
@@ -208,7 +212,7 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
             {/* Botão Adicionar (Azul) */}
             <Button 
               onClick={handleConfirmOrder} 
-              disabled={isOrdering || disabled}
+              disabled={isOrdering || isUnavailable}
               className="bg-blue-500 hover:bg-blue-600 text-white"
             >
               Adicionar ao Pedido
