@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, Shield, Users, Utensils, DollarSign, MessageSquare, Table, ClipboardList, History, UserCog } from "lucide-react";
+import { CheckCircle, XCircle, Shield, Users, Utensils, DollarSign, MessageSquare, Table, ClipboardList, History, UserCog, ScanFace, Star } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const features = [
