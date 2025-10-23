@@ -52,6 +52,7 @@ export default function CozinhaPage() {
       if (newStatus === 'preparando') {
         updatePayload.cozinheiro_id = cookId;
         updatePayload.hora_inicio_preparo = new Date().toISOString();
+        updatePayload.hora_entrega = null; // Garante que a hora de entrega é resetada
       } else if (newStatus === 'entregue') {
         updatePayload.hora_entrega = new Date().toISOString();
         

@@ -61,6 +61,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
       onStatusChange(item.id, 'entregue', cook.id);
     }
     setPendingAction(null);
+    setIsModalOpen(false); // Fecha o modal após o sucesso
   };
   
   const handleActionClick = async (action: 'start_prep' | 'finish_prep') => {
@@ -77,6 +78,17 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
     setPendingAction(action);
     setIsModalOpen(true);
   };
+  
+  // Cálculo do tempo de preparo
+  const tempoPreparo = useMemo(() => {
+    if (item.hora_inicio_preparo && item.hora_entrega) {
+      const start = new Date(item.hora_inicio_preparo);
+      const end = new Date(item.hora_entrega);
+      const diffMinutes = differenceInMinutes(end, start);
+      return `${diffMinutes} min`;
+    }
+    return null;
+  }, [item.hora_inicio_preparo, item.hora_entrega]);
 
   return (
     <>
@@ -93,12 +105,18 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
             </div>
             <div className="flex items-center">
               <Clock className="w-4 h-4 mr-2" />
-              <span className={cn(isOverdue ? "text-destructive font-semibold" : "")}>Há {tempoDesdePedido}</span>
+              <span className={cn(isOverdue ? "text-destructive font-semibold" : "")}>Pedido há {tempoDesdePedido}</span>
             </div>
             {item.cozinheiro?.nome && (
                 <div className="flex items-center text-xs text-primary">
                     <Utensils className="w-3 h-3 mr-2" />
                     <span>Responsável: {item.cozinheiro.nome}</span>
+                </div>
+            )}
+            {tempoPreparo && (
+                <div className="flex items-center text-xs text-success">
+                    <Clock className="w-3 h-3 mr-2" />
+                    <span>Tempo de Preparo: {tempoPreparo}</span>
                 </div>
             )}
           </div>
