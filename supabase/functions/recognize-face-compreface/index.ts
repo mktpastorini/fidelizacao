@@ -123,6 +123,7 @@ serve(async (req) => {
         .single();
 
       if (clientError) {
+        console.error(`[recognize-face] Erro ao buscar dados do cliente: ${clientError.message}`);
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
       console.log("[recognize-face] Dados do cliente recuperados com sucesso.");
@@ -134,9 +135,13 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("--- [recognize-face] ERRO FATAL ---");
-    console.error("Mensagem:", error.message);
-    console.error("Stack:", error.stack);
-    return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
+    // Tentativa de logar o erro de forma mais completa
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : 'N/A';
+    console.error("Mensagem:", errorMessage);
+    console.error("Stack:", errorStack);
+    
+    return new Response(JSON.stringify({ error: `Erro interno na função: ${errorMessage}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
