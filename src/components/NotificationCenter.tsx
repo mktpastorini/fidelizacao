@@ -42,7 +42,7 @@ async function fetchPendingOrderItems(): Promise<PendingOrderItem[]> {
       pedido:pedidos!inner(mesa:mesas(numero)),
       cliente:clientes!consumido_por_cliente_id(nome)
     `)
-    .in("status", ["pendente", "preparando"])
+    .in("status", ["pendente", "preparando"]) // Mantém apenas pendente e preparando
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
