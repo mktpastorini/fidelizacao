@@ -6,26 +6,43 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função auxiliar para buscar as configurações do usuário logado
+// Função auxiliar para buscar as configurações do Superadmin
 async function getComprefaceSettings(supabaseAdmin: any, userId: string) {
   console.log(`[recognize-face] Buscando configurações do CompreFace para o usuário: ${userId}`);
 
+  // 1. Buscar o ID do Superadmin
+  const { data: superadminProfile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'superadmin')
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError || !superadminProfile) {
+    console.error("[recognize-face] Erro ao buscar Superadmin:", profileError);
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+  }
+  
+  const superadminId = superadminProfile.id;
+  console.log(`[recognize-face] Superadmin ID encontrado: ${superadminId}`);
+
+  // 2. Buscar as configurações do Superadmin
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('user_settings')
     .select('compreface_url, compreface_api_key')
-    .eq('id', userId)
+    .eq('id', superadminId)
     .single();
 
   if (settingsError) {
-    console.error(`[recognize-face] Erro ao buscar configurações do usuário ${userId}:`, settingsError);
+    console.error(`[recognize-face] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
     return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
-  return { settings, error: null };
+  return { settings, error: null, superadminId };
 }
 
 serve(async (req) => {
@@ -63,8 +80,8 @@ serve(async (req) => {
     console.log(`[recognize-face] 2/7: Usuário autenticado: ${userIdForClients}`);
 
 
-    // 3. Buscando configurações do CompreFace do usuário logado
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin, userIdForClients);
+    // 3. Buscando configurações do CompreFace do Superadmin
+    const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin, userIdForClients);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -102,7 +119,7 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      // 7. Buscar dados do cliente usando o ID do usuário logado
+      // 7. Buscar dados do cliente usando o ID do usuário logado (dono do cliente)
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')

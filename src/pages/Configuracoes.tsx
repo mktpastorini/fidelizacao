@@ -44,14 +44,33 @@ async function fetchPageData(): Promise<UserData> {
 }
 
 function CompreFaceSettingsForm() {
-  const { settings, refetch: refetchSettings } = useSettings();
+  const { settings, refetch: refetchSettings, userRole } = useSettings();
   const queryClient = useQueryClient();
+  
+  // Apenas Superadmin pode ver e editar
+  if (userRole !== 'superadmin') {
+    return (
+      <Alert variant="default">
+        <ShieldAlert className="h-4 w-4" />
+        <AlertTitle>Configuração Centralizada</AlertTitle>
+        <AlertDescription>
+          As configurações do servidor de reconhecimento facial são gerenciadas apenas pelo Super Admin.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Partial<UserSettings>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
-      const { error } = await supabase.from("user_settings").upsert({ id: user.id, ...updatedSettings });
+      
+      // Garante que apenas o Superadmin pode salvar as configurações globais
+      if (userRole !== 'superadmin') throw new Error("Apenas Superadmin pode alterar estas configurações.");
+      
+      const settingsToUpsert = { id: user.id, ...updatedSettings };
+
+      const { error } = await supabase.from("user_settings").upsert(settingsToUpsert);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -101,7 +120,7 @@ function CompreFaceSettingsForm() {
 
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
-  const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
+  const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
 
   const { data, isLoading: isLoadingPage, isError } = useQuery({
     queryKey: ["configPageData"],

@@ -7,23 +7,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função auxiliar para buscar as configurações do usuário logado
-async function getComprefaceSettings(supabaseAdmin: any, userId: string) {
-  console.log(`[add-face-examples] Buscando configurações do CompreFace para o usuário: ${userId}`);
+// Função auxiliar para buscar as configurações do Superadmin
+async function getComprefaceSettings(supabaseAdmin: any) {
+  console.log("[add-face-examples] Buscando configurações do CompreFace do Superadmin principal...");
 
+  // 1. Buscar o ID do Superadmin
+  const { data: superadminProfile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'superadmin')
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError || !superadminProfile) {
+    console.error("[add-face-examples] Erro ao buscar Superadmin:", profileError);
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+  }
+  
+  const superadminId = superadminProfile.id;
+  console.log(`[add-face-examples] Superadmin ID encontrado: ${superadminId}`);
+
+  // 2. Buscar as configurações do Superadmin
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('user_settings')
     .select('compreface_url, compreface_api_key')
-    .eq('id', userId)
+    .eq('id', superadminId)
     .single();
 
   if (settingsError) {
-    console.error(`[add-face-examples] Erro ao buscar configurações do usuário ${userId}:`, settingsError);
+    console.error(`[add-face-examples] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
     return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
   return { settings, error: null };
@@ -60,14 +77,14 @@ serve(async (req) => {
         throw new Error("Falha na autenticação do usuário: Token de autorização ausente.");
     }
     
+    // Apenas verifica se o usuário está logado para garantir que a requisição é válida
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userId = user.id;
-    console.log(`[add-face-examples] 2/7: Usuário autenticado: ${userId}`);
+    console.log(`[add-face-examples] 2/7: Usuário autenticado: ${user.id}`);
 
-    // 3. Buscando configurações do CompreFace do usuário logado
-    console.log("[add-face-examples] 3/7: Buscando configurações do CompreFace...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin, userId);
+    // 3. Buscando configurações do CompreFace do Superadmin
+    console.log("[add-face-examples] 3/7: Buscando configurações globais do CompreFace...");
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
