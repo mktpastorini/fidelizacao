@@ -7,6 +7,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// ID fixo do Superadmin principal
+const SUPERADMIN_ID = '1';
+
+// Função auxiliar para buscar as configurações globais do usuário 1 fixo
+async function getComprefaceSettings(supabaseAdmin: any) {
+  console.log("[add-face-examples] Buscando configurações globais do CompreFace do usuário 1 (Superadmin principal)...");
+
+  const { data: settings, error: settingsError } = await supabaseAdmin
+    .from('user_settings')
+    .select('compreface_url, compreface_api_key')
+    .eq('id', SUPERADMIN_ID)
+    .single();
+
+  if (settingsError) {
+    console.error("[add-face-examples] Erro ao buscar configurações do usuário 1:", settingsError);
+    return { settings: null, error: new Error("Falha ao carregar configurações globais do sistema.") };
+  }
+
+  if (!settings?.compreface_url || !settings?.compreface_api_key) {
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin principal.") };
+  }
+
+  return { settings, error: null };
+}
+
 serve(async (req) => {
   console.log("--- [add-face-examples] INICIANDO EXECUÇÃO ---");
   
@@ -14,6 +39,11 @@ serve(async (req) => {
     console.log("[add-face-examples] Requisição OPTIONS recebida.");
     return new Response(null, { headers: corsHeaders })
   }
+
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
 
   try {
     console.log("[add-face-examples] 1/7: Parsing body da requisição...");
@@ -27,7 +57,7 @@ serve(async (req) => {
       throw new Error("`image_urls` deve ser um array com pelo menos uma URL.");
     }
 
-    console.log("[add-face-examples] 2/7: Autenticando usuário...");
+    console.log("[add-face-examples] 2/7: Autenticando usuário logado...");
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -39,22 +69,15 @@ serve(async (req) => {
     }
     console.log(`[add-face-examples] 2/7: Usuário autenticado: ${user.id}`);
 
-    console.log("[add-face-examples] 3/7: Buscando configurações do CompreFace...");
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from('user_settings')
-      .select('compreface_url, compreface_api_key')
-      .eq('id', user.id)
-      .single();
+    // 3. Buscando configurações do CompreFace do usuário 1 (Superadmin principal)
+    console.log("[add-face-examples] 3/7: Buscando configurações globais do CompreFace...");
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
-      throw new Error(`Não foi possível recuperar as configurações do CompreFace: ${settingsError.message}`);
-    }
-    if (!settings?.compreface_url || !settings?.compreface_api_key) {
-      throw new Error("URL ou Chave de API do CompreFace não configuradas.");
+      return new Response(JSON.stringify({ error: settingsError.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
     console.log(`[add-face-examples] 3/7: Configurações carregadas.`);
 
@@ -85,10 +108,8 @@ serve(async (req) => {
 
         const payload = { file: base64String };
         
-        console.log(`${logPrefix} Payload a ser enviado: { file: [base64...] }`);
-        console.log(`${logPrefix} Subject a ser enviado na URL: ${subject}`);
-
         console.log(`${logPrefix} 5/7: Enviando para CompreFace...`);
+        // O subject é o ID do cliente, que é único.
         const requestUrl = `${settings.compreface_url}/api/v1/recognition/faces?subject=${encodeURIComponent(subject)}`;
         
         const response = await fetch(requestUrl, {
