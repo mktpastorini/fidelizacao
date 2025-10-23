@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow staff to request approval" ON public.approval_requests;
