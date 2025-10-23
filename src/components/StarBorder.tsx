@@ -14,7 +14,7 @@ interface StarBorderProps {
 const starBorderStyles = `
 .star-border-container {
   position: relative;
-  padding: 1px; /* Padding to ensure the border is visible outside the content */
+  padding: var(--star-thickness); /* Usa a espessura como padding para criar o espaço da borda */
   border-radius: 0.75rem; /* Match shadcn/ui rounded-lg */
   overflow: hidden;
 }
@@ -42,9 +42,11 @@ const starBorderStyles = `
 .star-border-content {
   position: relative;
   z-index: 1;
-  /* Ensure content fills the container and hides the border overflow */
+  /* Garante que o conteúdo tenha o background do modal e o border-radius */
   height: 100%;
   width: 100%;
+  background-color: hsl(var(--background)); /* Usa o background do tema */
+  border-radius: calc(0.75rem - var(--star-thickness)); /* Ajusta o raio para caber dentro do container */
 }
 
 @keyframes rotate {
@@ -57,9 +59,9 @@ const starBorderStyles = `
 export function StarBorder({
   as: Component = 'div',
   children,
-  color = '#3b82f6', // blue-500
+  color = '#f59e0b', // Usando âmbar/laranja para combinar com o tema
   speed = 5,
-  thickness = 2,
+  thickness = 3,
   className,
 }: StarBorderProps) {
   
@@ -68,8 +70,6 @@ export function StarBorder({
     '--star-color': color,
     '--star-speed': `${speed}s`,
     '--star-thickness': `${thickness}px`,
-    // The background size needs to be large enough to cover the rotation area
-    '--star-bg-size': '400%', 
   } as React.CSSProperties;
 
   return (
@@ -80,7 +80,7 @@ export function StarBorder({
         className={cn("star-border-container", className)} 
         style={styleVariables}
       >
-        <div className="star-border-content h-full w-full">
+        <div className="star-border-content">
           {children}
         </div>
       </Component>
