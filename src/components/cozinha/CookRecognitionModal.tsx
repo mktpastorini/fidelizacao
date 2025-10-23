@@ -26,8 +26,8 @@ function useCookRecognition() {
     setIsLoading(true);
     setError(null);
     try {
-      // Chamamos o Edge Function que faz o reconhecimento
-      const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
+      // Chamamos o Edge Function DEDICADO para cozinheiros
+      const { data, error: functionError } = await supabase.functions.invoke('recognize-cook-face', {
         body: { image_url: imageSrc },
       });
 
@@ -35,7 +35,7 @@ function useCookRecognition() {
 
       setIsLoading(false);
       if (data.match) {
-        // O match.id será o ID do cliente/cozinheiro no CompreFace
+        // O match.id é o ID do cozinheiro na tabela 'cozinheiros'
         return { id: data.match.id, nome: data.match.nome, avatar_url: data.match.avatar_url };
       }
       return null;
@@ -108,23 +108,23 @@ export function CookRecognitionModal({ isOpen, onOpenChange, onCookRecognized, i
       const imageSrc = webcamRef.current.getScreenshot();
       if (imageSrc) {
         setSnapshot(imageSrc);
-        // Não fazemos o reconhecimento aqui, apenas capturamos a imagem
+        // Após a captura, inicia o reconhecimento
+        handleRecognition(imageSrc);
       } else {
         showError("Não foi possível capturar a imagem.");
       }
     }
   }, []);
   
-  const handleRecognition = useCallback(async () => {
-    if (!snapshot) return;
-    const result = await recognize(snapshot);
+  const handleRecognition = useCallback(async (imageSrc: string) => {
+    const result = await recognize(imageSrc);
     
     if (result) {
       setMatch(result);
     } else {
       setMatch({ id: 'none', nome: 'Não Reconhecido', avatar_url: null });
     }
-  }, [snapshot, recognize]);
+  }, [recognize]);
 
   const handleConfirm = () => {
     if (snapshot && match && match.id !== 'none') {
@@ -222,11 +222,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, onCookRecognized, i
               <Camera className="w-4 h-4 mr-2" /> Capturar Rosto
             </Button>
           )}
-          {snapshot && !isScanning && !match && (
-            <Button onClick={handleRecognition} disabled={isSubmitting}>
-              <Check className="w-4 h-4 mr-2" /> Confirmar Identidade
-            </Button>
-          )}
+          {/* Removido o botão de "Confirmar Identidade" que era redundante após a captura */}
           {isRecognized && (
             <Button onClick={handleConfirm} disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
