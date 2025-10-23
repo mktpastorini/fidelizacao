@@ -71,7 +71,7 @@ const App = () => (
                 
                 {/* Restringindo acesso a Gerência */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
-                <Route path="/gorjetas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><GorjetasPage /></RoleGuard>} /> {/* NOVO */}
+                <Route path="/gorjetas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'garcom']}><GorjetasPage /></RoleGuard>} /> {/* ATUALIZADO */}
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
                 
                 {/* Configurações: Apenas Superadmin e Admin */}
