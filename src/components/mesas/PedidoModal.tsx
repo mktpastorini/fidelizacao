@@ -297,10 +297,19 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
+        
+      // 4. Verificar se ainda há ocupantes na mesa
+      const { count: remainingOccupantsCount } = await supabase.from("mesa_ocupantes")
+        .select('*', { count: 'exact', head: true })
+        .eq("mesa_id", mesa!.id);
 
-      // 4. Se o pedido original estiver vazio, fechar a mesa e o pedido original
+      // 5. Se o pedido original estiver vazio, fechar o pedido original
       if (remainingItemsCount === 0) {
         await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
+      }
+      
+      // 6. Se não houver mais ocupantes, liberar a mesa (cliente_id = null)
+      if (remainingOccupantsCount === 0) {
         await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
       }
     },
@@ -630,7 +639,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={() => closeOrderMutation.mutate()} disabled={!pedido || pedido.itens_pedido.length === 0 || closeOrderMutation.isPending}>
+            <Button onClick={() => closeOrderMutation.mutate()} disabled={!pedido || totalPedido === 0 || closeOrderMutation.isPending}>
               <CreditCard className="w-4 h-4 mr-2" />
               {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar Conta Total"}
             </Button>
