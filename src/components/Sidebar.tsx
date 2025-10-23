@@ -14,7 +14,7 @@ const allNavItems = [
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha', 'garcom'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
-  { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] }, // Adicionado aqui
+  { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
 ];
 
 export function Sidebar() {
@@ -60,7 +60,7 @@ export function Sidebar() {
       </nav>
       <div className="p-2 border-t border-border">
         {/* Restringindo o acesso a Configurações no Sidebar */}
-        {userRole && ['superadmin', 'admin', 'gerente', 'cozinha'].includes(userRole) && (
+        {userRole && ['superadmin', 'admin', 'cozinha'].includes(userRole) && (
           <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
               <div className="flex items-center"><Settings className="w-5 h-5 mr-3" /><span>Configurações</span></div>
           </NavLink>
