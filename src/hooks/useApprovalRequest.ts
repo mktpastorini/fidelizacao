@@ -60,39 +60,24 @@ export function useApprovalRequest() {
             case 'free_table': {
                 const mesaId = target_id;
                 
-                // 1. VERIFICAÇÃO DE TRAVAMENTO: Checa se há itens em preparo
-                const { count: preparingCount, error: prepError } = await supabase
-                    .from('itens_pedido')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('pedido:pedidos(mesa_id)', mesaId)
-                    .eq('status', 'preparando');
-                
-                if (prepError) throw prepError;
-                
-                if (preparingCount && preparingCount > 0) {
-                    throw new Error(`Mesa travada: ${preparingCount} item(s) em preparo. Finalize o preparo antes de liberar.`);
-                }
-                
-                // 2. Tenta cancelar o pedido aberto (se existir)
+                // 1. Tenta cancelar o pedido aberto (se existir)
                 const { data: openOrder, error: findError } = await supabase.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').maybeSingle();
                 if (findError && findError.code !== 'PGRST116') throw findError;
 
                 let orderWasCancelled = false;
                 if (openOrder) {
-                    // Cancela o pedido (status 'cancelado')
                     const { error: updateError } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
                     if (updateError) throw updateError;
                     orderWasCancelled = true;
                 }
 
-                // 3. Libera a mesa e remove ocupantes
+                // 2. Libera a mesa e remove ocupantes
                 await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
                 await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
                 
                 queryClient.invalidateQueries({ queryKey: ["mesas"] });
                 queryClient.invalidateQueries({ queryKey: ["salaoData"] });
                 queryClient.invalidateQueries({ queryKey: ["clientes"] });
-                queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
                 
                 if (orderWasCancelled) {
                     showSuccess("Mesa liberada e pedido cancelado!");

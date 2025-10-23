@@ -20,7 +20,6 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import MenuPublicoPage from "./pages/MenuPublico";
 import UsuariosPage from "./pages/Usuarios";
-import CozinheirosPage from "./pages/Cozinheiros"; // Importado
 import { PageActionsProvider } from "./contexts/PageActionsContext";
 
 const queryClient = new QueryClient();
@@ -64,7 +63,6 @@ const App = () => (
                 
                 {/* Cozinha: Acesso exclusivo ou compartilhado */}
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha', 'garcom']}><Cozinha /></RoleGuard>} />
-                <Route path="/cozinheiros" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><CozinheirosPage /></RoleGuard>} />
                 
                 {/* Restringindo acesso a Gerência */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />

@@ -126,12 +126,12 @@ export function NotificationCenter() {
                     <div className="grid gap-2">
                       {pendingOrderItems?.map((item) => (
                         <div key={item.id} className="grid gap-1 text-sm p-2 rounded-md bg-secondary">
-                          <div className="font-medium leading-none flex justify-between items-center">
+                          <p className="font-medium leading-none flex justify-between items-center">
                             <span>{item.nome_produto} (x{item.quantidade})</span>
                             <Badge variant="outline" className={cn(item.status === 'pendente' ? 'bg-warning/20 text-warning-foreground' : 'bg-primary/20 text-primary')}>
                               {item.status === 'pendente' ? 'Novo' : 'Preparo'}
                             </Badge>
-                          </div>
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             Mesa {item.pedido?.mesa?.numero || '?'}{item.cliente?.nome && ` | Consumidor: ${item.cliente.nome}`}
                           </p>
