@@ -117,51 +117,6 @@ export function CookRecognitionModal({
     deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
 
-  const renderContent = () => {
-    if (mediaError) {
-      return (
-        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
-          <p className="text-lg font-bold text-red-600">{mediaError}</p>
-          <Button onClick={resetState}>Tentar Novamente</Button>
-        </div>
-      );
-    }
-
-    if (isScanning || isSubmitting) {
-      return <div className="text-center h-24 flex flex-col justify-center items-center"><Loader2 className="w-8 h-8 animate-spin mb-2" /><p className="text-lg animate-pulse">{isSubmitting ? "Processando Ação..." : statusMessage}</p></div>;
-    }
-    
-    if (snapshot && match) {
-      return (
-        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
-          <p className="text-lg">Ação de {actionLabel} por:</p>
-          <div className="flex items-center gap-2">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={match.avatar_url || undefined} />
-              <AvatarFallback><User /></AvatarFallback>
-            </Avatar>
-            <p className="text-2xl font-bold text-primary">{match.nome}</p>
-          </div>
-          <div className="flex gap-2 justify-center pt-2">
-            <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
-            <Button onClick={handleConfirm} disabled={isSubmitting}><Check className="w-4 h-4 mr-2" />Confirmar Ação</Button>
-          </div>
-        </div>
-      );
-    }
-    
-    if (snapshot && !match) {
-      return (
-        <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
-          <p className="text-lg font-bold text-destructive">Cozinheiro não reconhecido.</p>
-          <Button onClick={resetState}>Tentar Novamente</Button>
-        </div>
-      );
-    }
-    
-    return <div className="text-center h-24 flex flex-col justify-center items-center"><Button onClick={handleCapture} disabled={isScanning}>Capturar Rosto</Button></div>;
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -173,7 +128,7 @@ export function CookRecognitionModal({
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-4">
           <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
-            {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : 
+            {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" id="cook-recognition-snapshot" /> : 
              mediaError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500 p-4 text-center">
                 <p>{mediaError}</p>
              </div> :

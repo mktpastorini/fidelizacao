@@ -6,6 +6,34 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Função auxiliar para buscar as configurações do Superadmin
+async function getComprefaceSettings(supabaseAdmin: any) {
+  const { data: superadminProfile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'superadmin')
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError || !superadminProfile) {
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+  }
+  
+  const superadminId = superadminProfile.id;
+
+  const { data: settings, error: settingsError } = await supabaseAdmin
+    .from('user_settings')
+    .select('compreface_url, compreface_api_key')
+    .eq('id', superadminId)
+    .single();
+
+  if (settingsError || !settings?.compreface_url || !settings?.compreface_api_key) {
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin.") };
+  }
+
+  return { settings, error: null, superadminId };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -18,32 +46,14 @@ serve(async (req) => {
 
   try {
     const { itemId, newStatus, image_url } = await req.json();
-    if (!itemId || !newStatus || !image_url) {
-      throw new Error("`itemId`, `newStatus` e `image_url` são obrigatórios.");
+    if (!itemId || !newStatus) {
+      throw new Error("`itemId` e `newStatus` são obrigatórios.");
     }
     
-    // 1. Reconhecimento Facial do Cozinheiro
-    const recognitionResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/recognize-cook-face`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': req.headers.get('Authorization')!, // Passa o token do usuário logado
-        },
-        body: JSON.stringify({ image_url }),
-    });
-    
-    const recognitionData = await recognitionResponse.json();
-    if (!recognitionResponse.ok || !recognitionData.match) {
-        throw new Error(recognitionData.error || "Cozinheiro não reconhecido ou falha no serviço de reconhecimento.");
-    }
-    
-    const recognizedCookId = recognitionData.match.id;
-    const cookName = recognitionData.match.nome;
-
-    // 2. Buscar o item atual
+    // 1. Buscar o item atual para verificar se requer preparo
     const { data: item, error: itemError } = await supabaseAdmin
         .from('itens_pedido')
-        .select('status, cozinheiro_id, pedido_id, requer_preparo')
+        .select('status, cozinheiro_id, pedido:pedidos(mesa_id), requer_preparo')
         .eq('id', itemId)
         .single();
         
@@ -53,13 +63,75 @@ serve(async (req) => {
     
     const currentStatus = item.status;
     const currentCookId = item.cozinheiro_id;
-    const pedidoId = item.pedido_id;
+    
+    let recognizedCookId: string | null = null;
+    let cookName: string = "Garçom/Balcão";
 
-    // 3. Lógica de Transição
+    // --- FLUXO 1: Item SEM PREPARO (Ação direta do Garçom/Balcão) ---
+    if (!item.requer_preparo && newStatus === 'entregue' && image_url === 'dummy') {
+        // Esta é a ação de entrega de item sem preparo (Garçom/Balcão)
+        if (currentStatus !== 'pendente') {
+            throw new Error(`Transição inválida: Item sem preparo deve estar 'pendente' para ser entregue.`);
+        }
+        
+        // Atualiza status para 'entregue' (cozinheiro_id permanece NULL)
+        const { error: updateError } = await supabaseAdmin
+            .from('itens_pedido')
+            .update({ status: 'entregue', updated_at: new Date().toISOString() })
+            .eq('id', itemId);
+        if (updateError) throw updateError;
+        
+        return new Response(JSON.stringify({ success: true, message: `Item sem preparo entregue ao cliente.` }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
+    
+    // --- FLUXO 2: Item COM PREPARO (Requer reconhecimento facial) ---
+    if (!image_url || image_url === 'dummy') {
+        throw new Error("Ação de preparo/finalização requer reconhecimento facial. Imagem ausente.");
+    }
+    
+    // 1a. Buscar configurações do CompreFace do Superadmin
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    if (settingsError) throw settingsError;
+
+    // 1b. Reconhecimento Facial do Cozinheiro
+    const recognitionResponse = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=1`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': settings.compreface_api_key,
+        },
+        body: JSON.stringify({ file: image_url.startsWith('data:image') ? image_url.split(',')[1] : image_url }),
+    });
+    
+    const recognitionData = await recognitionResponse.json();
+    const bestMatch = recognitionData.result?.[0]?.subjects?.[0];
+    
+    if (!recognitionResponse.ok || !bestMatch || bestMatch.similarity < 0.85) {
+        throw new Error(recognitionData.error || "Cozinheiro não reconhecido ou similaridade insuficiente. Tente novamente.");
+    }
+    
+    recognizedCookId = bestMatch.subject;
+    
+    // 1c. Verificar se o ID reconhecido é um Cozinheiro válido
+    const { data: cook, error: cookError } = await supabaseAdmin
+        .from('cozinheiros')
+        .select('id, nome')
+        .eq('id', recognizedCookId)
+        .single();
+        
+    if (cookError || !cook) {
+        throw new Error("ID reconhecido não corresponde a um cozinheiro cadastrado.");
+    }
+    cookName = cook.nome;
+
+
+    // 4. Lógica de Transição (Item COM PREPARO)
     if (newStatus === 'preparando' && currentStatus === 'pendente') {
         // Ação: Iniciar Preparo
         
-        // Verifica se o item requer preparo (Garçom/Balcão não deve iniciar preparo de itens sem preparo)
         if (!item.requer_preparo) {
             throw new Error("Este item não requer preparo na cozinha.");
         }

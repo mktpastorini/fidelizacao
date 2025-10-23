@@ -78,7 +78,7 @@ export function KanbanCard({ item, onInitiateRecognition, isProcessing }: Kanban
                 size="sm" 
                 variant="outline" 
                 className="w-full bg-green-600 hover:bg-green-700 text-white" 
-                onClick={() => onInitiateRecognition(item, 'entregue')} // Garçom/Balcão usa o mesmo fluxo, mas sem reconhecimento facial (apenas clique)
+                onClick={() => onInitiateRecognition(item, 'entregue')} 
                 disabled={!canDeliverNonPrep}
               >
                 <CheckCircle className="w-4 h-4 mr-2" />

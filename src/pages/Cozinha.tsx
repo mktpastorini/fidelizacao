@@ -56,23 +56,9 @@ export default function CozinhaPage() {
     refetchInterval: 15000, // Atualiza a cada 15 segundos
   });
 
+  // Mutação para itens que REQUEREM PREPARO (usa reconhecimento facial)
   const processKitchenActionMutation = useMutation({
     mutationFn: async ({ itemId, newStatus, image_url }: { itemId: string; newStatus: 'preparando' | 'entregue'; image_url: string }) => {
-      // Se for Garçom/Balcão e for item sem preparo, não precisa de reconhecimento facial
-      const item = items?.find(i => i.id === itemId);
-      const isNonPrepByStaff = item && !item.requer_preparo && ['garcom', 'balcao'].includes(userRole!);
-      
-      if (isNonPrepByStaff) {
-        // Ação direta (sem reconhecimento facial)
-        const { error } = await supabase
-          .from("itens_pedido")
-          .update({ status: 'entregue' })
-          .eq("id", itemId);
-        if (error) throw error;
-        return { message: "Item entregue ao cliente (sem preparo)." };
-      }
-      
-      // Ação que requer reconhecimento facial (Cozinha/Gerência ou item com preparo)
       const { data, error } = await supabase.functions.invoke('process-kitchen-action', {
         body: { itemId, newStatus, image_url },
       });
@@ -82,7 +68,7 @@ export default function CozinhaPage() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
-      queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] }); // Invalida para atualizar o travamento
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
       showSuccess(data.message || "Status do item atualizado!");
       setIsRecognitionOpen(false);
       setItemToProcess(null);
@@ -90,14 +76,33 @@ export default function CozinhaPage() {
     onError: (err: Error) => showError(err.message),
   });
   
+  // Mutação para itens que NÃO REQUEREM PREPARO (Garçom/Balcão)
+  const deliverNonPrepItemMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from("itens_pedido")
+        .update({ status: 'entregue' })
+        .eq("id", itemId);
+      if (error) throw error;
+      return { message: "Item entregue ao cliente." };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto"] });
+      showSuccess(data.message);
+    },
+    onError: (err: Error) => showError(err.message),
+  });
+
   const handleInitiateRecognition = (item: KitchenItem, status: 'preparando' | 'entregue') => {
-    const isNonPrepByStaff = !item.requer_preparo && ['garcom', 'balcao'].includes(userRole!);
+    const isNonPrepByStaff = !item.requer_preparo && ['garcom', 'balcao', 'superadmin', 'admin', 'gerente'].includes(userRole!);
     
-    if (isNonPrepByStaff) {
-      // Se for Garçom/Balcão e item sem preparo, executa a mutação diretamente (passando uma URL dummy)
-      processKitchenActionMutation.mutate({ itemId: item.id, newStatus: 'entregue', image_url: 'dummy' });
+    if (isNonPrepByStaff && status === 'entregue') {
+      // 1. Fluxo Rápido (Garçom/Balcão entregando item sem preparo)
+      deliverNonPrepItemMutation.mutate(item.id);
     } else {
-      // Se for Cozinha/Gerência ou item com preparo, abre o modal de reconhecimento
+      // 2. Fluxo de Cozinha (Requer preparo OU Cozinha/Gerência está agindo)
       setItemToProcess(item);
       setTargetStatus(status);
       setIsRecognitionOpen(true);
@@ -105,17 +110,16 @@ export default function CozinhaPage() {
   };
 
   const handleCookConfirmed = (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string) => {
-    // O modal de reconhecimento já capturou a imagem.
-    // Agora, chamamos a mutação com a imagem capturada (snapshot)
-    const snapshot = (document.getElementById('cook-recognition-snapshot') as HTMLImageElement)?.src;
+    // Captura a imagem do modal (que deve ter o ID 'cook-recognition-snapshot')
+    const snapshotElement = document.getElementById('cook-recognition-snapshot') as HTMLImageElement;
+    const snapshot = snapshotElement?.src;
     
     if (!snapshot) {
         showError("Falha ao capturar a imagem para confirmação.");
         return;
     }
     
-    // O Edge Function 'process-kitchen-action' fará o reconhecimento novamente e a validação do cookId.
-    // Aqui, apenas passamos a imagem capturada.
+    // Chama a mutação principal que usa o Edge Function
     processKitchenActionMutation.mutate({ itemId, newStatus, image_url: snapshot });
   };
 
@@ -128,13 +132,12 @@ export default function CozinhaPage() {
       return false;
     }
     
-    // Itens de Rodízio (componente_rodizio) devem ser incluídos se requer_preparo for true
-    // Se requer_preparo for false, eles são tratados como itens de venda direta (entregues pelo garçom)
-    if (item.status === 'pendente' || item.status === 'preparando') {
-      return true;
+    // Inclui itens que requerem preparo OU itens sem preparo que ainda estão pendentes
+    if (item.requer_preparo || item.status !== 'entregue') {
+        return true;
     }
     
-    // Inclui itens que foram entregues recentemente
+    // Inclui itens que foram entregues recentemente (para visualização)
     if (item.status === 'entregue') {
       return true;
     }
@@ -184,7 +187,7 @@ export default function CozinhaPage() {
         item={itemToProcess}
         targetStatus={targetStatus}
         onCookConfirmed={handleCookConfirmed}
-        isSubmitting={processKitchenActionMutation.isPending}
+        isSubmitting={processKitchenActionMutation.isPending || deliverNonPrepItemMutation.isPending}
       />
     </div>
   );
