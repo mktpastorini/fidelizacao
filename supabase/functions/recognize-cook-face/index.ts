@@ -80,6 +80,7 @@ serve(async (req) => {
     const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
+      // Retorna 400 se for erro de configuração (para o frontend exibir a mensagem)
       return new Response(JSON.stringify({ error: settingsError.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
@@ -101,11 +102,21 @@ serve(async (req) => {
     console.log(`[recognize-cook-face] 5/6: Resposta recebida do CompreFace com status: ${response.status}`);
     if (!response.ok) {
       const errorBody = await response.json().catch(() => response.text());
+      
+      // Se o erro for 400 e for o código 28 (rosto não detectado), retornamos 200 com match: null
       if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
         console.log("[recognize-cook-face] CompreFace não encontrou um rosto na imagem.");
         return new Response(JSON.stringify({ match: null, message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
-      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
+      
+      // Para outros erros do CompreFace, lançamos um erro 400 para o frontend
+      const errorDetail = typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody);
+      console.error(`[recognize-cook-face] Erro da API do CompreFace: ${errorDetail}`);
+      
+      return new Response(JSON.stringify({ error: `Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${errorDetail}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     const data = await response.json();
@@ -123,6 +134,7 @@ serve(async (req) => {
         .single();
 
       if (cookError) {
+        console.error(`[recognize-cook-face] Erro ao buscar dados do cozinheiro: ${cookError.message}`);
         throw new Error(`Match encontrado, mas erro ao buscar dados do cozinheiro: ${cookError.message}`);
       }
       console.log("[recognize-cook-face] Dados do cozinheiro recuperados com sucesso.");
@@ -136,6 +148,7 @@ serve(async (req) => {
     console.error("--- [recognize-cook-face] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
     console.error("Stack:", error.stack);
+    // Retorna 500 para erros internos não tratados (como falha de rede ou erro de código)
     return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
