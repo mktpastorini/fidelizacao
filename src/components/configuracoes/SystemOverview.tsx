@@ -4,12 +4,46 @@ import { CheckCircle, XCircle, Shield, Users, Utensils, DollarSign, MessageSquar
 import { Separator } from "@/components/ui/separator";
 
 const features = [
-  { title: "Reconhecimento Facial", description: "Identificação instantânea de clientes na chegada e na cozinha para controle de preparo.", icon: ScanFace },
-  { title: "Fidelidade por Pontos", description: "Acúmulo automático de pontos por pagamento de pedidos e resgate de prêmios.", icon: Star },
-  { title: "Automação de Mensagens", description: "Envio automático de mensagens de boas-vindas, pós-pagamento e aniversário via webhook.", icon: MessageSquare },
-  { title: "Gestão de Mesas e Pedidos", description: "Controle visual do salão, ocupação de mesas, pedidos abertos e fechamento de conta parcial/total.", icon: Table },
-  { title: "Relatórios Financeiros", description: "Visão de faturamento, ticket médio e estatísticas de gorjetas por garçom.", icon: DollarSign },
-  { title: "Cardápio Digital", description: "Menu público acessível via QR Code, permitindo que clientes adicionem itens ao pedido.", icon: ClipboardList },
+  { 
+    title: "Reconhecimento Facial na Chegada", 
+    description: "Identificação instantânea do cliente ao entrar no salão. Ao ser alocado à mesa, o cliente principal recebe automaticamente uma mensagem de boas-vindas via WhatsApp (se configurado).", 
+    icon: ScanFace 
+  },
+  { 
+    title: "Reconhecimento Facial na Cozinha", 
+    description: "O cozinheiro deve confirmar sua identidade via reconhecimento facial para iniciar e finalizar o preparo de um item. Isso registra o tempo exato de produção e o responsável, garantindo rastreabilidade.", 
+    icon: Utensils 
+  },
+  { 
+    title: "Fidelidade por Pontos", 
+    description: "Acúmulo automático de 1 ponto por cliente (principal e acompanhantes) a cada pedido pago. Os pontos podem ser resgatados por prêmios configurados no cardápio.", 
+    icon: Star 
+  },
+  { 
+    title: "Automação de Mensagens", 
+    description: "Envio automático de mensagens de boas-vindas, pós-pagamento e aniversário via webhook. As mensagens são personalizadas com dados do cliente (nome, preferências, etc.).", 
+    icon: MessageSquare 
+  },
+  { 
+    title: "Prevenção de Fraudes (Aprovações)", 
+    description: "Ações sensíveis como 'Liberar Mesa' (que cancela pedidos abertos) e 'Aplicar Desconto' exigem aprovação de um Gerente ou Admin, impossibilitando que Garçons ou Balcões executem essas ações sem auditoria.", 
+    icon: Shield 
+  },
+  { 
+    title: "Gestão de Mesas e Pedidos", 
+    description: "Controle visual do salão, ocupação de mesas, pedidos abertos e fechamento de conta parcial/total.", 
+    icon: Table 
+  },
+  { 
+    title: "Relatórios Financeiros", 
+    description: "Visão de faturamento, ticket médio e estatísticas de gorjetas por garçom.", 
+    icon: DollarSign 
+  },
+  { 
+    title: "Cardápio Digital", 
+    description: "Menu público acessível via QR Code, permitindo que clientes adicionem itens ao pedido, identificando-se via reconhecimento facial ou como 'Mesa Geral'.", 
+    icon: ClipboardList 
+  },
 ];
 
 const roles = [
@@ -51,7 +85,7 @@ const roles = [
   { 
     role: 'cozinha', 
     label: 'Cozinha', 
-    description: 'Acesso ao painel Kanban para iniciar e finalizar o preparo de itens.',
+    description: 'Acesso ao painel Kanban para iniciar e finalizar o preparo de itens, com reconhecimento facial obrigatório para rastreabilidade.',
     permissions: ['Painel da Cozinha (Kanban)'],
     restrictions: ['Acesso restrito apenas ao painel de preparo'],
   },
