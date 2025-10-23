@@ -1,0 +1,63 @@
+CREATE OR REPLACE FUNCTION public.finalizar_pagamento_parcial(p_pedido_id uuid, p_cliente_id_pagando uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+DECLARE
+    v_user_id uuid;
+    v_mesa_id uuid;
+    v_cliente_principal_id uuid;
+    new_pedido_id uuid;
+    remaining_items_count integer;
+    v_acompanhantes_originais jsonb;
+BEGIN
+    -- 1. Obter informações do pedido original e o cliente principal da mesa
+    SELECT p.user_id, p.mesa_id, p.acompanhantes, m.cliente_id
+    INTO v_user_id, v_mesa_id, v_acompanhantes_originais, v_cliente_principal_id
+    FROM public.pedidos p
+    JOIN public.mesas m ON p.mesa_id = m.id
+    WHERE p.id = p_pedido_id AND p.user_id = auth.uid();
+
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'Pedido não encontrado ou não pertence ao usuário.';
+    END IF;
+
+    -- 2. Criar um novo pedido "recibo" para o cliente que está pagando
+    INSERT INTO public.pedidos (user_id, cliente_id, status, closed_at, mesa_id, acompanhantes)
+    VALUES (v_user_id, p_cliente_id_pagando, 'pago', now(), v_mesa_id, v_acompanhantes_originais)
+    RETURNING id INTO new_pedido_id;
+
+    -- 3. Mover os itens do cliente para o novo pedido "recibo"
+    UPDATE public.itens_pedido
+    SET pedido_id = new_pedido_id
+    WHERE pedido_id = p_pedido_id AND consumido_por_cliente_id = p_cliente_id_pagando;
+
+    -- 3b. SE O CLIENTE PAGANDO FOR O CLIENTE PRINCIPAL, mover também os itens da MESA (consumido_por_cliente_id IS NULL)
+    IF p_cliente_id_pagando = v_cliente_principal_id THEN
+        UPDATE public.itens_pedido
+        SET pedido_id = new_pedido_id, consumido_por_cliente_id = p_cliente_id_pagando -- Atribui o item da mesa ao cliente principal
+        WHERE pedido_id = p_pedido_id AND consumido_por_cliente_id IS NULL;
+    END IF;
+
+    -- 4. Remover o cliente da lista de ocupantes da mesa (lógica de ocupação atual)
+    DELETE FROM public.mesa_ocupantes
+    WHERE mesa_id = v_mesa_id AND cliente_id = p_cliente_id_pagando;
+
+    -- 5. Verificar se o pedido original ainda tem itens
+    SELECT COUNT(*) INTO remaining_items_count
+    FROM public.itens_pedido
+    WHERE pedido_id = p_pedido_id;
+
+    -- 6. Se o pedido original estiver vazio, fechar a mesa e salvar os acompanhantes originais
+    IF remaining_items_count = 0 THEN
+        UPDATE public.pedidos
+        SET status = 'pago', closed_at = now(), acompanhantes = v_acompanhantes_originais
+        WHERE id = p_pedido_id;
+
+        UPDATE public.mesas
+        SET cliente_id = NULL
+        WHERE id = v_mesa_id;
+    END IF;
+END;
+$function$;
