@@ -194,42 +194,90 @@ export default function MenuPublicoPage() {
     }
   };
 
-  const renderContent = () => {
-    if (isLoading) {
-      return <Skeleton className="h-96" />;
+  const renderMenuContent = () => {
+    if (menuData.produtos.length === 0) {
+      return <p className="col-span-full text-center text-muted-foreground py-10">Nenhum produto nesta categoria.</p>;
     }
 
-    if (!mesaData) {
-      return (
+    return (
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+        {filteredProdutos.length > 0 ? (
+          filteredProdutos.map((produto) => {
+            const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
+            const isUnavailable = !isRodizioType && (produto.estoque_atual ?? 0) <= 0;
+            
+            return (
+              <PublicMenuProductCard 
+                key={produto.id} 
+                produto={produto} 
+                onInitiateOrder={handleInitiateOrder} 
+                disabled={isUnavailable}
+              />
+            );
+          })
+        ) : (
+          <p className="col-span-full text-center text-muted-foreground py-10">Nenhum produto nesta categoria.</p>
+        )}
+      </div>
+    );
+  };
+
+  if (isLoading) {
+    return <Skeleton className="h-screen w-full" />;
+  }
+
+  if (!mesaId || !mesaData) {
+    return (
+      <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
         <Card className="mt-12 bg-red-900 text-white border-red-700">
           <CardHeader><CardTitle className="flex items-center"><Lock className="w-6 h-6 mr-2" /> Mesa Não Encontrada</CardTitle></CardHeader>
           <CardContent><p>O código QR desta mesa é inválido ou a mesa foi excluída.</p></CardContent>
         </Card>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (!isMesaOcupada) {
-      return (
+  if (!isMesaOcupada) {
+    return (
+      <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
         <Card className="mt-12 bg-yellow-900 text-white border-yellow-700">
           <CardHeader><CardTitle className="flex items-center"><Lock className="w-6 h-6 mr-2" /> Mesa Livre</CardTitle></CardHeader>
           <CardContent><p>Esta mesa não está ocupada por um cliente. Por favor, chame um atendente para iniciar seu pedido.</p></CardContent>
         </Card>
-      );
-    }
+      </div>
+    );
+  }
 
-    if (menuData.produtos.length === 0) {
-      return <p className="text-center text-gray-300">Nenhum produto disponível no momento.</p>;
-    }
+  return (
+    <div className="h-screen flex flex-col bg-background">
+      <div className="max-w-5xl mx-auto w-full p-4 sm:p-6 shrink-0">
+        {/* 1. Header Fixo */}
+        <div className="flex justify-between items-center mb-4">
+          <Button variant="ghost" onClick={() => navigate(-1)} className="text-foreground hover:bg-primary/10">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar
+          </Button>
+          {isMesaOcupada && mesaId && (
+            <Button variant="default" onClick={() => setIsSummaryOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
+              <ReceiptText className="w-4 h-4 mr-2" />
+              Ver Comanda
+            </Button>
+          )}
+        </div>
+        
+        {/* 2. Título Fixo */}
+        <h1 className="text-3xl font-serif font-bold mb-6 text-primary text-center flex items-center justify-center gap-2 tracking-wider">
+          <Utensils className="w-6 h-6" />
+          Cardápio da Mesa {mesaData?.numero || mesaId}
+        </h1>
 
-    return (
-      <div className="space-y-6">
-        {/* Filtro de Categorias */}
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border border-primary/30 bg-card/50 shadow-lg">
+        {/* 3. Filtro de Categorias Fixo */}
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border border-primary/30 bg-card/50 shadow-lg mb-4">
           <div className="flex w-max space-x-2 p-2">
             <Button 
               variant={selectedCategory === "all" ? "default" : "ghost"} 
               onClick={() => setSelectedCategory("all")}
-              className={cn(selectedCategory === "all" ? "bg-primary text-primary-foreground shadow-md" : "text-primary hover:bg-primary/10")}
+              className={cn(selectedCategory === "all" ? "bg-primary text-primary-foreground shadow-md" : "text-foreground hover:bg-primary/10")}
             >
               Todos
             </Button>
@@ -246,51 +294,12 @@ export default function MenuPublicoPage() {
           </div>
           <ScrollBar orientation="horizontal" />
         </ScrollArea>
-
-        {/* Lista de Produtos */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {filteredProdutos.length > 0 ? (
-            filteredProdutos.map((produto) => {
-              const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
-              const isUnavailable = !isRodizioType && (produto.estoque_atual ?? 0) <= 0;
-              
-              return (
-                <PublicMenuProductCard 
-                  key={produto.id} 
-                  produto={produto} 
-                  onInitiateOrder={handleInitiateOrder} 
-                  disabled={isUnavailable} // Passa a disponibilidade correta
-                />
-              );
-            })
-          ) : (
-            <p className="col-span-full text-center text-muted-foreground py-10">Nenhum produto nesta categoria.</p>
-          )}
-        </div>
       </div>
-    );
-  };
 
-  return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen overflow-y-auto">
-      <div className="flex justify-between items-center mb-6">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="text-foreground hover:bg-primary/10">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Voltar
-        </Button>
-        {isMesaOcupada && mesaId && (
-          <Button variant="default" onClick={() => setIsSummaryOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
-            <ReceiptText className="w-4 h-4 mr-2" />
-            Ver Comanda
-          </Button>
-        )}
+      {/* 4. Lista de Produtos Rolável */}
+      <div className="flex-1 overflow-y-auto max-w-5xl mx-auto w-full">
+        {renderMenuContent()}
       </div>
-      
-      <h1 className="text-3xl font-serif font-bold mb-6 text-primary text-center flex items-center justify-center gap-2 tracking-wider">
-        <Utensils className="w-6 h-6" />
-        Cardápio da Mesa {mesaData?.numero || mesaId}
-      </h1>
-      {renderContent()}
 
       {mesaId && (
         <PublicOrderSummary
