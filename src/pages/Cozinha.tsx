@@ -45,7 +45,7 @@ export default function CozinhaPage() {
   const { userRole } = useSettings();
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [isManagerOpen, setIsManagerOpen] = useState(false);
-  const [pendingAction, setPendingAction] = useState<{ itemId: string; newStatus: 'preparando' | 'entregue'; currentCozinheiroId: string | null } | null>(null);
+  const [pendingAction, setPendingAction] = useState<{ itemId: string; newStatus: 'preparando' | 'entregue' } | null>(null);
 
   const isManagerOrAdmin = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
@@ -56,27 +56,10 @@ export default function CozinhaPage() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ itemId, newStatus, cozinheiroId }: { itemId: string; newStatus: 'preparando' | 'entregue'; cozinheiroId: string | null }) => {
-      const updatePayload: Partial<ItemPedido> = { status: newStatus };
-      
-      // Se estiver movendo para 'preparando' ou 'entregue' (e for a primeira vez), registra o cozinheiro
-      if (newStatus === 'preparando' || newStatus === 'entregue') {
-        updatePayload.cozinheiro_id = cozinheiroId;
-      }
-      
-      // Se estiver movendo para 'entregue', garante que apenas o cozinheiro que iniciou o preparo pode finalizar
-      if (newStatus === 'entregue') {
-        const { data: item, error: fetchError } = await supabase.from('itens_pedido').select('cozinheiro_id').eq('id', itemId).single();
-        if (fetchError) throw fetchError;
-        
-        if (item.cozinheiro_id && item.cozinheiro_id !== cozinheiroId) {
-          throw new Error("Apenas o cozinheiro que iniciou o preparo pode marcar como pronto.");
-        }
-      }
-
+    mutationFn: async ({ itemId, newStatus }: { itemId: string; newStatus: 'preparando' | 'entregue' }) => {
       const { error } = await supabase
         .from("itens_pedido")
-        .update(updatePayload)
+        .update({ status: newStatus })
         .eq("id", itemId);
       if (error) throw error;
     },
@@ -95,39 +78,25 @@ export default function CozinhaPage() {
   // Função chamada pelo KanbanCard para iniciar a ação (se for item sem preparo, executa direto)
   const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue') => {
     // Para itens SEM preparo, Garçom/Balcão/Gerência pode executar diretamente
-    updateStatusMutation.mutate({ itemId, newStatus, cozinheiroId: null });
+    updateStatusMutation.mutate({ itemId, newStatus });
   };
 
   // Função chamada pelo KanbanCard para iniciar o fluxo de confirmação facial
   const handleConfirmAction = (itemId: string, newStatus: 'preparando' | 'entregue') => {
-    const currentItem = items?.find(i => i.id === itemId);
-    
-    setPendingAction({ 
-        itemId, 
-        newStatus, 
-        currentCozinheiroId: currentItem?.cozinheiro_id || null 
-    });
+    setPendingAction({ itemId, newStatus });
     setIsConfirmationOpen(true);
   };
 
   // Função chamada pelo modal após a confirmação facial
-  const handleConfirmed = (cozinheiroId: string) => {
+  const handleConfirmed = (confirmedUserId: string) => {
     if (pendingAction) {
-      const { itemId, newStatus, currentCozinheiroId } = pendingAction;
-      
-      // Se estiver movendo para 'entregue', verifica se é o mesmo cozinheiro
-      if (newStatus === 'entregue' && currentCozinheiroId && currentCozinheiroId !== cozinheiroId) {
-        showError("Apenas o cozinheiro que iniciou o preparo pode marcar como pronto.");
-        setPendingAction(null);
-        return;
-      }
-      
-      updateStatusMutation.mutate({ itemId, newStatus, cozinheiroId });
+      // O modal já garantiu que o rosto corresponde ao usuário logado.
+      updateStatusMutation.mutate(pendingAction);
     }
   };
   
   const { data: user } = supabase.auth.getUser();
-  const currentUserId = user?.user?.id || ''; // ID do usuário logado (Garçom, Admin, etc.)
+  const currentUserId = user?.user?.id || '';
 
   // Filtra itens para o Kanban
   const filteredItems = items?.filter(item => {
@@ -209,7 +178,7 @@ export default function CozinhaPage() {
         onOpenChange={setIsConfirmationOpen}
         onConfirmed={handleConfirmed}
         isSubmitting={updateStatusMutation.isPending}
-        targetUserId={currentUserId} // Passamos o ID do usuário logado para o modal
+        targetUserId={currentUserId}
       />
       
       {/* Modal de Gerenciamento de Cozinheiros */}
