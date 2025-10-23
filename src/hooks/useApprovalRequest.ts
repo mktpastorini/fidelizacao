@@ -60,18 +60,39 @@ export function useApprovalRequest() {
             case 'free_table': {
                 const mesaId = target_id;
                 
-                // 1. Tenta cancelar o pedido aberto (se existir)
+                // 1. Verifica se a mesa pode ser liberada (Regra de negócio: não pode ter itens em preparo)
+                const { data: canBeFreed, error: checkError } = await supabase.rpc('check_mesa_can_be_freed', { p_mesa_id: mesaId }).single();
+                if (checkError) throw checkError;
+                
+                if (!canBeFreed) {
+                    throw new Error(`Mesa ${payload.mesa_numero} não pode ser liberada: existem itens em preparo.`);
+                }
+                
+                // 2. Tenta cancelar o pedido aberto (se existir)
                 const { data: openOrder, error: findError } = await supabase.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').maybeSingle();
                 if (findError && findError.code !== 'PGRST116') throw findError;
 
                 let orderWasCancelled = false;
                 if (openOrder) {
-                    const { error: updateError } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
-                    if (updateError) throw updateError;
-                    orderWasCancelled = true;
+                    // Cancelar itens PENDENTES do cliente principal
+                    await supabase.from('itens_pedido')
+                        .delete()
+                        .eq('pedido_id', openOrder.id)
+                        .eq('status', 'pendente')
+                        .eq('consumido_por_cliente_id', payload.cliente_id); // Assumindo que o payload tem o cliente_id principal
+
+                    // Verificar se restou algo
+                    const { count: remainingItemsCount } = await supabase.from("itens_pedido")
+                        .select('*', { count: 'exact', head: true })
+                        .eq("pedido_id", openOrder.id);
+                        
+                    if (remainingItemsCount === 0) {
+                        await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
+                        orderWasCancelled = true;
+                    }
                 }
 
-                // 2. Libera a mesa e remove ocupantes
+                // 3. Libera a mesa e remove ocupantes
                 await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
                 await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
                 
@@ -119,6 +140,19 @@ export function useApprovalRequest() {
     const rolesThatRequireApproval: UserRole[] = ['balcao', 'garcom', 'cozinha'];
     
     console.log(`[ApprovalCheck] Usuário: ${userRole}. Requer aprovação? ${rolesThatRequireApproval.includes(userRole)}`);
+
+    if (request.action_type === 'free_table') {
+        // Pré-verificação de travamento da mesa
+        const { data: canBeFreed, error: checkError } = await supabase.rpc('check_mesa_can_be_freed', { p_mesa_id: request.target_id }).single();
+        if (checkError) {
+            showError(`Erro ao verificar mesa: ${checkError.message}`);
+            return false;
+        }
+        if (!canBeFreed) {
+            showError(`Mesa ${request.payload.mesa_numero} não pode ser liberada: existem itens em preparo.`);
+            return false;
+        }
+    }
 
     if (rolesThatRequireApproval.includes(userRole)) {
       // Se for um usuário que precisa de aprovação, cria a solicitação
