@@ -7,9 +7,9 @@ import { ptBR } from 'date-fns/locale';
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useState, useMemo } from "react";
-import { CookRecognitionModal } from "./CookRecognitionModal"; // Importado
+import { CookRecognitionModal } from "./CookRecognitionModal";
 import { showError } from "@/utils/toast";
-import { supabase } from "@/integrations/supabase/client"; // Importado supabase
+import { supabase } from "@/integrations/supabase/client";
 
 type KanbanCardProps = {
   item: ItemPedido & {
@@ -121,8 +121,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
             )}
           </div>
           <div className="pt-2">
-            {item.status === 'pendente' && (
-              isNonPrepItem ? (
+            {item.status === 'pendente' && isNonPrepItem && (
                 // Item sem preparo: Garçom/Balcão pode marcar como entregue
                 <Button 
                   size="sm" 
@@ -134,7 +133,8 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
                   <CheckCircle className="w-4 h-4 mr-2" />
                   Entregar ao Cliente
                 </Button>
-              ) : (
+            )}
+            {item.status === 'pendente' && !isNonPrepItem && (
                 // Item com preparo: Ação restrita à Cozinha/Gerência
                 <>
                   <Button 
@@ -153,7 +153,6 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
                     </div>
                   )}
                 </>
-              )
             )}
             {item.status === 'preparando' && (
               // Item em preparo: Cozinha marca como pronto

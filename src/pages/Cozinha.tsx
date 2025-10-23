@@ -2,11 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
-import { CookPerformanceReport } from "@/components/cozinha/CookPerformanceReport"; // Importado
+import { CookPerformanceReport } from "@/components/cozinha/CookPerformanceReport";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Importado Tabs
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -96,25 +96,17 @@ export default function CozinhaPage() {
       return false;
     }
     
-    // 2. Inclui itens que estão pendentes ou em preparo E que requerem preparo
-    if ((item.status === 'pendente' || item.status === 'preparando') && item.requer_preparo) {
-      return true;
-    }
-    
-    // 3. Inclui itens de venda direta (requer_preparo=false) que estão pendentes (para Garçom/Balcão entregar)
-    if (item.status === 'pendente' && !item.requer_preparo) {
-        return true;
-    }
-    
-    // 4. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
-    if (item.status === 'entregue') {
+    // 2. Inclui itens que estão pendentes, em preparo ou entregues recentemente
+    if (item.status === 'pendente' || item.status === 'preparando' || item.status === 'entregue') {
       return true;
     }
     
     return false;
   }) || [];
 
-  const pendingItems = filteredItems.filter(item => item.status === 'pendente');
+  // Separação em 4 colunas
+  const prepPendingItems = filteredItems.filter(item => item.status === 'pendente' && item.requer_preparo);
+  const deliveryPendingItems = filteredItems.filter(item => item.status === 'pendente' && !item.requer_preparo);
   const preparingItems = filteredItems.filter(item => item.status === 'preparando');
   const deliveredItems = filteredItems.filter(item => item.status === 'entregue');
 
@@ -133,7 +125,8 @@ export default function CozinhaPage() {
         
         <TabsContent value="kanban" className="mt-6 flex-1 min-h-0">
           {isLoading ? (
-            <div className="flex-1 flex gap-6">
+            <div className="flex-1 flex gap-4">
+              <Skeleton className="flex-1" />
               <Skeleton className="flex-1" />
               <Skeleton className="flex-1" />
               <Skeleton className="flex-1" />
@@ -141,9 +134,10 @@ export default function CozinhaPage() {
           ) : isError ? (
             <p className="text-destructive">Erro ao carregar os pedidos.</p>
           ) : (
-            <div className="flex-1 flex gap-6 h-full">
-              <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
+            <div className="flex-1 flex gap-4 h-full">
+              <KanbanColumn title="Aguardando Preparo" items={prepPendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
               <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
+              <KanbanColumn title="Aguardando Entrega (Bar)" items={deliveryPendingItems} onStatusChange={handleStatusChange} borderColor="border-blue-500" />
               <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
             </div>
           )}
