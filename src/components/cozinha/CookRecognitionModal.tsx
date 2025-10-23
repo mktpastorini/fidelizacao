@@ -38,7 +38,6 @@ export function CookRecognitionModal({
   const [statusMessage, setStatusMessage] = useState("Aponte a câmera para o rosto");
   const [isScanning, setIsScanning] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [usePreferredCamera, setUsePreferredCamera] = useState(true); // Novo estado para controle de fallback
 
   const actionLabel = targetStatus === 'preparando' ? 'Iniciar Preparo' : 'Finalizar Item';
 
@@ -48,7 +47,6 @@ export function CookRecognitionModal({
     setStatusMessage("Aponte a câmera para o rosto");
     setMediaError(null);
     setIsScanning(false);
-    setUsePreferredCamera(true); // Tenta usar a preferida novamente ao reabrir
   }, []);
 
   useEffect(() => {
@@ -59,23 +57,8 @@ export function CookRecognitionModal({
 
   const handleMediaError = useCallback((err: any) => {
     console.error("Erro ao acessar a câmera:", err);
-    
-    if (err.name === 'OverconstrainedError' && usePreferredCamera) {
-      // Se falhar com a câmera preferida, tenta o fallback
-      console.warn("OverconstrainedError com câmera preferida. Tentando fallback...");
-      setUsePreferredCamera(false);
-      setMediaError(null); // Limpa o erro para tentar novamente
-      return;
-    }
-    
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      setMediaError("Acesso à câmera negado. Por favor, permita o acesso nas configurações do seu navegador.");
-    } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-      setMediaError("Acesso à câmera bloqueado. O sistema deve ser acessado via HTTPS.");
-    } else {
-      setMediaError(`Não foi possível acessar a câmera: ${err.message}`);
-    }
-  }, [usePreferredCamera]);
+    setMediaError("Não foi possível acessar a câmera. Verifique as permissões.");
+  }, []);
 
   const performRecognition = useCallback(async (imageSrc: string) => {
     setStatusMessage("Analisando...");
@@ -131,12 +114,9 @@ export function CookRecognitionModal({
   const videoConstraints = {
     width: 400,
     height: 400,
-    // Usa o deviceId preferido APENAS se usePreferredCamera for true
-    deviceId: usePreferredCamera && settings?.preferred_camera_device_id 
-      ? { exact: settings.preferred_camera_device_id } 
-      : undefined,
+    deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
   };
-
+  
   // DEFINIÇÃO DA FUNÇÃO renderContent
   const renderContent = () => {
     if (mediaError) {
@@ -210,7 +190,7 @@ export function CookRecognitionModal({
              />
             }
           </div>
-          {renderContent()}
+          {renderContent()} {/* CHAMADA CORRETA */}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>Cancelar</Button>
