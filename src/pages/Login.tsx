@@ -8,6 +8,7 @@ import { FullscreenToggle } from "@/components/login/FullscreenToggle";
 // Lista de URLs de vídeo padrão.
 const DEFAULT_VIDEO_URLS = [
   "https://assets.mixkit.co/videos/preview/mixkit-restaurant-with-a-view-of-the-city-at-night-4416-large.mp4",
+  
   // Adicione seus vídeos locais aqui:
   // "/videos/fundo1.mp4",
   // "/videos/fundo2.mp4",
