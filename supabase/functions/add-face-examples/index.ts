@@ -58,16 +58,12 @@ serve(async (req) => {
     }
 
     console.log("[add-face-examples] 2/7: Autenticando usuário logado...");
-    const userClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-    const { data: { user }, error: userError } = await userClient.auth.getUser();
-    if (userError || !user) {
-        throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
+    // Apenas verifica se o usuário está logado, mas não usa o ID dele para configurações do CompreFace
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new Error("Falha na autenticação do usuário: Token de autorização ausente.");
     }
-    console.log(`[add-face-examples] 2/7: Usuário autenticado: ${user.id}`);
+    console.log(`[add-face-examples] 2/7: Token de autorização presente.`);
 
     // 3. Buscando configurações do CompreFace do usuário 1 (Superadmin principal)
     console.log("[add-face-examples] 3/7: Buscando configurações globais do CompreFace...");

@@ -54,19 +54,9 @@ serve(async (req) => {
       imageData = image_url.split(',')[1];
     }
 
-    // 2. Autenticação do usuário logado (apenas para validar a origem)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
-    }
-    
-    // Não precisamos do ID do usuário logado, apenas da validação do token.
-    // Se o token for inválido, o `userClient.auth.getUser()` falharia, mas aqui estamos usando o cliente admin para validar o token.
-    // Para simplificar, vamos apenas garantir que o token exista.
-
-    // 3. Buscando configurações do CompreFace do usuário 1
+    // 2. Buscando configurações do CompreFace do usuário 1
     const userIdForClients = SUPERADMIN_ID;
-    console.log(`[recognize-multiple-faces] 3/6: Usando ID fixo para clientes e configurações: ${userIdForClients}`);
+    console.log(`[recognize-multiple-faces] 2/6: Usando ID fixo para clientes e configurações: ${userIdForClients}`);
     
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 

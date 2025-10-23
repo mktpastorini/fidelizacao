@@ -55,7 +55,6 @@ serve(async (req) => {
     }
 
     // 2. Determinar o ID do usuário (dono do estabelecimento)
-    // Para reconhecimento, sempre usamos o SUPERADMIN_ID para buscar as configurações e os clientes.
     const userIdForClients = SUPERADMIN_ID;
     console.log(`[recognize-face] 2/7: Usando ID fixo para clientes e configurações: ${userIdForClients}`);
 
