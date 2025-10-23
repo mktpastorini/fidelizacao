@@ -9,8 +9,6 @@ import { useCookRecognition } from '@/hooks/useCookRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AnimatedContent } from '../AnimatedContent';
-import { StarBorder } from '../StarBorder'; // Importado
 
 type CookRecognitionModalProps = {
   isOpen: boolean;
@@ -176,49 +174,45 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
         resetState();
       }
     }}>
-      <StarBorder speed={10} thickness={3} color="#f59e0b" className="rounded-lg">
-        <DialogContent className="max-w-md bg-background p-0 border-none shadow-2xl">
-          <AnimatedContent distance={50} duration={0.8} delay={0.1} className="w-full p-6">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2"><Utensils className="w-6 h-6" /> {title}</DialogTitle>
-              <DialogDescription>
-                Confirme sua identidade para {isStartPrep ? 'iniciar o preparo' : 'marcar como pronto'} do item: <span className="font-semibold">{itemInfo}</span>
-              </DialogDescription>
-            </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-4">
-              <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
-                {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : 
-                cameraError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500 p-4 text-center">
-                    <p>{cameraError}</p>
-                </div> :
-                <Webcam 
-                  audio={false} 
-                  ref={webcamRef} 
-                  screenshotFormat="image/jpeg" 
-                  videoConstraints={videoConstraints} 
-                  className="w-full h-full object-cover" 
-                  mirrored={true}
-                  onUserMediaError={(e) => {
-                    console.error("Erro ao acessar a câmera:", e);
-                    setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
-                  }} 
-                />
-                }
-              </div>
-              {!snapshot && !cameraError && devices.length > 1 && (
-                <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
-                  <SelectTrigger className="w-full max-w-xs"><SelectValue placeholder="Selecione uma câmera" /></SelectTrigger>
-                  <SelectContent>{devices.map((device) => (<SelectItem key={device.deviceId} value={device.deviceId}>{device.label || `Câmera ${devices.indexOf(device) + 1}`}</SelectItem>))}</SelectContent>
-                </Select>
-              )}
-              {renderContent()}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isScanning}>Cancelar</Button>
-            </DialogFooter>
-          </AnimatedContent>
-        </DialogContent>
-      </StarBorder>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Utensils className="w-6 h-6" /> {title}</DialogTitle>
+          <DialogDescription>
+            Confirme sua identidade para {isStartPrep ? 'iniciar o preparo' : 'marcar como pronto'} do item: <span className="font-semibold">{itemInfo}</span>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-4 py-4">
+          <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
+            {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : 
+             cameraError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500 p-4 text-center">
+                <p>{cameraError}</p>
+             </div> :
+             <Webcam 
+               audio={false} 
+               ref={webcamRef} 
+               screenshotFormat="image/jpeg" 
+               videoConstraints={videoConstraints} 
+               className="w-full h-full object-cover" 
+               mirrored={true}
+               onUserMediaError={(e) => {
+                 console.error("Erro ao acessar a câmera:", e);
+                 setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
+               }} 
+             />
+            }
+          </div>
+          {!snapshot && !cameraError && devices.length > 1 && (
+            <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
+              <SelectTrigger className="w-full max-w-xs"><SelectValue placeholder="Selecione uma câmera" /></SelectTrigger>
+              <SelectContent>{devices.map((device) => (<SelectItem key={device.deviceId} value={device.deviceId}>{device.label || `Câmera ${devices.indexOf(device) + 1}`}</SelectItem>))}</SelectContent>
+            </Select>
+          )}
+          {renderContent()}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isScanning}>Cancelar</Button>
+        </DialogFooter>
+      </DialogContent>
     </Dialog>
   );
 }
