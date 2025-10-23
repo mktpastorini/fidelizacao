@@ -67,11 +67,11 @@ type GroupedClientItems = {
 
 const WAITER_ROLES: UserRole[] = ['garcom', 'balcao', 'gerente', 'admin', 'superadmin'];
 
-async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
+async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[], garcom: StaffProfile | null }) | null> {
   if (!mesaId) return null;
   const { data, error } = await supabase
     .from("pedidos")
-    .select("*, itens_pedido(*)")
+    .select("*, itens_pedido(*), garcom:profiles!garcom_id(id, first_name, last_name, role)")
     .eq("mesa_id", mesaId)
     .eq("status", "aberto")
     .order("created_at", { ascending: false })
@@ -159,6 +159,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     queryFn: fetchWaiters,
     enabled: isOpen,
   });
+  
+  // Efeito para inicializar o estado da gorjeta e do garçom
+  useEffect(() => {
+    if (pedido) {
+      const hasTip = (pedido.gorjeta_valor || 0) > 0;
+      setTipEnabled(hasTip);
+      setSelectedGarcomId(pedido.garcom_id || null);
+    } else {
+      setTipEnabled(false);
+      setSelectedGarcomId(null);
+    }
+  }, [pedido]);
 
   const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
   const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
@@ -434,7 +446,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       const cliente = ocupantes?.find(o => o.id === clienteId);
-      showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
+      showSuccess(`Pagamento parcial de conta individual de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagandoIndividual(null);
       setIsMesaItemPartialPaymentOpen(false);
     },
@@ -467,7 +479,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { 
           body: { pedidoId: pedido.id, userId: user.id } 
         });
-        if (functionError) showError(`Conta fechada, mas falha ao enviar webhook: ${functionError.message}`);
+        if (functionError) showError(`Conta fechada, mas falha ao enviar notificação: ${functionError.message}`);
       }
     },
     onSuccess: () => {
@@ -534,7 +546,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     }
     // Só permite pagamento parcial se o item agrupado for composto por um único item original
     if (item.original_ids.length > 1) {
-        showError("Não é possível pagar parcialmente um item agrupado com múltiplos registros originais. Remova e adicione novamente se necessário.");
+        showError("Não é possível pagar parcialmente um item agrupado com múltiplos IDs originais. Remova e adicione novamente se necessário.");
         return;
     }
     
@@ -667,6 +679,17 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     if (!itemMesaToPay) return 0;
     return itemMesaToPay.subtotal / itemMesaToPay.total_quantidade;
   }, [itemMesaToPay]);
+  
+  const garcomNome = useMemo(() => {
+    if (pedido?.garcom) {
+      return `${pedido.garcom.first_name || ''} ${pedido.garcom.last_name || ''}`.trim() || pedido.garcom.id;
+    }
+    const selectedWaiter = waiters?.find(w => w.id === selectedGarcomId);
+    if (selectedWaiter) {
+      return `${selectedWaiter.first_name || ''} ${selectedWaiter.last_name || ''}`.trim() || selectedWaiter.id;
+    }
+    return 'N/A';
+  }, [pedido?.garcom, waiters, selectedGarcomId]);
 
   return (
     <>
@@ -927,6 +950,14 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     </div>
                 )}
             </div>
+            
+            {/* Informação do Garçom (se já estiver no pedido e gorjeta desativada) */}
+            {pedido?.garcom && !tipEnabled && (
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1"><UserIcon className="w-4 h-4" /> Garçom Associado:</span>
+                    <span className="font-semibold">{garcomNome}</span>
+                </div>
+            )}
             
             <div className="flex justify-between items-center text-lg font-bold">
               <span>Subtotal dos Itens:</span>
