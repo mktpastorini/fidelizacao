@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,6 @@ export function RecognitionTester() {
   const [isScanning, setIsScanning] = useState(false);
   const [matchResult, setMatchResult] = useState<{ name: string; distance: number; avatar: string | null } | 'not_found' | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
-  const [useFallbackConstraints, setUseFallbackConstraints] = useState(false); // Novo estado para fallback
 
   useEffect(() => {
     const getDevices = async () => {
@@ -38,33 +37,6 @@ export function RecognitionTester() {
     };
     getDevices();
   }, [settings]);
-
-  const videoConstraints = useMemo(() => {
-    if (useFallbackConstraints || !selectedDeviceId) {
-      // Restrições padrão (qualquer câmera)
-      return { width: 400, height: 400 };
-    }
-    // Restrições específicas (câmera preferida)
-    return {
-      width: 400,
-      height: 400,
-      deviceId: { exact: selectedDeviceId },
-    };
-  }, [selectedDeviceId, useFallbackConstraints]);
-
-  const handleMediaError = useCallback((err: any) => {
-    console.error("Erro ao acessar a câmera no RecognitionTester:", err);
-    
-    if (err.name === 'OverconstrainedError' && !useFallbackConstraints) {
-      console.warn("OverconstrainedError detectado. Tentando fallback de câmera.");
-      setUseFallbackConstraints(true);
-      return;
-    }
-    
-    // Se for outro erro ou se o fallback falhar, exibe o erro
-    // Note: O erro de permissão é geralmente tratado no CameraSettings, mas mantemos aqui por segurança.
-    // Não definimos um erro global aqui para não sobrescrever o erro do hook de reconhecimento.
-  }, [useFallbackConstraints]);
 
   const handleScan = useCallback(async () => {
     if (!webcamRef.current) return;
@@ -92,7 +64,6 @@ export function RecognitionTester() {
   const reset = () => {
     setSnapshot(null);
     setMatchResult(null);
-    setUseFallbackConstraints(false); // Resetar fallback
   };
 
   if (error) {
@@ -113,13 +84,12 @@ export function RecognitionTester() {
                 audio={false}
                 ref={webcamRef}
                 screenshotFormat="image/jpeg"
-                videoConstraints={videoConstraints}
+                videoConstraints={{ deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined, width: 400, height: 400 }}
                 className="w-full h-full object-cover"
-                onUserMediaError={handleMediaError}
               />
             </div>
             <div className="w-full max-w-xs space-y-2">
-              <Select value={selectedDeviceId || ''} onValueChange={(value) => { setSelectedDeviceId(value); setUseFallbackConstraints(false); }}>
+              <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
                 <SelectTrigger><SelectValue placeholder="Selecione uma câmera" /></SelectTrigger>
                 <SelectContent>
                   {devices.map((device) => (
@@ -138,7 +108,7 @@ export function RecognitionTester() {
 
       <Card>
         <CardContent className="p-4 text-center min-h-[300px] flex flex-col items-center justify-center">
-          {!snapshot && !isScanning && <p className="text-muted-foreground">Aguardando análise...</p>}
+          {!snapshot && <p className="text-muted-foreground">Aguardando análise...</p>}
           {isScanning && <Loader2 className="w-12 h-12 animate-spin text-primary" />}
           
           {snapshot && !isScanning && (

@@ -13,16 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Copy, RefreshCw, Send, User } from "lucide-react";
+import { Copy, RefreshCw, Send } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useState, useEffect } from "react"; // CORREÇÃO: Importando useState e useEffect
 
 type UserData = {
   templates: MessageTemplate[];
   produtos: Produto[];
-  profile: { first_name: string | null, last_name: string | null } | null;
 };
 
 // Função para obter data/hora no horário de Brasília
@@ -34,18 +32,15 @@ function getBrazilTime() {
 
 async function fetchPageData(): Promise<UserData> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { templates: [], produtos: [], profile: null };
+  if (!user) return { templates: [], produtos: [] };
 
   const { data: templates, error: templatesError } = await supabase.from("message_templates").select("*");
   if (templatesError) throw new Error(`Erro ao buscar templates: ${templatesError.message}`);
 
   const { data: produtos, error: produtosError } = await supabase.from("produtos").select("*").order("nome");
   if (produtosError) throw new Error(`Erro ao buscar produtos: ${produtosError.message}`);
-  
-  const { data: profile, error: profileError } = await supabase.from("profiles").select("first_name, last_name").eq("id", user.id).single();
-  if (profileError && profileError.code !== 'PGRST116') throw new Error(`Erro ao buscar perfil: ${profileError.message}`);
 
-  return { templates: templates || [], produtos: produtos || [], profile: profile || null };
+  return { templates: templates || [], produtos: produtos || [] };
 }
 
 function CompreFaceSettingsForm() {
@@ -104,67 +99,9 @@ function CompreFaceSettingsForm() {
   );
 }
 
-function ProfileSettingsForm({ defaultProfile }: { defaultProfile: UserData['profile'] }) {
-  const { refetch: refetchSettings } = useSettings();
-  const [firstName, setFirstName] = useState(defaultProfile?.first_name || '');
-  const [lastName, setLastName] = useState(defaultProfile?.last_name || '');
-
-  useEffect(() => {
-    setFirstName(defaultProfile?.first_name || '');
-    setLastName(defaultProfile?.last_name || '');
-  }, [defaultProfile]);
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (values: { first_name: string, last_name: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Usuário não autenticado");
-      
-      const { error } = await supabase.from("profiles").update(values).eq("id", user.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      refetchSettings(); // Refetch para atualizar o nome no contexto
-      showSuccess("Nome atualizado com sucesso!");
-    },
-    onError: (error: Error) => showError(error.message),
-  });
-
-  const isDirty = firstName !== (defaultProfile?.first_name || '') || lastName !== (defaultProfile?.last_name || '');
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <Label htmlFor="first-name">Primeiro Nome</Label>
-        <Input
-          id="first-name"
-          placeholder="Seu primeiro nome"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-        />
-      </div>
-      <div>
-        <Label htmlFor="last-name">Sobrenome</Label>
-        <Input
-          id="last-name"
-          placeholder="Seu sobrenome"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-        />
-      </div>
-      <Button 
-        onClick={() => updateProfileMutation.mutate({ first_name: firstName, last_name: lastName })} 
-        disabled={updateProfileMutation.isPending || !isDirty}
-      >
-        {updateProfileMutation.isPending ? "Salvando..." : "Salvar Nome"}
-      </Button>
-    </div>
-  );
-}
-
-
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
-  const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
+  const { settings, refetch: refetchSettings, isLoading: isLoadingSettings } = useSettings();
 
   const { data, isLoading: isLoadingPage, isError } = useQuery({
     queryKey: ["configPageData"],
@@ -172,27 +109,11 @@ export default function ConfiguracoesPage() {
   });
 
   const isLoading = isLoadingSettings || isLoadingPage;
-  
-  // Funções que podem configurar o sistema (Superadmin e Admin)
-  const canConfigureSystem = !!userRole && ['superadmin', 'admin'].includes(userRole);
-  // Funções que podem ver a documentação e API Key (Superadmin, Admin, Gerente, Cozinha)
-  const canViewApi = !!userRole && ['superadmin', 'admin', 'gerente', 'cozinha'].includes(userRole);
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (updatedSettings: Partial<UserSettings>) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado");
-      
-      // Se o usuário não pode configurar o sistema, ele só pode atualizar a câmera preferida
-      if (!canConfigureSystem && updatedSettings.preferred_camera_device_id === undefined) {
-        // Se o usuário não é admin, ele só pode salvar a câmera.
-        // Se ele tentar salvar outra coisa, o contexto já deve ter impedido, mas garantimos aqui.
-        if (Object.keys(updatedSettings).length === 1 && updatedSettings.preferred_camera_device_id !== undefined) {
-             // OK, é apenas a câmera.
-        } else {
-             throw new Error("Acesso negado. Apenas Superadmins e Admins podem alterar estas configurações globais.");
-        }
-      }
       
       const settingsToUpsert = { id: user.id, ...updatedSettings };
 
@@ -254,21 +175,6 @@ export default function ConfiguracoesPage() {
 
   const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
 
-  // Define as abas visíveis
-  const tabs = [
-    { value: "perfil", label: "Meu Perfil", visible: true },
-    { value: "acesso", label: "Acesso & API Key", visible: true },
-    { value: "camera", label: "Câmera", visible: true },
-    { value: "mensagens", label: "Integrações de Mensagens", visible: canConfigureSystem },
-    { value: "reconhecimento", label: "Reconhecimento Facial", visible: canConfigureSystem },
-    { value: "operacao", label: "Operação do Salão", visible: canConfigureSystem },
-    { value: "aparencia", label: "Aparência", visible: canConfigureSystem },
-    { value: "api", label: "Documentação API", visible: canViewApi },
-  ].filter(tab => tab.visible);
-
-  // Determina a aba padrão
-  const defaultTab = tabs[0]?.value || 'perfil';
-
   return (
     <div>
       <div className="mb-6">
@@ -278,162 +184,143 @@ export default function ConfiguracoesPage() {
         </p>
       </div>
 
-      <Tabs defaultValue={defaultTab} className="w-full">
-        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
-          {tabs.map(tab => (
-            <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
-          ))}
+      <Tabs defaultValue="acesso" className="w-full">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="acesso">Acesso & Segurança</TabsTrigger>
+          <TabsTrigger value="mensagens">Integrações de Mensagens</TabsTrigger>
+          <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>
+          <TabsTrigger value="operacao">Operação do Salão</TabsTrigger>
+          <TabsTrigger value="aparencia">Aparência</TabsTrigger>
+          <TabsTrigger value="api">Documentação API</TabsTrigger>
         </TabsList>
 
-        {/* 0. Meu Perfil (Nome) - Acessível a todos */}
-        <TabsContent value="perfil" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><User className="w-5 h-5" /> Meu Perfil</CardTitle><CardDescription>Atualize seu nome de exibição no sistema.</CardDescription></CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-24 w-full" /> : <ProfileSettingsForm defaultProfile={data?.profile || null} />}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 1. Acesso & API Key (Acessível a todos que podem ver a página) */}
+        {/* 1. Acesso & Segurança */}
         <TabsContent value="acesso" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Chave de API Pessoal</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
-            <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
-          </Card>
-        </TabsContent>
-        
-        {/* 1.1 Câmera Preferida (Acessível a todos que podem ver a página) */}
-        <TabsContent value="camera" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
-            <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Chave de API</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
-        {/* 2. Integrações de Mensagens (Restrito a Superadmin/Admin) */}
-        {canConfigureSystem && (
-          <TabsContent value="mensagens" className="mt-6">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader><CardTitle>Webhook Principal</CardTitle><CardDescription>Configure seu webhook para automações de WhatsApp.</CardDescription></CardHeader>
-                <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar as configurações.</p> : (<WebhookForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} onTest={() => testWebhookMutation.mutate()} isTesting={testWebhookMutation.isPending} />)}</CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle>Templates de Mensagens</CardTitle><CardDescription>Escolha os templates para cada evento automático (Chegada e Pós-Pagamento).</CardDescription></CardHeader>
-                <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar os templates.</p> : (<TemplateSettingsForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} templates={data?.templates || []} />)}</CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Automação de Aniversários</CardTitle>
-                  <CardDescription>Configure o envio automático de mensagens de aniversário.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? <Skeleton className="h-40 w-full" /> : (
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="birthday-template">Template de Aniversário</Label>
-                        <Select value={settings?.aniversario_template_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ aniversario_template_id: value })}>
-                          <SelectTrigger id="birthday-template">
-                            <SelectValue placeholder="Selecione o template" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {birthdayTemplates.map(template => (
-                              <SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="birthday-time">Horário de Envio</Label>
-                        <Input 
-                          id="birthday-time" 
-                          type="time" 
-                          defaultValue={settings?.aniversario_horario || "09:00"} 
-                          onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} 
-                        />
-                      </div>
-                      <Button 
-                        onClick={() => sendBirthdayWishesMutation.mutate()} 
-                        disabled={sendBirthdayWishesMutation.isPending}
-                      >
-                        <Send className="w-4 h-4 mr-2" />
-                        {sendBirthdayWishesMutation.isPending ? "Enviando..." : "Enviar para Aniversariantes de Hoje (Manual)"}
-                      </Button>
-                      <p className="text-sm text-muted-foreground">
-                        Para envio automático, consulte a Documentação API para instruções sobre como configurar a automação externa.
-                      </p>
+        {/* 2. Integrações de Mensagens */}
+        <TabsContent value="mensagens" className="mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Webhook Principal</CardTitle><CardDescription>Configure seu webhook para automações de WhatsApp.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar as configurações.</p> : (<WebhookForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} onTest={() => testWebhookMutation.mutate()} isTesting={testWebhookMutation.isPending} />)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Templates de Mensagens</CardTitle><CardDescription>Escolha os templates para cada evento automático (Chegada e Pós-Pagamento).</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar os templates.</p> : (<TemplateSettingsForm onSubmit={(values) => updateSettingsMutation.mutate(values)} isSubmitting={updateSettingsMutation.isPending} defaultValues={settings || undefined} templates={data?.templates || []} />)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>Automação de Aniversários</CardTitle>
+                <CardDescription>Configure o envio automático de mensagens de aniversário.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-40 w-full" /> : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="birthday-template">Template de Aniversário</Label>
+                      <Select value={settings?.aniversario_template_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ aniversario_template_id: value })}>
+                        <SelectTrigger id="birthday-template">
+                          <SelectValue placeholder="Selecione o template" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {birthdayTemplates.map(template => (
+                            <SelectItem key={template.id} value={template.id}>{template.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        )}
-
-        {/* 3. Reconhecimento Facial (Restrito a Superadmin/Admin) */}
-        {canConfigureSystem && (
-          <TabsContent value="reconhecimento" className="mt-6">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader><CardTitle>Servidor de Reconhecimento (CompreFace)</CardTitle><CardDescription>Conecte seu servidor CompreFace auto-hospedado.</CardDescription></CardHeader>
-                <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : <CompreFaceSettingsForm />}</CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        )}
-        
-        {/* 4. Operação do Salão (Restrito a Superadmin/Admin) */}
-        {canConfigureSystem && (
-          <TabsContent value="operacao" className="mt-6">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader><CardTitle>Fechamento do Dia</CardTitle><CardDescription>Configure o relatório diário e o fechamento automático.</CardDescription></CardHeader>
-                <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div><Label htmlFor="report-phone">Nº de WhatsApp para Relatório</Label><Input id="report-phone" placeholder="(99) 99999-9999" defaultValue={settings?.daily_report_phone_number || ""} onBlur={(e) => updateSettingsMutation.mutate({ daily_report_phone_number: e.target.value })} /></div><div className="flex items-center space-x-2"><Switch id="auto-close" checked={settings?.auto_close_enabled} onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_close_enabled: checked })} /><Label htmlFor="auto-close">Habilitar fechamento automático</Label></div>{settings?.auto_close_enabled && (<div><Label htmlFor="auto-close-time">Horário do Fechamento</Label><Input id="auto-close-time" type="time" defaultValue={settings?.auto_close_time || "23:00"} onBlur={(e) => updateSettingsMutation.mutate({ auto_close_time: e.target.value })} /></div>)}</div>)}</CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle>Automação de Pedidos</CardTitle><CardDescription>Configure um item para ser adicionado automaticamente quando um cliente senta à mesa.</CardDescription></CardHeader>
-                <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center space-x-2"><Switch id="auto-add-item" checked={settings?.auto_add_item_enabled} onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_add_item_enabled: checked })} /><Label htmlFor="auto-add-item">Habilitar item de entrada automático</Label></div>{settings?.auto_add_item_enabled && (<div className="space-y-2"><Label htmlFor="default-product">Produto Padrão</Label><Select value={settings?.default_produto_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ default_produto_id: value })}><SelectTrigger id="default-product"><SelectValue placeholder="Selecione o produto padrão" /></SelectTrigger><SelectContent>{data?.produtos.map(produto => (<SelectItem key={produto.id} value={produto.id}>{produto.nome}</SelectItem>))}</SelectContent></Select></div>)}</div>)}</CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        )}
-
-        {/* 5. Aparência (Restrito a Superadmin/Admin) */}
-        {canConfigureSystem && (
-          <TabsContent value="aparencia" className="mt-6">
-            <div className="space-y-6">
-              <Card>
-                <CardHeader><CardTitle>Estilo do Menu</CardTitle><CardDescription>Escolha como você prefere navegar pelo sistema.</CardDescription></CardHeader>
-                <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle>Vídeo de Fundo do Login</CardTitle><CardDescription>Defina a URL do vídeo que será exibida na tela de login.</CardDescription></CardHeader>
-                <CardContent>
-                  {isLoading ? <Skeleton className="h-16 w-full" /> : (
-                    <div className="space-y-2">
-                      <Label htmlFor="login-video-url">URL do Vídeo (MP4)</Label>
-                      <Input
-                        id="login-video-url"
-                        placeholder="https://seu-servidor.com/video.mp4, /videos/local.mp4"
-                        defaultValue={settings?.login_video_url || ""}
-                        onBlur={(e) => updateSettingsMutation.mutate({ login_video_url: e.target.value })}
+                    <div>
+                      <Label htmlFor="birthday-time">Horário de Envio</Label>
+                      <Input 
+                        id="birthday-time" 
+                        type="time" 
+                        defaultValue={settings?.aniversario_horario || "09:00"} 
+                        onBlur={(e) => updateSettingsMutation.mutate({ aniversario_horario: e.target.value })} 
                       />
-                      <p className="text-xs text-muted-foreground">Se vazio, será usado o vídeo padrão. Você pode inserir múltiplas URLs separadas por vírgula para que o sistema escolha uma aleatoriamente.</p>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-        )}
+                    <Button 
+                      onClick={() => sendBirthdayWishesMutation.mutate()} 
+                      disabled={sendBirthdayWishesMutation.isPending}
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      {sendBirthdayWishesMutation.isPending ? "Enviando..." : "Enviar para Aniversariantes de Hoje (Manual)"}
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Para envio automático, consulte a Documentação API para instruções sobre como configurar a automação externa.
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
 
-        {/* 6. Documentação API (Acessível a todos que podem ver a página) */}
-        {canViewApi && (
-          <TabsContent value="api" className="mt-6">
-            <ApiDocumentation />
-          </TabsContent>
-        )}
+        {/* 3. Reconhecimento Facial */}
+        <TabsContent value="reconhecimento" className="mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Servidor de Reconhecimento (CompreFace)</CardTitle><CardDescription>Conecte seu servidor CompreFace auto-hospedado.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : <CompreFaceSettingsForm />}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
+              <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* 4. Operação do Salão */}
+        <TabsContent value="operacao" className="mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Fechamento do Dia</CardTitle><CardDescription>Configure o relatório diário e o fechamento automático.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div><Label htmlFor="report-phone">Nº de WhatsApp para Relatório</Label><Input id="report-phone" placeholder="(99) 99999-9999" defaultValue={settings?.daily_report_phone_number || ""} onBlur={(e) => updateSettingsMutation.mutate({ daily_report_phone_number: e.target.value })} /></div><div className="flex items-center space-x-2"><Switch id="auto-close" checked={settings?.auto_close_enabled} onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_close_enabled: checked })} /><Label htmlFor="auto-close">Habilitar fechamento automático</Label></div>{settings?.auto_close_enabled && (<div><Label htmlFor="auto-close-time">Horário do Fechamento</Label><Input id="auto-close-time" type="time" defaultValue={settings?.auto_close_time || "23:00"} onBlur={(e) => updateSettingsMutation.mutate({ auto_close_time: e.target.value })} /></div>)}</div>)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Automação de Pedidos</CardTitle><CardDescription>Configure um item para ser adicionado automaticamente quando um cliente senta à mesa.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-32 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center space-x-2"><Switch id="auto-add-item" checked={settings?.auto_add_item_enabled} onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_add_item_enabled: checked })} /><Label htmlFor="auto-add-item">Habilitar item de entrada automático</Label></div>{settings?.auto_add_item_enabled && (<div className="space-y-2"><Label htmlFor="default-product">Produto Padrão</Label><Select value={settings?.default_produto_id || ""} onValueChange={(value) => updateSettingsMutation.mutate({ default_produto_id: value })}><SelectTrigger id="default-product"><SelectValue placeholder="Selecione o produto padrão" /></SelectTrigger><SelectContent>{data?.produtos.map(produto => (<SelectItem key={produto.id} value={produto.id}>{produto.nome}</SelectItem>))}</SelectContent></Select></div>)}</div>)}</CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* 5. Aparência */}
+        <TabsContent value="aparencia" className="mt-6">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Estilo do Menu</CardTitle><CardDescription>Escolha como você prefere navegar pelo sistema.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Vídeo de Fundo do Login</CardTitle><CardDescription>Defina a URL do vídeo que será exibida na tela de login.</CardDescription></CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-16 w-full" /> : (
+                  <div className="space-y-2">
+                    <Label htmlFor="login-video-url">URL do Vídeo (MP4)</Label>
+                    <Input
+                      id="login-video-url"
+                      placeholder="https://seu-servidor.com/video.mp4, /videos/local.mp4"
+                      defaultValue={settings?.login_video_url || ""}
+                      onBlur={(e) => updateSettingsMutation.mutate({ login_video_url: e.target.value })}
+                    />
+                    <p className="text-xs text-muted-foreground">Se vazio, será usado o vídeo padrão. Você pode inserir múltiplas URLs separadas por vírgula para que o sistema escolha uma aleatoriamente.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* 6. Documentação API */}
+        <TabsContent value="api" className="mt-6">
+          <ApiDocumentation />
+        </TabsContent>
       </Tabs>
     </div>
   );

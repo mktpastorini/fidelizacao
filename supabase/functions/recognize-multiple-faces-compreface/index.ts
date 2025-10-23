@@ -6,39 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função auxiliar para buscar as configurações do CompreFace do usuário 1 fixo
-async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log("[recognize-multiple-faces] Buscando configurações globais do CompreFace do usuário 1 (Superadmin principal)...");
-
-  const { data: settings, error: settingsError } = await supabaseAdmin
-    .from('user_settings')
-    .select('compreface_url, compreface_api_key')
-    .eq('id', '1')
-    .single();
-
-  if (settingsError) {
-    console.error("[recognize-multiple-faces] Erro ao buscar configurações do usuário 1:", settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações globais do sistema.") };
-  }
-
-  if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin principal.") };
-  }
-
-  return { settings, error: null };
-}
-
 serve(async (req) => {
   console.log("--- [recognize-multiple-faces] INICIANDO EXECUÇÃO ---");
 
   if (req.method === 'OPTIONS') {
+    console.log("[recognize-multiple-faces] Requisição OPTIONS recebida.");
     return new Response(null, { headers: corsHeaders })
   }
-
-  const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
 
   try {
     console.log("[recognize-multiple-faces] 1/6: Parsing body da requisição...");
@@ -49,42 +23,52 @@ serve(async (req) => {
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
+      console.log("[recognize-multiple-faces] Prefixo data:image removido do base64.");
     }
 
-    let userId: string | null = null;
-    const authHeader = req.headers.get('Authorization');
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
+    let userId: string | null = null;
+
+    // 2. Determinar o ID do usuário (dono do estabelecimento)
+    const authHeader = req.headers.get('Authorization');
+    
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
+      // Tenta obter o usuário usando o token fornecido (para usuários logados no painel)
       const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-      if (user && !userError) {
-        userId = user.id;
-        console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userId}`);
-      } else {
+      
+      if (userError || !user) {
         throw new Error(`Falha na autenticação do usuário: ${userError?.message || "Usuário não encontrado."}`);
       }
+      userId = user.id;
+      console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userId}`);
     } else {
       throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
     }
 
-    // Ignora o userId autenticado e usa o usuário 1 para configurações
-    const fixedUserId = '1';
-
-    console.log("[recognize-multiple-faces] 3/6: Buscando configurações do CompreFace do usuário 1...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    // 3. Buscando configurações do CompreFace (USANDO SUPABASE ADMIN)
+    console.log("[recognize-multiple-faces] 3/6: Buscando configurações do CompreFace...");
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('user_settings')
+      .select('compreface_url, compreface_api_key')
+      .eq('id', userId)
+      .single();
 
     if (settingsError) {
-      return new Response(JSON.stringify({ error: settingsError.message }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+      throw new Error(`Não foi possível recuperar as configurações do CompreFace: ${settingsError.message}`);
     }
-
+    if (!settings?.compreface_url || !settings?.compreface_api_key) {
+      throw new Error("URL ou Chave de API do CompreFace não configuradas.");
+    }
     console.log("[recognize-multiple-faces] 3/6: Configurações carregadas.");
 
     const payload = { file: imageData };
     console.log("[recognize-multiple-faces] 4/6: Enviando para CompreFace para reconhecimento de múltiplas faces...");
+    // Usar limit=0 para obter todos os rostos detectados
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=0`, {
       method: 'POST',
       headers: {
@@ -106,30 +90,31 @@ serve(async (req) => {
 
     const data = await response.json();
     const recognizedFaces = [];
-    const minSimilarity = 0.85;
+    const minSimilarity = 0.85; // Limiar de similaridade para considerar um match
 
     if (data.result && Array.isArray(data.result)) {
       for (const faceResult of data.result) {
         const bestSubject = faceResult.subjects?.[0];
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
           console.log(`[recognize-multiple-faces] Match encontrado - Subject: ${bestSubject.subject}, Similaridade: ${bestSubject.similarity}`);
-
+          
+          // Buscar dados do cliente (USANDO SUPABASE ADMIN)
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
-            .select('id, nome, avatar_url, gostos, casado_com, visitas')
+            .select('id, nome, avatar_url, gostos, casado_com, visitas') // Selecionar informações adicionais
             .eq('id', bestSubject.subject)
-            .eq('user_id', fixedUserId)
+            .eq('user_id', userId) // Adiciona filtro de segurança
             .single();
 
           if (clientError) {
             console.error(`Erro ao buscar dados do cliente ${bestSubject.subject}: ${clientError.message}`);
-            continue;
+            continue; // Pular este rosto se não conseguir buscar o cliente
           }
 
           recognizedFaces.push({
             client: client,
             similarity: bestSubject.similarity,
-            box: faceResult.box,
+            box: faceResult.box, // Incluir a caixa delimitadora
           });
         }
       }

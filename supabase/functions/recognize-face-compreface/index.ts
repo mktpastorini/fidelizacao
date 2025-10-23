@@ -6,29 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Função auxiliar para buscar as configurações do CompreFace do usuário 1 fixo
-async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log("[recognize-face] Buscando configurações globais do CompreFace do usuário 1 (Superadmin principal)...");
-
-  // Busca as configurações do usuário 1 diretamente
-  const { data: settings, error: settingsError } = await supabaseAdmin
-    .from('user_settings')
-    .select('compreface_url, compreface_api_key')
-    .eq('id', '1')
-    .single();
-
-  if (settingsError) {
-    console.error("[recognize-face] Erro ao buscar configurações do usuário 1:", settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações globais do sistema.") };
-  }
-
-  if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin principal.") };
-  }
-
-  return { settings, error: null };
-}
-
 serve(async (req) => {
   console.log("--- [recognize-face] INICIANDO EXECUÇÃO ---");
 
@@ -36,11 +13,6 @@ serve(async (req) => {
     console.log("[recognize-face] Requisição OPTIONS recebida.");
     return new Response(null, { headers: corsHeaders })
   }
-
-  const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
 
   try {
     console.log("[recognize-face] 1/7: Parsing body da requisição...");
@@ -54,20 +26,60 @@ serve(async (req) => {
       console.log("[recognize-face] Prefixo data:image removido do base64.");
     }
 
-    // Ignora o usuário logado, pois sempre usa configurações do usuário 1
-    const userId = '1';
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
-    // 3. Buscando configurações do CompreFace do usuário 1
-    console.log("[recognize-face] 3/7: Buscando configurações do CompreFace do usuário 1...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    let userId: string | null = null;
 
-    if (settingsError) {
-      return new Response(JSON.stringify({ error: settingsError.message }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      });
+    // 2. Determinar o ID do usuário (dono do estabelecimento)
+    const authHeader = req.headers.get('Authorization');
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      // Tenta obter o usuário usando o token fornecido (para usuários logados no painel)
+      const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+      
+      if (userError || !user) {
+        console.log(`[recognize-face] Falha na validação do token: ${userError?.message || "Usuário não encontrado."}`);
+      } else {
+        userId = user.id;
+        console.log(`[recognize-face] 2/7: Usuário autenticado (Painel Admin/Garçom): ${userId}`);
+      }
+    } 
+    
+    if (!userId && mesa_id) {
+      // Se for requisição anônima do menu público ou falha na autenticação do painel, buscar o user_id pela mesa
+      const { data: mesa, error: mesaError } = await supabaseAdmin
+        .from('mesas')
+        .select('user_id')
+        .eq('id', mesa_id)
+        .single();
+      
+      if (mesaError || !mesa?.user_id) {
+        throw new Error(`Mesa ID inválido ou usuário da mesa não encontrado: ${mesaError?.message}`);
+      }
+      userId = mesa.user_id;
+      console.log(`[recognize-face] 2/7: Usuário determinado pela Mesa ID: ${userId}`);
+    } else if (!userId) {
+      throw new Error("ID do usuário ou da mesa é obrigatório para o reconhecimento.");
     }
 
+    // 3. Buscando configurações do CompreFace (USANDO SUPABASE ADMIN)
+    console.log("[recognize-face] 3/7: Buscando configurações do CompreFace...");
+    const { data: settings, error: settingsError } = await supabaseAdmin
+      .from('user_settings')
+      .select('compreface_url, compreface_api_key')
+      .eq('id', userId)
+      .single();
+
+    if (settingsError) {
+      throw new Error(`Não foi possível recuperar as configurações do CompreFace: ${settingsError.message}`);
+    }
+    if (!settings?.compreface_url || !settings?.compreface_api_key) {
+      throw new Error("URL ou Chave de API do CompreFace não configuradas para este estabelecimento.");
+    }
     console.log("[recognize-face] 3/7: Configurações carregadas.");
 
     const payload = { file: imageData };
@@ -96,15 +108,15 @@ serve(async (req) => {
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
-
-      // Buscar dados do cliente usando user_id = '1' para garantir acesso
+      
+      // 7. Buscar dados do cliente (USANDO SUPABASE ADMIN)
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', userId)
+        .eq('user_id', userId) // Adiciona filtro de segurança
         .single();
-
+        
       if (clientError) {
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
