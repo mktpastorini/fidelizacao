@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Produto, Mesa, Categoria } from "@/types/supabase";
+import { Produto, Mesa, Categoria, ItemPedido } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -154,7 +154,7 @@ export default function MenuPublicoPage() {
       
       let nomeProdutoFinal = produto.nome + (observacoes ? ` (${observacoes})` : '');
       let requerPreparo = produto.requer_preparo;
-      let status: ItemPedido['status'] = 'pendente';
+      let status: ItemPedido['status'] = 'pendente'; // Todos os itens começam como pendente
 
       // Se for Pacote Rodízio, prefixamos e forçamos requer_preparo: false.
       if (produto.tipo === 'rodizio') {
@@ -162,22 +162,20 @@ export default function MenuPublicoPage() {
           requerPreparo = false;
       }
       
-      // Se for Item de Rodízio, usamos o valor de requer_preparo do produto.
+      // Se for Item de Rodízio, usamos o requer_preparo definido pelo produto.
       if (produto.tipo === 'componente_rodizio') {
           requerPreparo = produto.requer_preparo;
       }
       
-      // Se for item de Venda e não requer preparo, marca como entregue.
-      if (produto.tipo === 'venda' && !requerPreparo) {
-          status = 'entregue';
-      }
+      // NOTA: Removemos a lógica que marcava itens de venda direta sem preparo como 'entregue' aqui.
+      // Eles agora serão 'pendente' e o Garçom/Balcão os marcará como 'entregue' no Kanban.
 
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         nome_produto: nomeProdutoFinal,
         quantidade: quantidade,
         preco: produto.preco,
-        status: status,
+        status: status, // Sempre 'pendente'
         requer_preparo: requerPreparo,
         user_id: userId,
         consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)

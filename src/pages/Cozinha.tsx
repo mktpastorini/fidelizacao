@@ -17,7 +17,6 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
   // Buscamos todos os itens pendentes/em preparo E itens entregues recentes.
-  // A filtragem de itens de rodízio (que não devem aparecer) será feita no frontend.
   const orFilter = `status.in.("pendente","preparando"),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`;
 
   const { data, error } = await supabase
@@ -65,8 +64,7 @@ export default function CozinhaPage() {
     updateStatusMutation.mutate({ itemId, newStatus });
   };
 
-  // Filtra itens de rodízio/componente de rodízio (que geralmente têm nome_produto começando com [RESGATE] ou [RODIZIO])
-  // E também filtra itens que já foram entregues, mas que não requerem preparo (para evitar duplicidade se o garçom já entregou)
+  // Filtra itens para o Kanban
   const filteredItems = items?.filter(item => {
     const nome = item.nome_produto.toUpperCase();
     
@@ -75,12 +73,14 @@ export default function CozinhaPage() {
       return false;
     }
     
-    // 2. Mantém todos os itens pendentes ou em preparo
+    // 2. Inclui itens que estão pendentes ou em preparo (requer preparo ou não)
     if (item.status === 'pendente' || item.status === 'preparando') {
       return true;
     }
     
-    // 3. Mantém itens entregues recentemente (para a coluna "Pronto/Entregue")
+    // 3. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
+    // NOTA: Itens de venda direta que não requerem preparo são marcados como 'entregue' na inserção.
+    // Se quisermos que eles apareçam na coluna 'Pronto/Entregue' por 30 minutos, mantemos esta lógica.
     if (item.status === 'entregue') {
       return true;
     }

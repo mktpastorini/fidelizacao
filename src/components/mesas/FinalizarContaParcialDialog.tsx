@@ -54,11 +54,11 @@ export function FinalizarContaParcialDialog({
   // Inicializa a seleção de itens da mesa (apenas se for o cliente principal)
   useEffect(() => {
     if (isOpen) {
-      // Se for o cliente principal, seleciona todos os itens da mesa por padrão.
-      // Se for acompanhante, a seleção começa vazia, mas ele pode selecionar.
       if (isClientePrincipal) {
+        // Se for o principal, seleciona todos os itens da mesa por padrão
         setSelectedMesaItemIds(itensMesaGeral.map(item => item.id));
       } else {
+        // Acompanhantes não podem pagar pelos itens da mesa por padrão
         setSelectedMesaItemIds([]);
       }
     }
@@ -69,7 +69,7 @@ export function FinalizarContaParcialDialog({
     ...itensMesaGeral.map(item => ({ ...item, isMesaItem: true })),
   ], [itensIndividuais, itensMesaGeral]);
 
-  const final ItemIdsToPay = useMemo(() => {
+  const finalItemIdsToPay = useMemo(() => {
     const individualIds = itensIndividuais.map(item => item.id);
     // Inclui todos os itens individuais e os itens da mesa selecionados
     return [...individualIds, ...selectedMesaItemIds];
@@ -107,19 +107,15 @@ export function FinalizarContaParcialDialog({
         </AlertDialogHeader>
         
         <ScrollArea className="max-h-60 my-4 pr-2">
-          {itensIndividuais.length > 0 && (
-            <>
-              <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
-              <ul className="space-y-1 text-sm mb-4 p-2 border rounded-md bg-secondary">
-                {itensIndividuais.map(item => (
-                  <li key={item.id} className="flex justify-between">
-                    <span>{item.nome_produto} (x{item.quantidade})</span>
-                    <span>{formatCurrency(calcularPrecoComDesconto(item))}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
+          <ul className="space-y-1 text-sm mb-4 p-2 border rounded-md bg-secondary">
+            {itensIndividuais.map(item => (
+              <li key={item.id} className="flex justify-between">
+                <span>{item.nome_produto} (x{item.quantidade})</span>
+                <span>{formatCurrency(calcularPrecoComDesconto(item))}</span>
+              </li>
+            ))}
+          </ul>
           
           {itensMesaGeral.length > 0 && (
             <>

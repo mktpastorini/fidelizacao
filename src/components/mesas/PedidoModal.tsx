@@ -166,7 +166,38 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         pedidoId = novoPedido.id;
       }
 
-      const { error: itemError } = await supabase.from("itens_pedido").insert({ pedido_id: pedidoId, user_id: user.id, ...novoItem });
+      const produtoSelecionado = produtos?.find(p => p.nome === novoItem.nome_produto);
+      if (!produtoSelecionado) throw new Error("Produto não encontrado.");
+
+      let nomeProdutoFinal = novoItem.nome_produto;
+      let requerPreparo = produtoSelecionado.requer_preparo;
+      let status: ItemPedido['status'] = 'pendente';
+
+      // 1. Adicionar prefixo se for Pacote Rodízio
+      if (produtoSelecionado.tipo === 'rodizio') {
+          nomeProdutoFinal = `[RODIZIO] ${novoItem.nome_produto}`;
+          requerPreparo = false; // Pacote Rodízio nunca requer preparo
+      }
+      
+      // 2. Se for Item de Rodízio, usa o requer_preparo definido pelo usuário
+      if (produtoSelecionado.tipo === 'componente_rodizio') {
+          requerPreparo = produtoSelecionado.requer_preparo; 
+      }
+      
+      // 3. Determinar o status inicial
+      // Todos os itens, mesmo os de venda direta sem preparo, começam como 'pendente'
+      // para que o Garçom/Balcão possa clicar em 'Entregar ao Cliente' no Kanban.
+      // A única exceção é o Pacote Rodízio, que é excluído do Kanban pelo nome.
+      status = 'pendente'; 
+
+      const { error: itemError } = await supabase.from("itens_pedido").insert({ 
+        pedido_id: pedidoId, 
+        user_id: user.id, 
+        ...novoItem,
+        nome_produto: nomeProdutoFinal,
+        status: status,
+        requer_preparo: requerPreparo,
+      });
       if (itemError) throw new Error(itemError.message);
     },
     onSuccess: () => {
@@ -224,28 +255,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         .in("id", itemIdsToPay);
       if (updateItemsError) throw updateItemsError;
 
-      // 2. Verificar se o cliente pagando é o principal e se ele ainda está na mesa
-      const isPrincipal = clientePrincipal?.id === clienteId;
-      
-      // 3. Se o cliente pagando for o principal, e ele pagou todos os itens da mesa,
-      // e não há mais itens individuais de outros clientes, liberamos a mesa.
-      
-      // 4. Remover o cliente da lista de ocupantes da mesa
+      // 2. Remover o cliente da lista de ocupantes da mesa
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
 
-      // 5. Verificar se o pedido original ainda tem itens
+      // 3. Verificar se o pedido original ainda tem itens
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
 
-      // 6. Se o pedido original estiver vazio, fechar a mesa e o pedido original
+      // 4. Se o pedido original estiver vazio, fechar a mesa e o pedido original
       if (remainingItemsCount === 0) {
-        // Se o pedido original estiver vazio, garantimos que o cliente principal (se existir)
-        // receba os pontos de todos os itens da mesa que foram pagos por ele ou por outros.
-        // NOTA: A lógica de pontos é tratada pelo trigger `on_pedido_pago_add_points`
-        // que é acionado quando o status do pedido muda para 'pago'.
-        
-        // Se o pedido original está vazio, ele deve ser fechado.
         await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
         await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
       }
@@ -323,20 +342,14 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     
     // 2. Se for Item de Rodízio, usa o requer_preparo definido pelo usuário
     if (produtoSelecionado.tipo === 'componente_rodizio') {
-        // Usa o valor de requer_preparo do produto, que agora é configurável
         requerPreparo = produtoSelecionado.requer_preparo; 
     }
-
+    
     // 3. Determinar o status inicial
+    // Todos os itens, mesmo os de venda direta sem preparo, começam como 'pendente'
+    // para que o Garçom/Balcão possa clicar em 'Entregar ao Cliente' no Kanban.
+    // A única exceção é o Pacote Rodízio, que é excluído do Kanban pelo nome.
     let status: ItemPedido['status'] = 'pendente';
-    
-    // Se for item de Venda e não requer preparo, marca como entregue.
-    if (produtoSelecionado.tipo === 'venda' && !requerPreparo) {
-        status = 'entregue';
-    }
-    
-    // Se for Pacote Rodízio, ele não deve ir para o Kanban, mas o status 'pendente' é inofensivo aqui,
-    // pois o prefixo [RODIZIO] o exclui do Kanban.
 
     addItemMutation.mutate({ 
         ...values, 
@@ -349,18 +362,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   // Função para abrir o modal de pagamento parcial
   const handlePartialPaymentOpen = (cliente: Cliente) => {
     setClientePagando(cliente);
-    // Inicializa a seleção de itens da mesa (se houver)
-    // NOTA: A lógica de inicialização foi movida para FinalizarContaParcialDialog.tsx
     
     // Valida se há itens para pagar (individuais + mesa, se for o principal)
     const items = getItemsToPayIndividual(cliente.id);
     const itemsMesa = itensMesaGeral;
     
-    // Se for o cliente principal, ele pode pagar pelos itens da mesa.
-    const canPayMesa = clientePrincipal?.id === cliente.id;
-    
     // Se for o principal, a validação é se há itens individuais OU itens da mesa.
-    if (canPayMesa) {
+    if (clientePrincipal?.id === cliente.id) {
         setIsPartialDialogValid(items.length > 0 || itemsMesa.length > 0);
     } else {
         // Se for acompanhante, a validação é se há itens individuais.
