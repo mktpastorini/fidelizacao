@@ -65,7 +65,12 @@ export function Dock() {
           <DockIcon key={item.to} mouseX={mouseX} item={item} />
         ))}
         <div className="w-px h-8 bg-border mx-2" />
-        <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full bg-secondary/50" onClick={handleLogout}>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="w-10 h-10 rounded-full bg-secondary/50 hover:bg-secondary" 
+          onClick={handleLogout}
+        >
           <LogOut className="w-5 h-5 text-muted-foreground" />
         </Button>
       </motion.div>

@@ -99,7 +99,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        // Aumentando o espalhamento e a opacidade para ser bem visível
+        // Usando a nova variável --primary-rgb para a sombra dourada
         'dock': '0 15px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(var(--primary-rgb), 0.5)',
       }
     },

@@ -38,7 +38,7 @@ export function DockIcon({ mouseX, item }: DockIconProps) {
               className={cn(
                 "aspect-square w-10 rounded-full flex items-center justify-center transition-colors",
                 isActive
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/50"
                   : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
               )}
             >

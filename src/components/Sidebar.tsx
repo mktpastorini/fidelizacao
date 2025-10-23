@@ -33,10 +33,10 @@ export function Sidebar() {
   const filteredNavItems = allNavItems.filter(item => item.roles.includes(userRole!));
 
   return (
-    <aside className="w-64 bg-card border-r flex flex-col text-foreground shrink-0">
+    <aside className="w-64 bg-card border-r flex flex-col text-foreground shrink-0 shadow-2xl">
       <div className="p-4 border-b border-border h-16 flex items-center">
         <SquareKanban className="w-8 h-8 text-primary" />
-        <h1 className="text-2xl font-bold text-center ml-2">Fidelize</h1>
+        <h1 className="text-2xl font-serif font-bold text-center ml-2 tracking-wider">Fidelize</h1>
       </div>
       <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
         {filteredNavItems.map((item) => (
@@ -46,8 +46,11 @@ export function Sidebar() {
             end={item.to === "/" || item.to === "/dashboard"}
             className={({ isActive }) =>
               cn(
-                "flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground",
-                isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                "flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground transition-all duration-200",
+                "hover:bg-secondary hover:text-foreground",
+                isActive 
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/30" 
+                  : "hover:border-l-4 hover:border-primary/50"
               )
             }
           >
@@ -61,11 +64,11 @@ export function Sidebar() {
       <div className="p-2 border-t border-border">
         {/* Restringindo o acesso a Configurações no Sidebar */}
         {userRole && ['superadmin', 'admin'].includes(userRole) && (
-          <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground", isActive && "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground")}>
+          <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground transition-all duration-200", isActive ? "bg-primary text-primary-foreground shadow-md shadow-primary/30" : "hover:bg-secondary hover:text-foreground hover:border-l-4 hover:border-primary/50")}>
               <div className="flex items-center"><Settings className="w-5 h-5 mr-3" /><span>Configurações</span></div>
           </NavLink>
         )}
-        <Button variant="ghost" className="w-full justify-start mt-1 text-muted-foreground hover:text-foreground" onClick={handleLogout}>
+        <Button variant="ghost" className="w-full justify-start mt-1 text-muted-foreground hover:text-foreground hover:bg-secondary" onClick={handleLogout}>
           <LogOut className="w-5 h-5 mr-3" />
           <span>Sair</span>
         </Button>
