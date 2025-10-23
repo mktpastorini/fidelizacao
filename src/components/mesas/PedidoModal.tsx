@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { Mesa, Pedido, ItemPedido, Produto, Cliente } from "@/types/supabase";
+import { Mesa, Pedido, ItemPedido, Produto, Cliente, StaffProfile, UserRole } from "@/types/supabase";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus, User as UserIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
@@ -29,6 +29,7 @@ import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import { Switch } from "../ui/switch";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -44,6 +45,14 @@ const itemSchema = z.object({
   status: z.enum(['pendente', 'preparando', 'entregue']),
   requer_preparo: z.boolean(),
 });
+
+type ItemToPayWithQuantity = {
+  id: string;
+  quantidade: number;
+  isMesaItem: boolean;
+};
+
+const WAITER_ROLES: UserRole[] = ['garcom', 'balcao', 'gerente', 'admin', 'superadmin'];
 
 async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
   if (!mesaId) return null;
@@ -78,16 +87,19 @@ async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
   return clientes;
 }
 
+async function fetchWaiters(): Promise<StaffProfile[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, role")
+    .in("role", WAITER_ROLES);
+  if (error) throw error;
+  return data as StaffProfile[] || [];
+}
+
 const calcularPrecoComDesconto = (item: ItemPedido) => {
   const precoTotal = (item.preco || 0) * item.quantidade;
   const desconto = precoTotal * ((item.desconto_percentual || 0) / 100);
   return precoTotal - desconto;
-};
-
-type ItemToPayWithQuantity = {
-  id: string;
-  quantidade: number;
-  isMesaItem: boolean;
 };
 
 export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
@@ -101,6 +113,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
   const [clientePagandoMesaId, setClientePagandoMesaId] = useState<string | null>(null);
   const [isMesaItemPartialPaymentOpen, setIsMesaItemPartialPaymentOpen] = useState(false);
+  
+  // Gorjeta State
+  const [tipEnabled, setTipEnabled] = useState(false);
+  const [selectedGarcomId, setSelectedGarcomId] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
@@ -124,16 +140,22 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     queryFn: () => fetchOcupantes(mesa!.id),
     enabled: !!mesa && isOpen,
   });
+  
+  const { data: waiters } = useQuery({
+    queryKey: ["waiters"],
+    queryFn: fetchWaiters,
+    enabled: isOpen,
+  });
 
   const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
   const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
   
   const hasActiveOccupants = ocupantes && ocupantes.length > 0;
 
-  const { itensAgrupados, totalPedido, itensMesaGeral } = useMemo(() => {
-    if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), totalPedido: 0, itensMesaGeral: [] };
+  const { itensAgrupados, subtotalItens, itensMesaGeral } = useMemo(() => {
+    if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), subtotalItens: 0, itensMesaGeral: [] };
     
-    const total = pedido.itens_pedido.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
+    const subtotal = pedido.itens_pedido.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
     
     const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: string }; itens: ItemPedido[]; subtotal: number }>();
     
@@ -162,8 +184,11 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       }
     });
 
-    return { itensAgrupados: agrupados, totalPedido: total, itensMesaGeral: mesaGeral };
+    return { itensAgrupados: agrupados, subtotalItens: subtotal, itensMesaGeral: mesaGeral };
   }, [pedido, ocupantes]);
+  
+  const gorjetaValor = tipEnabled ? subtotalItens * 0.1 : 0;
+  const totalPedido = subtotalItens + gorjetaValor;
 
   const getItemsToPayIndividual = (clienteId: string) => {
     return itensAgrupados.get(clienteId)?.itens || [];
@@ -243,6 +268,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
+      // Calcula o subtotal dos itens que estão sendo pagos parcialmente
+      const subtotalParcial = itemsToPayWithQuantity.reduce((acc, { id, quantidade }) => {
+        const originalItem = pedido.itens_pedido.find(item => item.id === id);
+        if (!originalItem) return acc;
+        const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
+        return acc + precoUnitarioComDesconto * quantidade;
+      }, 0);
+      
+      // Calcula a gorjeta de 10% sobre o subtotal parcial
+      const gorjetaParcial = tipEnabled ? subtotalParcial * 0.1 : 0;
+      
+      // Cria o novo pedido "recibo"
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -250,6 +287,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         closed_at: new Date().toISOString(), 
         mesa_id: mesa!.id, 
         acompanhantes: pedido.acompanhantes,
+        gorjeta_valor: gorjetaParcial, // Adiciona a gorjeta parcial
+        garcom_id: selectedGarcomId, // Adiciona o garçom
       }).select("id").single();
       if (newPedidoError) throw newPedidoError;
       const newPedidoId = newPedido.id;
@@ -329,15 +368,25 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const closeOrderMutation = useMutation({
     mutationFn: async () => {
       if (!pedido || !mesa || !ocupantes) throw new Error("Pedido, mesa ou ocupantes não encontrados.");
+      if (tipEnabled && !selectedGarcomId) throw new Error("Selecione o garçom para aplicar a gorjeta.");
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
+      // 1. Atualiza o pedido aberto com a gorjeta e o garçom antes de fechar
+      const { error: updateError } = await supabase.from("pedidos")
+        .update({ gorjeta_valor: gorjetaValor, garcom_id: selectedGarcomId })
+        .eq("id", pedido.id);
+      if (updateError) throw updateError;
+
+      // 2. Chama a função RPC para fechar o pedido e liberar a mesa
       const { error: rpcError } = await supabase.rpc('finalizar_pagamento_total', {
         p_pedido_id: pedido.id,
         p_mesa_id: mesa.id,
       });
       if (rpcError) throw rpcError;
 
+      // 3. Envia confirmação de pagamento (se houver cliente principal)
       if (pedido.cliente_id) {
         const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { 
           body: { pedidoId: pedido.id, userId: user.id } 
@@ -352,6 +401,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
+      queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
@@ -423,6 +473,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
+      // Calcula o subtotal do item da mesa que está sendo pago
+      const subtotalItem = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 }) * quantidade;
+      const gorjetaParcial = tipEnabled ? subtotalItem * 0.1 : 0;
+
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -430,6 +484,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         closed_at: new Date().toISOString(), 
         mesa_id: mesa!.id, 
         acompanhantes: pedido.acompanhantes,
+        gorjeta_valor: gorjetaParcial, // Adiciona a gorjeta parcial
+        garcom_id: selectedGarcomId, // Adiciona o garçom
       }).select("id").single();
       if (newPedidoError) throw newPedidoError;
       const newPedidoId = newPedido.id;
@@ -440,7 +496,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         ...originalItem,
         id: undefined,
         pedido_id: newPedidoId,
-        quantidade: quantityToPay,
+        quantidade: quantidade,
         consumido_por_cliente_id: clienteId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -476,6 +532,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Pagamento parcial de item da mesa atribuído a ${cliente?.nome || 'cliente'}!`);
       setIsMesaItemPartialPaymentOpen(false);
@@ -715,15 +772,54 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               </div>
             </div>
           )}
-          <div className="mt-6 pt-4 border-t">
+          <div className="mt-6 pt-4 border-t space-y-4">
+            {/* Seção de Gorjeta */}
+            <div className="space-y-3 p-3 border rounded-lg bg-secondary">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="tip-toggle" checked={tipEnabled} onCheckedChange={setTipEnabled} disabled={closeOrderMutation.isPending} />
+                        <Label htmlFor="tip-toggle" className="text-base font-semibold">Adicionar Gorjeta (10%)</Label>
+                    </div>
+                    <span className="text-lg font-bold text-primary">R$ {gorjetaValor.toFixed(2).replace('.', ',')}</span>
+                </div>
+                {tipEnabled && (
+                    <div>
+                        <Label htmlFor="garcom-select">Garçom Responsável</Label>
+                        <Select 
+                            value={selectedGarcomId || ''} 
+                            onValueChange={setSelectedGarcomId}
+                            disabled={closeOrderMutation.isPending}
+                        >
+                            <SelectTrigger id="garcom-select" className="mt-1">
+                                <SelectValue placeholder="Selecione o garçom" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {waiters?.map(waiter => (
+                                    <SelectItem key={waiter.id} value={waiter.id}>
+                                        {waiter.first_name} {waiter.last_name} ({waiter.role})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+            
             <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total Restante na Mesa:</span>
+              <span>Subtotal dos Itens:</span>
+              <span>R$ {subtotalItens.toFixed(2).replace('.', ',')}</span>
+            </div>
+            <div className="flex justify-between items-center text-2xl font-extrabold text-primary">
+              <span>Total Final:</span>
               <span>R$ {totalPedido.toFixed(2).replace('.', ',')}</span>
             </div>
           </div>
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-            <Button onClick={() => closeOrderMutation.mutate()} disabled={!pedido || totalPedido === 0 || closeOrderMutation.isPending}>
+            <Button 
+                onClick={() => closeOrderMutation.mutate()} 
+                disabled={!pedido || subtotalItens === 0 || closeOrderMutation.isPending || (tipEnabled && !selectedGarcomId)}
+            >
               <CreditCard className="w-4 h-4 mr-2" />
               {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar Conta Total"}
             </Button>
@@ -757,7 +853,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                 <Select 
                   value={clientePagandoMesaId || ''} 
                   onValueChange={setClientePagandoMesaId}
-                  disabled={ocupantes.length === 0 || payMesaItemPartialMutation.isPending}
+                  disabled={ocupantes.length === 0 || payMesaItemPartialPaymentOpen}
                 >
                   <SelectTrigger id="cliente-pagando-mesa" className="mt-1">
                     <SelectValue placeholder="Selecione o cliente" />
@@ -779,7 +875,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     variant="outline" 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.max(1, prev - 1))} 
-                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialMutation.isPending}
+                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialPaymentOpen}
                   >
                     <Minus className="w-4 h-4" />
                   </Button>
@@ -810,12 +906,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={payMesaItemPartialMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={payMesaItemPartialPaymentOpen}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmMesaItemPayment} 
-              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialMutation.isPending}
+              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialPaymentOpen}
             >
-              {payMesaItemPartialMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+              {payMesaItemPartialPaymentOpen ? "Processando..." : "Confirmar Pagamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

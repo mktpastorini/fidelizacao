@@ -77,6 +77,8 @@ export type Pedido = {
   closed_at: string | null;
   itens_pedido: ItemPedido[];
   acompanhantes?: { id: string; nome: string }[];
+  gorjeta_valor?: number | null; // NOVO CAMPO
+  garcom_id?: string | null; // NOVO CAMPO
 };
 
 export type ItemPedido = {
@@ -151,3 +153,10 @@ export type ApprovalRequest = {
 };
 
 export type UserRole = 'superadmin' | 'admin' | 'gerente' | 'balcao' | 'garcom' | 'cozinha';
+
+export type StaffProfile = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: UserRole;
+};
