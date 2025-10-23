@@ -52,7 +52,9 @@ export default function CozinhaPage() {
         updatePayload.hora_inicio_preparo = new Date().toISOString();
       } else if (newStatus === 'entregue') {
         updatePayload.hora_entrega = new Date().toISOString();
-        // Se o item já tinha um cozinheiro_id, mantemos. Se não, usamos o ID do cozinheiro que finalizou (para itens sem preparo).
+        
+        // Se o item não tinha cozinheiro_id (ex: item sem preparo entregue por Garçom/Balcão),
+        // usamos o cookId passado (que será o ID do usuário logado).
         if (!items?.find(i => i.id === itemId)?.cozinheiro_id) {
             updatePayload.cozinheiro_id = cookId;
         }

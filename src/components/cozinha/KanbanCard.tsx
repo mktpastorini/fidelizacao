@@ -9,6 +9,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useState } from "react";
 import { CookRecognitionModal } from "./CookRecognitionModal"; // Importado
 import { showError } from "@/utils/toast";
+import { supabase } from "@/integrations/supabase/client"; // Importado supabase
 
 type KanbanCardProps = {
   item: ItemPedido & {
@@ -61,24 +62,28 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
     setPendingAction(null);
   };
   
-  const handleActionClick = (action: 'start_prep' | 'finish_prep') => {
+  const handleActionClick = async (action: 'start_prep' | 'finish_prep') => {
+    // Obtém o ID do usuário logado
+    const { data: { user } } = await supabase.auth.getUser();
+    const userId = user?.id;
+    
+    if (!userId) {
+        showError("Usuário não autenticado.");
+        return;
+    }
+
     if (isNonPrepItem && action === 'finish_prep') {
-        // Se for item sem preparo, Garçom/Balcão pode entregar diretamente sem reconhecimento
+        // Se for item sem preparo, Garçom/Balcão pode entregar diretamente
         if (canDeliverNonPrep) {
-            // Usamos o ID do usuário logado como cozinheiro_id para registrar quem entregou
-            onStatusChange(item.id, 'entregue', 'system'); 
+            // Usa o ID do usuário logado como cookId
+            onStatusChange(item.id, 'entregue', userId); 
             return;
         }
     }
     
-    // Para itens que requerem preparo (start_prep ou finish_prep), exige reconhecimento
-    if (item.requer_preparo || action === 'start_prep') {
-        setPendingAction(action);
-        setIsModalOpen(true);
-    } else if (action === 'finish_prep' && isNonPrepItem && canDeliverNonPrep) {
-        // Fallback para garantir que itens sem preparo sejam entregues se o botão for clicado
-        onStatusChange(item.id, 'entregue', 'system');
-    }
+    // Para itens que requerem preparo, ou para iniciar o preparo, exige reconhecimento
+    setPendingAction(action);
+    setIsModalOpen(true);
   };
 
   return (
