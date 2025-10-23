@@ -7,8 +7,8 @@ const corsHeaders = {
 }
 
 // Função auxiliar para buscar as configurações do Superadmin
-async function getComprefaceSettings(supabaseAdmin: any, userId: string) {
-  console.log(`[recognize-face] Buscando configurações do CompreFace para o usuário: ${userId}`);
+async function getComprefaceSettings(supabaseAdmin: any) {
+  console.log(`[recognize-face] Buscando configurações do CompreFace do Superadmin principal...`);
 
   // 1. Buscar o ID do Superadmin
   const { data: superadminProfile, error: profileError } = await supabaseAdmin
@@ -76,12 +76,12 @@ serve(async (req) => {
     
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userIdForClients = user.id;
+    const userIdForClients = user.id; // ID do usuário logado (Garçom, Admin, etc.)
     console.log(`[recognize-face] 2/7: Usuário autenticado: ${userIdForClients}`);
 
 
     // 3. Buscando configurações do CompreFace do Superadmin
-    const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin, userIdForClients);
+    const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -119,12 +119,13 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      // 7. Buscar dados do cliente usando o ID do usuário logado (dono do cliente)
+      // 7. Buscar dados do cliente usando o ID do Superadmin (garantindo que todos os clientes sejam visíveis)
+      // NOTA: Estamos assumindo que todos os clientes pertencem ao Superadmin (multi-tenant simplificado)
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', userIdForClients)
+        .eq('user_id', superadminId) // <--- USANDO O ID DO SUPERADMIN AQUI
         .single();
 
       if (clientError) {
