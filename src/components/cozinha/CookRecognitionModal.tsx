@@ -38,7 +38,7 @@ export function CookRecognitionModal({
   const [statusMessage, setStatusMessage] = useState("Aponte a câmera para o rosto");
   const [isScanning, setIsScanning] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
-  const [usePreferredCamera, setUsePreferredCamera] = useState(true); // Novo estado para controle de fallback
+  const [usePreferredCamera, setUsePreferredCamera] = useState(true); // Estado para controle de fallback
 
   const actionLabel = targetStatus === 'preparando' ? 'Iniciar Preparo' : 'Finalizar Item';
 
@@ -61,7 +61,7 @@ export function CookRecognitionModal({
     console.error("Erro ao acessar a câmera:", err);
     
     if (err.name === 'OverconstrainedError' && usePreferredCamera) {
-      // Se falhar com a câmera preferida, tenta o fallback
+      // Se falhar com a câmera preferida, tenta o fallback (sem deviceId)
       console.warn("OverconstrainedError com câmera preferida. Tentando fallback...");
       setUsePreferredCamera(false);
       setMediaError(null); // Limpa o erro para tentar novamente
