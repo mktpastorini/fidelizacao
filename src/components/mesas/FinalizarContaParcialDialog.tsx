@@ -46,6 +46,7 @@ export function FinalizarContaParcialDialog({
   isSubmitting,
   isPartialDialogValid,
 }: FinalizarContaParcialDialogProps) {
+  // Hooks devem ser chamados no topo
   const [selectedMesaItemIds, setSelectedMesaItemIds] = useState<string[]>([]);
   
   const isClientePrincipal = cliente?.id === clientePrincipalId;
@@ -63,21 +64,15 @@ export function FinalizarContaParcialDialog({
     }
   }, [isOpen, isClientePrincipal, itensMesaGeral]);
 
-  if (!cliente) return null;
-
-  const allItemsToDisplay = [
+  const allItemsToDisplay = useMemo(() => [
     ...itensIndividuais.map(item => ({ ...item, isMesaItem: false })),
     ...itensMesaGeral.map(item => ({ ...item, isMesaItem: true })),
-  ];
-
-  const handleToggleMesaItem = (itemId: string, isChecked: boolean) => {
-    setSelectedMesaItemIds(prev => 
-      isChecked ? [...prev, itemId] : prev.filter(id => id !== itemId)
-    );
-  };
+  ], [itensIndividuais, itensMesaGeral]);
 
   const finalItemIdsToPay = useMemo(() => {
     const individualIds = itensIndividuais.map(item => item.id);
+    // Apenas o cliente principal pode selecionar itens da mesa.
+    // Se não for o principal, selectedMesaItemIds deve ser vazio, mas incluímos aqui para segurança.
     return [...individualIds, ...selectedMesaItemIds];
   }, [itensIndividuais, selectedMesaItemIds]);
 
@@ -86,6 +81,16 @@ export function FinalizarContaParcialDialog({
       .filter(item => !item.isMesaItem || finalItemIdsToPay.includes(item.id))
       .reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
   }, [allItemsToDisplay, finalItemIdsToPay]);
+
+  if (!cliente) return null;
+
+  const handleToggleMesaItem = (itemId: string, isChecked: boolean) => {
+    // Permite que qualquer cliente pague pelos itens da mesa, se selecionados.
+    // A regra de quem pode selecionar é definida pelo usuário no frontend.
+    setSelectedMesaItemIds(prev => 
+      isChecked ? [...prev, itemId] : prev.filter(id => id !== itemId)
+    );
+  };
 
   const handleConfirm = () => {
     if (finalItemIdsToPay.length > 0) {
@@ -118,23 +123,20 @@ export function FinalizarContaParcialDialog({
             <>
               <h4 className="font-semibold mb-2 flex items-center justify-between">
                 Itens da Mesa (Geral) ({itensMesaGeral.length})
-                {isClientePrincipal && (
-                    <Label className="text-xs text-muted-foreground">
-                        (Selecione quais deseja pagar)
-                    </Label>
-                )}
+                <Label className="text-xs text-muted-foreground">
+                    (Selecione quais deseja incluir)
+                </Label>
               </h4>
               <ul className="space-y-2 text-sm">
                 {itensMesaGeral.map(item => (
-                  <li key={item.id} className={cn("flex justify-between items-center p-2 rounded-md", isClientePrincipal ? "bg-secondary" : "bg-muted/50")}>
+                  <li key={item.id} className={cn("flex justify-between items-center p-2 rounded-md bg-secondary")}>
                     <div className="flex items-center space-x-2">
                       <Checkbox
                         id={`mesa-item-${item.id}`}
                         checked={selectedMesaItemIds.includes(item.id)}
                         onCheckedChange={(checked) => handleToggleMesaItem(item.id, !!checked)}
-                        disabled={!isClientePrincipal} // Apenas o principal pode selecionar itens da mesa
                       />
-                      <Label htmlFor={`mesa-item-${item.id}`} className={cn("font-normal cursor-pointer", !isClientePrincipal && "opacity-70")}>
+                      <Label htmlFor={`mesa-item-${item.id}`} className="font-normal cursor-pointer">
                         {item.nome_produto} (x{item.quantidade})
                       </Label>
                     </div>

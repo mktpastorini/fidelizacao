@@ -153,19 +153,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     return itensAgrupados.get(clienteId)?.itens || [];
   };
   
-  // Função para obter a lista final de itens para o modal de pagamento parcial
-  const getItemsForPartialPayment = (clienteId: string) => {
-    const itensIndividuais = getItemsToPayIndividual(clienteId);
-    
-    // Se o cliente for o principal, ele paga os itens da mesa que ainda não foram pagos
-    if (clientePrincipal?.id === clienteId) {
-        return [...itensIndividuais, ...itensMesaGeral];
-    }
-    
-    // Se for acompanhante, ele só paga os itens individuais dele.
-    return itensIndividuais;
-  };
-
   const addItemMutation = useMutation({
     mutationFn: async (novoItem: z.infer<typeof itemSchema>) => {
       if (!mesa || !mesa.cliente_id) throw new Error("Mesa ou cliente não selecionado.");
@@ -253,6 +240,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
       // 6. Se o pedido original estiver vazio, fechar a mesa e o pedido original
       if (remainingItemsCount === 0) {
+        // Se o pedido original estiver vazio, garantimos que o cliente principal (se existir)
+        // receba os pontos de todos os itens da mesa que foram pagos por ele ou por outros.
+        // NOTA: A lógica de pontos é tratada pelo trigger `on_pedido_pago_add_points`
+        // que é acionado quando o status do pedido muda para 'pago'.
+        
+        // Se o pedido original está vazio, ele deve ser fechado.
         await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
         await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
       }
@@ -357,14 +350,22 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const handlePartialPaymentOpen = (cliente: Cliente) => {
     setClientePagando(cliente);
     // Inicializa a seleção de itens da mesa (se houver)
-    if (clientePrincipal?.id === cliente.id) {
-        setMesaItemsToPay(itensMesaGeral);
-    } else {
-        setMesaItemsToPay([]);
-    }
+    // NOTA: A lógica de inicialização foi movida para FinalizarContaParcialDialog.tsx
+    
     // Valida se há itens para pagar (individuais + mesa, se for o principal)
-    const items = getItemsForPartialPayment(cliente.id);
-    setIsPartialDialogValid(items.length > 0);
+    const items = getItemsToPayIndividual(cliente.id);
+    const itemsMesa = itensMesaGeral;
+    
+    // Se for o cliente principal, ele pode pagar pelos itens da mesa.
+    const canPayMesa = clientePrincipal?.id === cliente.id;
+    
+    // Se for o principal, a validação é se há itens individuais OU itens da mesa.
+    if (canPayMesa) {
+        setIsPartialDialogValid(items.length > 0 || itemsMesa.length > 0);
+    } else {
+        // Se for acompanhante, a validação é se há itens individuais.
+        setIsPartialDialogValid(items.length > 0);
+    }
   };
 
   return (
