@@ -227,14 +227,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   });
 
   const closePartialOrderMutation = useMutation({
-    mutationFn: async ({ clienteId, itemIdsToPay }: { clienteId: string, itemIdsToPay: string[] }) => {
+    mutationFn: async ({ clienteId, itemsToPayWithQuantity }: { clienteId: string, itemsToPayWithQuantity: { id: string, quantidade: number, isMesaItem: boolean }[] }) => {
       if (!pedido) throw new Error("Pedido não encontrado.");
       
-      // 1. Mover os itens selecionados para o novo pedido "recibo"
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      // Criar um novo pedido "recibo"
+      // 1. Criar um novo pedido "recibo"
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -246,14 +245,50 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       if (newPedidoError) throw newPedidoError;
       const newPedidoId = newPedido.id;
 
-      // Mover os itens selecionados para o novo pedido
-      const { error: updateItemsError } = await supabase.from("itens_pedido")
-        .update({ 
-            pedido_id: newPedidoId, 
-            consumido_por_cliente_id: clienteId // Atribui todos os itens pagos ao cliente
-        })
-        .in("id", itemIdsToPay);
-      if (updateItemsError) throw updateItemsError;
+      const itemIdsToUpdate = itemsToPayWithQuantity.map(i => i.id);
+      const itemsToUpdate = pedido.itens_pedido.filter(item => itemIdsToUpdate.includes(item.id));
+
+      for (const itemToPay of itemsToPayWithQuantity) {
+        const originalItem = itemsToUpdate.find(i => i.id === itemToPay.id);
+        if (!originalItem) continue;
+
+        const quantityToPay = itemToPay.quantidade;
+        const quantityRemaining = originalItem.quantidade - quantityToPay;
+
+        if (itemToPay.isMesaItem && quantityRemaining > 0) {
+          // Se for item da mesa e houver quantidade restante, criamos um novo item para o recibo
+          // e atualizamos a quantidade do item original.
+          
+          // 1a. Criar o item pago (para o recibo)
+          const { error: insertError } = await supabase.from("itens_pedido").insert({
+            ...originalItem,
+            id: undefined, // Deixa o banco gerar um novo ID
+            pedido_id: newPedidoId,
+            quantidade: quantityToPay,
+            consumido_por_cliente_id: clienteId,
+            created_at: new Date().toISOString(), // Atualiza o timestamp
+            updated_at: new Date().toISOString(),
+          });
+          if (insertError) throw insertError;
+
+          // 1b. Atualizar a quantidade restante no item original (no pedido aberto)
+          const { error: updateError } = await supabase.from("itens_pedido")
+            .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
+            .eq("id", originalItem.id);
+          if (updateError) throw updateError;
+
+        } else {
+          // Se for item individual ou item da mesa pago integralmente, move o item inteiro
+          const { error: updateError } = await supabase.from("itens_pedido")
+            .update({ 
+                pedido_id: newPedidoId, 
+                consumido_por_cliente_id: clienteId,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("id", originalItem.id);
+          if (updateError) throw updateError;
+        }
+      }
 
       // 2. Remover o cliente da lista de ocupantes da mesa
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
@@ -367,13 +402,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     const items = getItemsToPayIndividual(cliente.id);
     const itemsMesa = itensMesaGeral;
     
-    // Se for o principal, a validação é se há itens individuais OU itens da mesa.
-    if (clientePrincipal?.id === cliente.id) {
-        setIsPartialDialogValid(items.length > 0 || itemsMesa.length > 0);
-    } else {
-        // Se for acompanhante, a validação é se há itens individuais.
-        setIsPartialDialogValid(items.length > 0);
-    }
+    // A validação agora é se há itens individuais OU itens da mesa.
+    setIsPartialDialogValid(items.length > 0 || itemsMesa.length > 0);
   };
 
   return (
@@ -614,7 +644,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         itensIndividuais={getItemsToPayIndividual(clientePagando?.id || '')}
         itensMesaGeral={itensMesaGeral}
         clientePrincipalId={clientePrincipal?.id || null}
-        onConfirm={(itemIdsToPay) => clientePagando && closePartialOrderMutation.mutate({ clienteId: clientePagando.id, itemIdsToPay })}
+        onConfirm={(itemsToPayWithQuantity) => clientePagando && closePartialOrderMutation.mutate({ clienteId: clientePagando.id, itemsToPayWithQuantity })}
         isSubmitting={closePartialOrderMutation.isPending}
         isPartialDialogValid={isPartialDialogValid}
       />
