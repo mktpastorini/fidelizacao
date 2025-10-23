@@ -5,8 +5,9 @@ import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { CookPerformanceReport } from "@/components/cozinha/CookPerformanceReport";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -123,7 +124,18 @@ export default function CozinhaPage() {
           <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="kanban" className="mt-6 flex-1 min-h-0">
+        <TabsContent value="kanban" className="mt-6 flex-1 flex flex-col min-h-0">
+          <div className="flex justify-between items-center mb-4 shrink-0">
+            <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["kitchenItems"] })}
+              disabled={updateStatusMutation.isPending}
+            >
+              <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
+            </Button>
+          </div>
           {isLoading ? (
             <div className="flex-1 flex gap-4 h-full">
               <Skeleton className="flex-1" />
