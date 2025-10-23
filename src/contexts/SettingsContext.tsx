@@ -13,7 +13,6 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 // Função para buscar as configurações globais do usuário 1 fixo
 async function fetchGlobalSettings(supabaseClient: any): Promise<Partial<UserSettings>> {
-  // Busca as configurações do usuário 1 diretamente
   const { data: adminSettings, error: adminSettingsError } = await supabaseClient
     .from('user_settings')
     .select('webhook_url, chegada_template_id, pagamento_template_id, aniversario_template_id, aniversario_horario, auto_add_item_enabled, default_produto_id, establishment_is_closed, daily_report_phone_number, auto_close_enabled, auto_close_time, menu_style, compreface_url, compreface_api_key, login_video_url')
@@ -35,9 +34,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const fetchSettings = async () => {
     setIsLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
 
-    if (user) {
+      if (!user) {
+        setSettings(null);
+        setUserRole(null);
+        setIsLoading(false);
+        return;
+      }
+
       // 1. Buscar configurações globais do usuário 1
       const globalSettings = await fetchGlobalSettings(supabase);
 
@@ -67,6 +73,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setUserRole(role as UserRole);
 
       // 4. Mesclar: Global (usuário 1) + Pessoal (sobrescreve)
+      // Para Superadmin/Admin, permite sobrescrever menu_style, para outros usa global
       const personalMenuStyle = (role === 'superadmin' || role === 'admin')
         ? (personalSettingsData?.menu_style || globalSettings.menu_style || 'sidebar')
         : (globalSettings.menu_style || 'sidebar');
@@ -94,12 +101,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       } as UserSettings;
 
       setSettings(finalSettings);
-
-    } else {
+    } catch (error) {
+      console.error("Erro ao carregar configurações no SettingsContext:", error);
       setSettings(null);
       setUserRole(null);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
