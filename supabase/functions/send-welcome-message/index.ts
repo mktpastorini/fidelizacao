@@ -28,6 +28,21 @@ function personalizeMessage(content: string, client: any): string {
   return personalized;
 }
 
+// Função auxiliar para buscar o ID do Superadmin
+async function getSuperadminId(supabaseAdmin: any) {
+  const { data: superadminProfile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'superadmin')
+    .limit(1)
+    .maybeSingle();
+
+  if (profileError || !superadminProfile) {
+    throw new Error("Falha ao encontrar o Superadmin principal.");
+  }
+  return superadminProfile.id;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -47,23 +62,29 @@ serve(async (req) => {
   )
 
   let logId: string | null = null;
+  let superadminId: string;
 
   try {
+    // 1. Obter o ID do Superadmin
+    superadminId = await getSuperadminId(supabaseAdmin);
+
+    // 2. Buscar configurações (webhook_url, template_id) usando o ID do Superadmin
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('webhook_url, chegada_template_id')
-      .eq('id', userId)
+      .eq('id', superadminId)
       .single()
 
     if (settingsError) throw settingsError
     if (!settings?.webhook_url || !settings?.chegada_template_id) {
-      throw new Error('Webhook ou template de chegada não configurado.');
+      throw new Error('Webhook ou template de chegada não configurado no perfil do Superadmin.');
     }
 
+    // 3. Criar log (associado ao Superadmin)
     const { data: initialLog, error: logError } = await supabaseAdmin
       .from('message_logs')
       .insert({
-        user_id: userId,
+        user_id: superadminId, // Log associado ao Superadmin
         cliente_id: clientId,
         template_id: settings.chegada_template_id,
         trigger_event: 'chegada',
@@ -75,17 +96,21 @@ serve(async (req) => {
     if (logError) throw new Error(`Falha ao criar log inicial: ${logError.message}`);
     logId = initialLog.id;
 
+    // 4. Buscar template (associado ao Superadmin)
     const { data: template, error: templateError } = await supabaseAdmin
       .from('message_templates')
       .select('conteudo')
       .eq('id', settings.chegada_template_id)
+      .eq('user_id', superadminId)
       .single()
     if (templateError) throw templateError
 
+    // 5. Buscar cliente (associado ao Superadmin)
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clientes')
       .select('nome, casado_com, indicacoes, gostos, whatsapp')
       .eq('id', clientId)
+      .eq('user_id', superadminId)
       .single()
     if (clientError) throw clientError
     if (!client.whatsapp) {

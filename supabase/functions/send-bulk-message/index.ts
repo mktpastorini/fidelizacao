@@ -80,7 +80,7 @@ serve(async (req) => {
       throw new Error('URL de Webhook não configurada no perfil do Superadmin.');
     }
 
-    // 4. Buscar o template (que já deve pertencer ao Superadmin, mas verificamos)
+    // 4. Buscar o template (associado ao Superadmin)
     const { data: template, error: templateError } = await supabaseAdmin
       .from('message_templates')
       .select('conteudo')
@@ -89,7 +89,7 @@ serve(async (req) => {
       .single();
     if (templateError || !template) throw templateError || new Error("Template não encontrado.");
 
-    // 5. Buscar clientes (que pertencem ao Superadmin)
+    // 5. Buscar clientes (associado ao Superadmin)
     const { data: clients, error: clientsError } = await supabaseAdmin
       .from('clientes')
       .select('id, nome, casado_com, indicacoes, gostos, whatsapp')
