@@ -64,11 +64,11 @@ const App = () => (
                 {/* Cozinha: Acesso exclusivo ou compartilhado */}
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha', 'garcom']}><Cozinha /></RoleGuard>} />
                 
-                {/* Restringindo acesso a Cozinha e Gerência */}
+                {/* Restringindo acesso a Gerência */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
                 
-                {/* Configurações: Removendo 'gerente' */}
+                {/* Configurações: Apenas Superadmin, Admin e Cozinha */}
                 <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'cozinha']}><Configuracoes /></RoleGuard>} />
                 
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />

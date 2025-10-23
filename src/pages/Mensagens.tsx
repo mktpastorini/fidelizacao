@@ -17,17 +17,41 @@ import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useSettings } from "@/contexts/SettingsContext"; // Importado useSettings
 
-async function fetchMessageTemplates(): Promise<MessageTemplate[]> {
-  const { data, error } = await supabase.from("message_templates").select("*").order("created_at", { ascending: false });
+// Função auxiliar para obter o ID do usuário cujos dados devem ser buscados
+async function getTargetUserId(userRole: string): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuário não autenticado");
+
+  // Se for Superadmin, usa o próprio ID
+  if (userRole === 'superadmin') {
+    return user.id;
+  }
+
+  // Se for Admin ou Gerente, busca o ID do Superadmin
+  if (['admin', 'gerente'].includes(userRole)) {
+    const { data, error } = await supabase.functions.invoke('get-superadmin-id');
+    if (error) throw new Error(`Falha ao buscar Superadmin ID: ${error.message}`);
+    if (!data.success) throw new Error(data.error || "Falha ao buscar Superadmin ID.");
+    return data.superadmin_id;
+  }
+
+  // Para outros roles (embora a rota seja restrita), usa o próprio ID como fallback
+  return user.id;
+}
+
+async function fetchMessageTemplates(targetUserId: string): Promise<MessageTemplate[]> {
+  const { data, error } = await supabase.from("message_templates").select("*").eq("user_id", targetUserId).order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return data || [];
 }
 
-async function fetchMessageLogs(): Promise<MessageLog[]> {
+async function fetchMessageLogs(targetUserId: string): Promise<MessageLog[]> {
   const { data, error } = await supabase
     .from("message_logs")
     .select("*, cliente:clientes(nome), template:message_templates(nome)")
+    .eq("user_id", targetUserId)
     .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as any[]) || [];
@@ -41,20 +65,29 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MensagensPage() {
   const queryClient = useQueryClient();
+  const { userRole, isLoading: isLoadingSettings } = useSettings();
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<MessageTemplate | null>(null);
   const [selectedLog, setSelectedLog] = useState<MessageLog | null>(null);
 
+  const { data: targetUserId, isLoading: isLoadingTargetUser } = useQuery({
+    queryKey: ["targetUserId"],
+    queryFn: () => getTargetUserId(userRole!),
+    enabled: !!userRole,
+  });
+
   const { data: templates, isLoading: isLoadingTemplates } = useQuery({
-    queryKey: ["message_templates"],
-    queryFn: fetchMessageTemplates,
+    queryKey: ["message_templates", targetUserId],
+    queryFn: () => fetchMessageTemplates(targetUserId!),
+    enabled: !!targetUserId,
   });
 
   const { data: logs, isLoading: isLoadingLogs } = useQuery({
-    queryKey: ["message_logs"],
-    queryFn: fetchMessageLogs,
+    queryKey: ["message_logs", targetUserId],
+    queryFn: () => fetchMessageLogs(targetUserId!),
+    enabled: !!targetUserId,
   });
 
   const { data: clientes, isLoading: isLoadingClientes } = useQuery({
@@ -74,9 +107,8 @@ export default function MensagensPage() {
 
   const addTemplateMutation = useMutation({
     mutationFn: async (newTemplate: Omit<MessageTemplate, 'id' | 'created_at' | 'user_id'>) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
-      const { error } = await supabase.from("message_templates").insert([{ ...newTemplate, user_id: user.id }]);
+      if (!targetUserId) throw new Error("ID do usuário alvo não encontrado.");
+      const { error } = await supabase.from("message_templates").insert([{ ...newTemplate, user_id: targetUserId }]);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -90,7 +122,8 @@ export default function MensagensPage() {
   const editTemplateMutation = useMutation({
     mutationFn: async (updatedTemplate: Partial<MessageTemplate>) => {
       const { id, ...templateInfo } = updatedTemplate;
-      const { error } = await supabase.from("message_templates").update(templateInfo).eq("id", id!);
+      if (!targetUserId) throw new Error("ID do usuário alvo não encontrado.");
+      const { error } = await supabase.from("message_templates").update(templateInfo).eq("id", id!).eq("user_id", targetUserId);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -103,7 +136,8 @@ export default function MensagensPage() {
 
   const deleteTemplateMutation = useMutation({
     mutationFn: async (templateId: string) => {
-      const { error } = await supabase.from("message_templates").delete().eq("id", templateId);
+      if (!targetUserId) throw new Error("ID do usuário alvo não encontrado.");
+      const { error } = await supabase.from("message_templates").delete().eq("id", templateId).eq("user_id", targetUserId);
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
@@ -115,6 +149,8 @@ export default function MensagensPage() {
 
   const sendBulkMessageMutation = useMutation({
     mutationFn: async (values: { template_id: string; client_ids: string[] }) => {
+      // O Edge Function 'send-bulk-message' usa o token do usuário logado para buscar o webhook e o ID do Superadmin para buscar clientes.
+      // Não precisamos passar o targetUserId aqui, pois o Edge Function já está configurado para buscar o Superadmin ID.
       const { data, error } = await supabase.functions.invoke('send-bulk-message', { body: values });
       if (error) throw new Error(error.message);
       return data;
@@ -159,6 +195,8 @@ export default function MensagensPage() {
     }
   };
 
+  const isLoadingAny = isLoadingSettings || isLoadingTargetUser || isLoadingTemplates || isLoadingLogs || isLoadingClientes;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -167,7 +205,7 @@ export default function MensagensPage() {
           <p className="text-muted-foreground mt-2">Crie templates e acompanhe o histórico de envios.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingTemplates || isLoadingClientes}>
+          <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingAny}>
             <Send className="w-4 h-4 mr-2" />
             Enviar Mensagem
           </Button>
