@@ -6,7 +6,7 @@ import { Skeleton } from "./ui/skeleton";
 import { Header } from "./Header";
 
 const MainContent = () => (
-  // Adicionando bg-secondary/50 para dar profundidade ao conteúdo principal
+  // O overflow-y-auto aqui garante que apenas o conteúdo principal role
   <main className="flex-1 p-6 lg:p-8 pt-20 pr-28 overflow-y-auto relative bg-secondary/50">
     <Header />
     <Outlet />
@@ -39,7 +39,7 @@ export function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex h-screen bg-background"> {/* Usando h-screen em vez de min-h-screen */}
       <Sidebar />
       <MainContent />
     </div>

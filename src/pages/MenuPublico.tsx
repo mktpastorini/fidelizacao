@@ -272,7 +272,7 @@ export default function MenuPublicoPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen overflow-y-auto">
       <div className="flex justify-between items-center mb-6">
         <Button variant="ghost" onClick={() => navigate(-1)} className="text-foreground hover:bg-primary/10">
           <ArrowLeft className="w-4 h-4 mr-2" />
