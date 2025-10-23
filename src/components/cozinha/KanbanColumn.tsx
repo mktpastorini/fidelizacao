@@ -10,7 +10,7 @@ type KanbanColumnProps = {
     } | null;
     cliente: { nome: string } | null;
   })[];
-  onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue') => void;
+  onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string | null) => void;
   borderColor: string;
 };
 

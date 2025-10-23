@@ -18,7 +18,7 @@ type KanbanCardProps = {
     } | null;
     cliente: { nome: string } | null;
   };
-  onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string) => void;
+  onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string | null) => void;
 };
 
 // Função para obter data/hora no horário de Brasília
@@ -63,25 +63,16 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
   };
   
   const handleActionClick = async (action: 'start_prep' | 'finish_prep') => {
-    // Obtém o ID do usuário logado
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id;
-    
-    if (!userId) {
-        showError("Usuário não autenticado.");
-        return;
-    }
-
     if (isNonPrepItem && action === 'finish_prep') {
         // Se for item sem preparo, Garçom/Balcão pode entregar diretamente
         if (canDeliverNonPrep) {
-            // Usa o ID do usuário logado como cookId
-            onStatusChange(item.id, 'entregue', userId); 
+            // Passa null como cookId, pois não é um cozinheiro registrado
+            onStatusChange(item.id, 'entregue', null); 
             return;
         }
     }
     
-    // Para itens que requerem preparo, ou para iniciar o preparo, exige reconhecimento
+    // Para itens que requerem preparo (start_prep ou finish_prep), exige reconhecimento
     setPendingAction(action);
     setIsModalOpen(true);
   };

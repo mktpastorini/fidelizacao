@@ -44,7 +44,7 @@ export default function CozinhaPage() {
   });
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ itemId, newStatus, cookId }: { itemId: string; newStatus: 'preparando' | 'entregue'; cookId: string }) => {
+    mutationFn: async ({ itemId, newStatus, cookId }: { itemId: string; newStatus: 'preparando' | 'entregue'; cookId: string | null }) => {
       const updatePayload: Partial<ItemPedido> = { status: newStatus };
       
       if (newStatus === 'preparando') {
@@ -53,10 +53,10 @@ export default function CozinhaPage() {
       } else if (newStatus === 'entregue') {
         updatePayload.hora_entrega = new Date().toISOString();
         
-        // Se o item não tinha cozinheiro_id (ex: item sem preparo entregue por Garçom/Balcão),
-        // usamos o cookId passado (que será o ID do usuário logado).
+        // Se o item já tinha um cozinheiro_id (iniciado preparo), mantemos.
+        // Se não tinha (item sem preparo), usamos o cookId passado (que será null).
         if (!items?.find(i => i.id === itemId)?.cozinheiro_id) {
-            updatePayload.cozinheiro_id = cookId;
+            updatePayload.cozinheiro_id = cookId; // Pode ser null
         }
       }
       
@@ -78,7 +78,7 @@ export default function CozinhaPage() {
     onError: (err: Error) => showError(err.message),
   });
 
-  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string) => {
+  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string | null) => {
     updateStatusMutation.mutate({ itemId, newStatus, cookId });
   };
 
