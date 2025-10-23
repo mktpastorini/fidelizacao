@@ -24,6 +24,8 @@ import { Switch } from "@/components/ui/switch";
 import { Produto, Categoria } from "@/types/supabase";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription } from "@/components/ui/alert"; // Importação adicionada
+import { AlertTriangle } from "lucide-react"; // Importação adicionada
 
 // Função auxiliar para transformar string vazia em null antes da coerção
 const emptyStringToNull = z.literal("").transform(() => null);
