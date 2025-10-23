@@ -20,10 +20,15 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
   const estoqueAtual = produto.estoque_atual ?? 0;
   const alertaEstoqueBaixo = produto.alerta_estoque_baixo ?? 0;
 
+  const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
   const isLowStock = estoqueAtual <= alertaEstoqueBaixo && estoqueAtual > 0;
   const isOutOfStock = estoqueAtual === 0;
 
   const getStockBadge = () => {
+    if (isRodizioType) {
+      return <Badge variant="secondary">Não Gerenciado</Badge>;
+    }
+    
     if (isOutOfStock) {
       return <Badge variant="destructive">Esgotado</Badge>;
     }
@@ -100,7 +105,7 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
         {/* Informações de Preço e Estoque */}
         <div className="mt-4 pt-2 border-t">
           <p className="text-2xl font-bold text-primary">{formatCurrency(produto.preco)}</p>
-          {produto.valor_compra !== null && produto.valor_compra !== undefined && (
+          {produto.valor_compra !== null && produto.valor_compra !== undefined && !isRodizioType && (
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <DollarSign className="w-3 h-3" /> Custo: {formatCurrency(produto.valor_compra)}
             </p>

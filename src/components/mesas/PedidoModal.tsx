@@ -252,31 +252,34 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     }
 
     let nomeProdutoFinal = values.nome_produto;
+    let requerPreparo = produtoSelecionado.requer_preparo;
     
-    // 1. Adicionar prefixo se for Rodízio ou Componente Rodízio
-    if (produtoSelecionado.tipo === 'rodizio' || produtoSelecionado.tipo === 'componente_rodizio') {
+    // 1. Adicionar prefixo se for Pacote Rodízio
+    if (produtoSelecionado.tipo === 'rodizio') {
         nomeProdutoFinal = `[RODIZIO] ${values.nome_produto}`;
+        requerPreparo = false; // Pacote Rodízio nunca requer preparo
+    }
+    
+    // 2. Se for Item de Rodízio, ele não é prefixado, mas garantimos que não requer preparo (conforme regra de negócio)
+    if (produtoSelecionado.tipo === 'componente_rodizio') {
+        requerPreparo = false;
     }
 
-    // 2. Determinar se requer preparo (já definido no ProdutoForm, mas garantimos aqui)
-    const requerPreparo = produtoSelecionado.requer_preparo;
+    // 3. Determinar o status inicial (sempre pendente, a menos que seja um item de venda sem preparo)
+    // Se o item não requer preparo, ele deve ser marcado como 'entregue' se for um item de VENDA (ex: água).
+    // Se for um item de RODÍZIO (componente), ele deve ser 'pendente' para aparecer no Kanban.
+    let status: ItemPedido['status'] = 'pendente';
+    if (produtoSelecionado.tipo === 'venda' && !requerPreparo) {
+        status = 'entregue';
+    }
     
-    // 3. Determinar o status inicial
-    const status = requerPreparo ? 'pendente' : 'entregue'; // Se não requer preparo, já vai como entregue (para não aparecer no Kanban)
-
-    // Se o item não requer preparo, ele não deve ir para o Kanban.
-    // Se o usuário quer que ele apareça no Kanban Pendente, mas vá direto para Entregue,
-    // precisamos que ele seja inserido como 'pendente' e o Garçom/Balcão o marque como 'entregue'.
-    // No entanto, a lógica atual do KanbanCard já trata itens sem preparo que estão 'pendente'.
-    
-    // Vamos manter a inserção como 'pendente' se for um item de venda sem preparo,
-    // para que o Garçom/Balcão possa confirmar a entrega.
-    // Se for Rodízio, ele não deve ir para o Kanban, então o prefixo [RODIZIO] cuidará disso.
+    // Se for Pacote Rodízio, ele não deve ir para o Kanban, mas o status 'pendente' é inofensivo aqui,
+    // pois o prefixo [RODIZIO] o exclui do Kanban.
 
     addItemMutation.mutate({ 
         ...values, 
         nome_produto: nomeProdutoFinal, // Usando o nome final
-        status: 'pendente', // Sempre começa como pendente
+        status: status,
         requer_preparo: requerPreparo,
     });
   };
