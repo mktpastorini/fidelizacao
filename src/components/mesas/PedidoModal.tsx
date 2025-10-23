@@ -440,7 +440,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         ...originalItem,
         id: undefined,
         pedido_id: newPedidoId,
-        quantidade: quantidade,
+        quantidade: quantityToPay,
         consumido_por_cliente_id: clienteId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -499,7 +499,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
-            <DialogDescription className="flex items-center gap-2">
+            {/* Substituído DialogDescription por um div para evitar o erro de aninhamento JSX */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Users className="w-4 h-4" />
               <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
               {clientePrincipal && (
@@ -508,7 +509,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                   {clientePrincipal.pontos} pontos (Principal)
                 </Badge>
               )}
-            </DialogDescription>
+            </div>
           </DialogHeader>
           {isPedidoError ? (
             <div className="flex flex-col items-center justify-center p-8 text-destructive">
@@ -789,12 +790,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     value={quantidadePagarMesa} 
                     onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.quantidade, parseInt(e.target.value) || 1)))} 
                     className="w-16 text-center"
-                    disabled={payMesaItemPartialMutation.isPending}
+                    disabled={payMesaItemPartialPaymentOpen}
                   />
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.quantidade, prev + 1))} 
-                    disabled={quantidadePagarMesa >= itemMesaToPay.quantidade || payMesaItemPartialMutation.isPending}
+                    disabled={quantidadePagarMesa >= itemMesaToPay.quantidade || payMesaItemPartialPaymentOpen}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
