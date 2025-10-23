@@ -10,7 +10,7 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AnimatedContent } from '../AnimatedContent';
-import { StarBorder } from '../StarBorder';
+import { StarBorder } from '../StarBorder'; // Importado
 
 type CookRecognitionModalProps = {
   isOpen: boolean;
@@ -20,8 +20,6 @@ type CookRecognitionModalProps = {
   onCookRecognized: (cook: Cozinheiro) => void;
 };
 
-const SCAN_INTERVAL_MS = 3000; // Tenta escanear a cada 3 segundos
-
 export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCookRecognized }: CookRecognitionModalProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
@@ -29,11 +27,10 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
   
   const [match, setMatch] = useState<Cozinheiro | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
-  const [statusMessage, setStatusMessage] = useState("Inicializando...");
+  const [statusMessage, setStatusMessage] = useState("Aponte a câmera para o rosto");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const isStartPrep = action === 'start_prep';
   const isFinishPrep = action === 'finish_prep';
@@ -43,40 +40,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
     setSnapshot(null);
     setStatusMessage("Aponte a câmera para o rosto");
     setCameraError(null);
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
   }, []);
-
-  const performRecognition = useCallback(async (imageSrc: string) => {
-    setStatusMessage("Analisando...");
-    const result = await recognize(imageSrc);
-    
-    if (result?.cook) {
-      setMatch(result.cook);
-      setStatusMessage(`Cozinheiro(a) reconhecido(a): ${result.cook.nome}`);
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current); // Para o scan automático após o match
-      }
-    } else {
-      setMatch(null);
-      setStatusMessage("Cozinheiro(a) não encontrado(a).");
-    }
-  }, [recognize]);
-
-  const captureAndRecognize = useCallback(() => {
-    if (isScanning || !webcamRef.current || match || cameraError) return;
-
-    const imageSrc = webcamRef.current.getScreenshot();
-    if (imageSrc) {
-      setSnapshot(imageSrc);
-      performRecognition(imageSrc);
-    } else {
-      // Se a captura falhar, tentamos novamente no próximo intervalo
-      console.warn("Falha ao capturar imagem. Tentando novamente...");
-    }
-  }, [isScanning, match, cameraError, performRecognition]);
 
   useEffect(() => {
     if (isOpen) {
@@ -103,20 +67,8 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
       };
       getDevices();
       resetState();
-      
-      // Inicia o scan automático
-      intervalRef.current = setInterval(captureAndRecognize, SCAN_INTERVAL_MS);
-      setStatusMessage("Aguardando reconhecimento facial...");
-    } else {
-      resetState();
     }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [isOpen, settings, resetState, captureAndRecognize]);
+  }, [isOpen, settings, resetState]);
 
   useEffect(() => {
     if (recognitionError) {
@@ -125,6 +77,31 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
     }
   }, [recognitionError]);
 
+  const performRecognition = useCallback(async (imageSrc: string) => {
+    setStatusMessage("Analisando...");
+    const result = await recognize(imageSrc);
+    
+    if (result?.cook) {
+      setMatch(result.cook);
+      setStatusMessage(`Cozinheiro(a) reconhecido(a): ${result.cook.nome}`);
+    } else {
+      setMatch(null);
+      setStatusMessage("Cozinheiro(a) não encontrado(a).");
+    }
+  }, [recognize]);
+
+  const handleCapture = useCallback(() => {
+    if (webcamRef.current) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) {
+        setSnapshot(imageSrc);
+        performRecognition(imageSrc);
+      } else {
+        showError("Não foi possível capturar a imagem. Tente novamente.");
+      }
+    }
+  }, [performRecognition]);
+
   const handleConfirm = () => {
     if (match) {
       onCookRecognized(match);
@@ -132,11 +109,8 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
     }
   };
 
-  const handleRescan = () => {
+  const handleRetry = () => {
     resetState();
-    // Reinicia o scan automático imediatamente
-    intervalRef.current = setInterval(captureAndRecognize, SCAN_INTERVAL_MS);
-    setStatusMessage("Aguardando reconhecimento facial...");
   };
 
   const videoConstraints = {
@@ -150,7 +124,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
       return (
         <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
           <p className="text-lg font-bold text-red-600">{cameraError}</p>
-          <Button onClick={handleRescan}>Tentar Novamente</Button>
+          <Button onClick={handleRetry}>Tentar Novamente</Button>
         </div>
       );
     }
@@ -159,7 +133,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
       return <div className="text-center h-24 flex flex-col justify-center items-center"><Loader2 className="w-8 h-8 animate-spin mb-2" /><p className="text-lg animate-pulse">{statusMessage}</p></div>;
     }
     
-    if (match) {
+    if (snapshot && match) {
       return (
         <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
           <p className="text-lg">Confirmar identidade:</p>
@@ -171,7 +145,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
             <p className="text-2xl font-bold">{match.nome}</p>
           </div>
           <div className="flex gap-2 justify-center pt-2">
-            <Button variant="outline" onClick={handleRescan}><RefreshCw className="w-4 h-4 mr-2" />Incorreto / Reescanear</Button>
+            <Button variant="outline" onClick={handleRetry}><X className="w-4 h-4 mr-2" />Incorreto</Button>
             <Button onClick={handleConfirm}><Check className="w-4 h-4 mr-2" />Confirmar</Button>
           </div>
         </div>
@@ -183,14 +157,13 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
         <div className="text-center h-24 flex flex-col justify-center items-center space-y-2">
           <p className="text-lg font-bold text-red-600">Cozinheiro(a) não encontrado(a).</p>
           <div className="flex gap-2 justify-center pt-2">
-            <Button variant="outline" onClick={handleRescan}><RefreshCw className="w-4 h-4 mr-2" />Reescanear</Button>
+            <Button variant="outline" onClick={handleRetry}>Tentar Novamente</Button>
           </div>
         </div>
       );
     }
     
-    // Estado inicial ou aguardando o primeiro scan
-    return <div className="text-center h-24 flex flex-col justify-center items-center"><Loader2 className="w-8 h-8 animate-spin mb-2" /><p className="text-lg animate-pulse">{statusMessage}</p></div>;
+    return <div className="text-center h-24 flex flex-col justify-center items-center"><Button onClick={handleCapture} disabled={!!cameraError}><Camera className="w-4 h-4 mr-2" /> Capturar Rosto</Button></div>;
   };
 
   const title = isStartPrep ? "Iniciar Preparo" : "Finalizar Preparo";
@@ -214,26 +187,25 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
             </DialogHeader>
             <div className="flex flex-col items-center gap-4 py-4">
               <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
-                {cameraError ? (
-                    <div className="w-full h-full flex items-center justify-center text-white bg-red-500 p-4 text-center">
-                        <p>{cameraError}</p>
-                    </div>
-                ) : (
-                    <Webcam 
-                      audio={false} 
-                      ref={webcamRef} 
-                      screenshotFormat="image/jpeg" 
-                      videoConstraints={videoConstraints} 
-                      className="w-full h-full object-cover" 
-                      mirrored={true}
-                      onUserMediaError={(e) => {
-                        console.error("Erro ao acessar a câmera:", e);
-                        setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
-                      }} 
-                    />
-                )}
+                {snapshot ? <img src={snapshot} alt="Rosto capturado" className="w-full h-full object-cover" /> : 
+                cameraError ? <div className="w-full h-full flex items-center justify-center text-white bg-red-500 p-4 text-center">
+                    <p>{cameraError}</p>
+                </div> :
+                <Webcam 
+                  audio={false} 
+                  ref={webcamRef} 
+                  screenshotFormat="image/jpeg" 
+                  videoConstraints={videoConstraints} 
+                  className="w-full h-full object-cover" 
+                  mirrored={true}
+                  onUserMediaError={(e) => {
+                    console.error("Erro ao acessar a câmera:", e);
+                    setCameraError("Não foi possível acessar a câmera. Verifique as permissões ou tente outra câmera.");
+                  }} 
+                />
+                }
               </div>
-              {!match && !cameraError && devices.length > 1 && (
+              {!snapshot && !cameraError && devices.length > 1 && (
                 <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
                   <SelectTrigger className="w-full max-w-xs"><SelectValue placeholder="Selecione uma câmera" /></SelectTrigger>
                   <SelectContent>{devices.map((device) => (<SelectItem key={device.deviceId} value={device.deviceId}>{device.label || `Câmera ${devices.indexOf(device) + 1}`}</SelectItem>))}</SelectContent>
