@@ -41,8 +41,9 @@ function getBrazilTime() {
 }
 
 async function fetchSalaoData(superadminId: string | null): Promise<SalaoData> {
-  const { data: { user } } = await supabase.auth.getUser();
-
+  // Não precisamos do user logado aqui, pois o RLS já garante a visibilidade dos dados
+  // mas mantemos a estrutura para consistência.
+  
   const { data: mesas, error: mesasError } = await supabase
     .from("mesas")
     .select("*, cliente:clientes(id, nome), ocupantes:mesa_ocupantes(cliente:clientes(id, nome))")
@@ -113,8 +114,18 @@ export default function SalaoPage() {
 
   const closeDayMutation = useMutation({
     mutationFn: async () => {
+      // A função close-day usa o token do usuário logado para autenticação, mas o userId
+      // para buscar as estatísticas. No entanto, a atualização do status 'establishment_is_closed'
+      // deve ser feita no perfil do Superadmin.
+      if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+      
+      // 1. Executa a função Edge (que calcula stats e envia webhook)
       const { error } = await supabase.functions.invoke('close-day');
       if (error) throw new Error(error.message);
+      
+      // 2. Atualiza o status de fechamento no perfil do Superadmin
+      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: true }).eq("id", superadminId);
+      if (updateError) throw updateError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
@@ -127,10 +138,11 @@ export default function SalaoPage() {
     mutationFn: async () => {
       if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
       
-      // Atualiza o status de fechamento no perfil do Superadmin
+      // 1. Atualiza o status de fechamento no perfil do Superadmin
       const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", superadminId);
       if (updateError) throw updateError;
 
+      // 2. Envia a notificação de abertura
       const { error: functionError } = await supabase.functions.invoke('open-day');
       if (functionError) {
         showError(`Dia aberto, mas falha ao enviar notificação: ${functionError.message}`);
