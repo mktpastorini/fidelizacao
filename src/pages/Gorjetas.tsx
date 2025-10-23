@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSuperadminId } from "@/hooks/useSuperadminId";
 import { useSettings } from "@/contexts/SettingsContext";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"; // Importado Alert
 
 type TipStat = {
   garcom_id: string;
@@ -47,7 +48,7 @@ const formatCurrency = (value: number | undefined) => {
 
 export default function GorjetasPage() {
   const { userRole } = useSettings();
-  const { superadminId, isLoadingSuperadminId } = useSuperadminId();
+  const { superadminId, isLoadingSuperadminId, errorSuperadminId } = useSuperadminId();
   
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(getBrazilTime()),
@@ -55,8 +56,7 @@ export default function GorjetasPage() {
   });
 
   const userIdToFetch = useMemo(() => {
-    // Superadmin, Admin, Gerente E Garçom podem ver as gorjetas.
-    // Os dados são sempre associados ao Superadmin.
+    // Garçom, Gerente, Admin e Superadmin usam o ID do Superadmin para buscar dados.
     if (userRole && ['superadmin', 'admin', 'gerente', 'garcom'].includes(userRole)) {
       return superadminId;
     }
@@ -75,19 +75,31 @@ export default function GorjetasPage() {
     return tipStats?.reduce((sum, stat) => sum + stat.total_gorjetas, 0) || 0;
   }, [tipStats]);
 
-  if (isLoading || isLoadingSuperadminId) {
+  if (isLoadingSuperadminId || isLoading) {
     return <Skeleton className="h-96 w-full" />;
   }
   
-  // Se o usuário for garçom, ele terá userIdToFetch, então a tela será renderizada.
-  // Se o usuário não tiver permissão (ex: balcao, cozinha), o RoleGuard no App.tsx já o bloqueou.
-  // Se o userIdToFetch for null aqui, é porque o RoleGuard falhou ou o userRole não está na lista permitida.
-  if (!userIdToFetch) {
-    // Este bloco só deve ser atingido se o RoleGuard no App.tsx falhar, mas mantemos a mensagem de erro genérica.
+  if (errorSuperadminId) {
     return (
-      <div className="p-8">
-        <p className="text-destructive">Acesso negado. Sua função não está autorizada a ver esta página.</p>
-      </div>
+      <Alert variant="destructive" className="mt-8">
+        <AlertTitle>Erro de Configuração</AlertTitle>
+        <AlertDescription>
+          Não foi possível carregar o ID do Superadmin, o que é necessário para buscar os dados de gorjeta. Verifique se o Edge Function 'get-superadmin-id' está funcionando corretamente.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Se o RoleGuard permitiu o acesso, mas o userIdToFetch ainda é null (o que só deve acontecer se o SuperadminId for null, mas sem erro),
+  // exibimos uma mensagem de erro de configuração.
+  if (!userIdToFetch) {
+    return (
+      <Alert variant="destructive" className="mt-8">
+        <AlertTitle>Erro de Acesso</AlertTitle>
+        <AlertDescription>
+          Sua função ({userRole}) está autorizada, mas o ID do Superadmin não foi encontrado. Verifique a configuração do perfil Superadmin.
+        </AlertDescription>
+      </Alert>
     );
   }
 
