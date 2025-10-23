@@ -8,7 +8,9 @@ import { FullscreenToggle } from "@/components/login/FullscreenToggle";
 // Lista de URLs de vídeo padrão.
 const DEFAULT_VIDEO_URLS = [
   "/ia.mp4",
-  
+  "/ia4.mp4",
+  "/ia2.mp4",
+  "/ia3.mp4",
   // Adicione seus vídeos locais aqui:
   // "/videos/fundo1.mp4",
   // "/videos/fundo2.mp4",
