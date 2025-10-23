@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
@@ -28,6 +28,7 @@ import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
 
 type PedidoModalProps = {
   isOpen: boolean;
@@ -46,15 +47,14 @@ const itemSchema = z.object({
 
 async function fetchPedidoAberto(mesaId: string): Promise<(Pedido & { itens_pedido: ItemPedido[] }) | null> {
   if (!mesaId) return null;
-  // Ajustado para pegar o pedido mais recente se houver múltiplos abertos (inconsistência)
   const { data, error } = await supabase
     .from("pedidos")
     .select("*, itens_pedido(*)")
     .eq("mesa_id", mesaId)
     .eq("status", "aberto")
-    .order("created_at", { ascending: false }) // Ordena para pegar o mais recente
-    .limit(1) // Limita a 1 resultado
-    .maybeSingle(); // Usa maybeSingle agora que limitamos a 1
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (error) throw new Error(error.message);
   return data;
@@ -73,7 +73,6 @@ async function fetchOcupantes(mesaId: string): Promise<Cliente[]> {
   const ids = ocupanteIds.map(o => o.cliente_id);
   if (ids.length === 0) return [];
   
-  // Adicionado 'pontos' na seleção de clientes
   const { data: clientes, error: clientesError } = await supabase.from("clientes").select("id, nome, pontos").in("id", ids);
   if (clientesError) throw clientesError;
   return clientes;
@@ -98,12 +97,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const [isResgateOpen, setIsResgateOpen] = useState(false);
   
-  // Novo estado para pagamento parcial de item da mesa
   const [itemMesaToPay, setItemMesaToPay] = useState<ItemPedido | null>(null);
   const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
   const [clientePagandoMesaId, setClientePagandoMesaId] = useState<string | null>(null);
   const [isMesaItemPartialPaymentOpen, setIsMesaItemPartialPaymentOpen] = useState(false);
-
 
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
@@ -131,7 +128,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
   const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
   
-  // Verifica se há ocupantes ativos na mesa
   const hasActiveOccupants = ocupantes && ocupantes.length > 0;
 
   const { itensAgrupados, totalPedido, itensMesaGeral } = useMemo(() => {
@@ -139,14 +135,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     
     const total = pedido.itens_pedido.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
     
-    const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: 'Mesa' }; itens: ItemPedido[]; subtotal: number }>();
+    const agrupados = new Map<string, { cliente: Cliente | { id: 'mesa', nome: string }; itens: ItemPedido[]; subtotal: number }>();
     
-    // Adiciona todos os ocupantes atuais
     ocupantes.forEach(o => agrupados.set(o.id, { cliente: o, itens: [], subtotal: 0 }));
     
-    // Garante que o cliente principal original (se não for um ocupante atual) ainda possa ser referenciado
-    // Embora o cliente principal possa ter saído, o ID dele ainda está no pedido.
-    // Para fins de exibição, vamos focar apenas nos ocupantes atuais e na Mesa Geral.
     agrupados.set('mesa', { cliente: { id: 'mesa', nome: 'Mesa (Geral)' }, itens: [], subtotal: 0 });
 
     const mesaGeral: ItemPedido[] = [];
@@ -161,9 +153,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           mesaGeral.push(item);
         }
       } else if (key !== 'mesa') {
-        // Caso um item esteja atribuído a um cliente que já saiu (não está em ocupantes),
-        // movemos o item para a Mesa Geral para que seja pago no fechamento total.
-        // Isso é uma correção de contingência, mas o fluxo normal deve evitar isso.
         const mesaGrupo = agrupados.get('mesa');
         if (mesaGrupo) {
             mesaGrupo.itens.push(item);
@@ -176,7 +165,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     return { itensAgrupados: agrupados, totalPedido: total, itensMesaGeral: mesaGeral };
   }, [pedido, ocupantes]);
 
-  // Função para obter os itens a serem pagos pelo cliente (apenas os individuais)
   const getItemsToPayIndividual = (clienteId: string) => {
     return itensAgrupados.get(clienteId)?.itens || [];
   };
@@ -201,18 +189,15 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       let requerPreparo = produtoSelecionado.requer_preparo;
       let status: ItemPedido['status'] = 'pendente';
 
-      // 1. Adicionar prefixo se for Pacote Rodízio
       if (produtoSelecionado.tipo === 'rodizio') {
           nomeProdutoFinal = `[RODIZIO] ${novoItem.nome_produto}`;
-          requerPreparo = false; // Pacote Rodízio nunca requer preparo
+          requerPreparo = false;
       }
       
-      // 2. Se for Item de Rodízio, usa o requer_preparo definido pelo usuário
       if (produtoSelecionado.tipo === 'componente_rodizio') {
           requerPreparo = produtoSelecionado.requer_preparo; 
       }
       
-      // 3. Determinar o status inicial
       status = 'pendente'; 
 
       const { error: itemError } = await supabase.from("itens_pedido").insert({ 
@@ -229,7 +214,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Adicionado invalidação para o sininho
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess("Item adicionado com sucesso!");
       form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
     },
@@ -245,7 +230,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Adicionado invalidação para o sininho
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess("Item removido com sucesso!");
     },
     onError: (error: Error) => showError(error.message),
@@ -258,7 +243,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      // 1. Criar um novo pedido "recibo"
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -281,29 +265,23 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         const quantityRemaining = originalItem.quantidade - quantityToPay;
 
         if (itemToPay.isMesaItem && quantityRemaining > 0) {
-          // Se for item da mesa e houver quantidade restante, criamos um novo item para o recibo
-          // e atualizamos a quantidade do item original.
-          
-          // 1a. Criar o item pago (para o recibo)
           const { error: insertError } = await supabase.from("itens_pedido").insert({
             ...originalItem,
-            id: undefined, // Deixa o banco gerar um novo ID
+            id: undefined,
             pedido_id: newPedidoId,
             quantidade: quantityToPay,
             consumido_por_cliente_id: clienteId,
-            created_at: new Date().toISOString(), // Atualiza o timestamp
+            created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
           if (insertError) throw insertError;
 
-          // 1b. Atualizar a quantidade restante no item original (no pedido aberto)
           const { error: updateError } = await supabase.from("itens_pedido")
             .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
             .eq("id", originalItem.id);
           if (updateError) throw updateError;
 
         } else {
-          // Se for item individual ou item da mesa pago integralmente, move o item inteiro
           const { error: updateError } = await supabase.from("itens_pedido")
             .update({ 
                 pedido_id: newPedidoId, 
@@ -315,25 +293,20 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         }
       }
 
-      // 2. Remover o cliente da lista de ocupantes da mesa
       await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
 
-      // 3. Verificar se o pedido original ainda tem itens
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
         
-      // 4. Verificar se ainda há ocupantes na mesa
       const { count: remainingOccupantsCount } = await supabase.from("mesa_ocupantes")
         .select('*', { count: 'exact', head: true })
         .eq("mesa_id", mesa!.id);
 
-      // 5. Se o pedido original estiver vazio, fechar o pedido original
       if (remainingItemsCount === 0) {
         await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
       }
       
-      // 6. Se não houver mais ocupantes, liberar a mesa (cliente_id = null)
       if (remainingOccupantsCount === 0) {
         await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
       }
@@ -344,11 +317,11 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
-      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar pontos
+      queryClient.invalidateQueries({ queryKey: ["clientes"] });
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagandoIndividual(null);
-      setIsMesaItemPartialPaymentOpen(false); // Fecha o modal de pagamento parcial de item da mesa
+      setIsMesaItemPartialPaymentOpen(false);
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -359,15 +332,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      // 1. Chamar a nova função RPC para fechar o pedido e liberar a mesa
-      // Esta função já atribui todos os itens restantes (Mesa Geral) ao cliente principal
       const { error: rpcError } = await supabase.rpc('finalizar_pagamento_total', {
         p_pedido_id: pedido.id,
         p_mesa_id: mesa.id,
       });
       if (rpcError) throw rpcError;
 
-      // 2. Enviar webhook de confirmação de pagamento (usando o pedidoId)
       if (pedido.cliente_id) {
         const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { 
           body: { pedidoId: pedido.id, userId: user.id } 
@@ -381,7 +351,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Adicionado invalidação para o sininho
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
@@ -389,7 +359,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   });
 
   const handleDiscountRequested = () => {
-    // Invalida o pedido para buscar o item atualizado com o desconto
     queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
   };
 
@@ -404,29 +373,25 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     let nomeProdutoFinal = values.nome_produto;
     let requerPreparo = produtoSelecionado.requer_preparo;
     
-    // 1. Adicionar prefixo se for Pacote Rodízio
     if (produtoSelecionado.tipo === 'rodizio') {
         nomeProdutoFinal = `[RODIZIO] ${values.nome_produto}`;
-        requerPreparo = false; // Pacote Rodízio nunca requer preparo
+        requerPreparo = false;
     }
     
-    // 2. Se for Item de Rodízio, usa o requer_preparo definido pelo usuário
     if (produtoSelecionado.tipo === 'componente_rodizio') {
         requerPreparo = produtoSelecionado.requer_preparo; 
     }
     
-    // 3. Determinar o status inicial
     let status: ItemPedido['status'] = 'pendente';
 
     addItemMutation.mutate({ 
         ...values, 
-        nome_produto: nomeProdutoFinal, // Usando o nome final
+        nome_produto: nomeProdutoFinal,
         status: status,
         requer_preparo: requerPreparo,
     });
   };
   
-  // Função para abrir o modal de pagamento individual
   const handlePartialPaymentOpen = (cliente: Cliente) => {
     const items = getItemsToPayIndividual(cliente.id);
     if (items.length === 0) {
@@ -436,20 +401,17 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     setClientePagandoIndividual(cliente);
   };
   
-  // Função para abrir o modal de pagamento parcial de item da mesa
   const handleMesaItemPartialPaymentOpen = (item: ItemPedido) => {
     if (!ocupantes || ocupantes.length === 0) {
-        // Este erro não deve ocorrer se o botão estiver desabilitado, mas é uma segurança.
         showError("Não há clientes ocupando a mesa para atribuir o pagamento.");
         return;
     }
     setItemMesaToPay(item);
     setQuantidadePagarMesa(1);
-    setClientePagandoMesaId(ocupantes[0].id); // Default para o primeiro ocupante
+    setClientePagandoMesaId(ocupantes[0].id);
     setIsMesaItemPartialPaymentOpen(true);
   };
   
-  // Mutação para pagamento parcial de item da mesa
   const payMesaItemPartialMutation = useMutation({
     mutationFn: async ({ itemId, quantidade, clienteId }: { itemId: string, quantidade: number, clienteId: string }) => {
       if (!pedido) throw new Error("Pedido não encontrado.");
@@ -461,7 +423,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      // 1. Criar um novo pedido "recibo" (usando o cliente que está pagando)
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -475,40 +436,35 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
       const quantityRemaining = originalItem.quantidade - quantidade;
 
-      // 2a. Criar o item pago (para o recibo)
       const { error: insertError } = await supabase.from("itens_pedido").insert({
         ...originalItem,
-        id: undefined, // Deixa o banco gerar um novo ID
+        id: undefined,
         pedido_id: newPedidoId,
         quantidade: quantidade,
         consumido_por_cliente_id: clienteId,
-        created_at: new Date().toISOString(), // Atualiza o timestamp
+        created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });
       if (insertError) throw insertError;
 
-      // 2b. Atualizar a quantidade restante no item original (no pedido aberto)
       if (quantityRemaining > 0) {
         const { error: updateError } = await supabase.from("itens_pedido")
           .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
           .eq("id", originalItem.id);
         if (updateError) throw updateError;
       } else {
-        // Se a quantidade restante for 0, deleta o item original do pedido aberto
         const { error: deleteError } = await supabase.from("itens_pedido")
           .delete()
           .eq("id", originalItem.id);
         if (deleteError) throw deleteError;
       }
       
-      // 3. Verificar se o pedido original ficou vazio e fechar se necessário
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
         
       if (remainingItemsCount === 0) {
         await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
-        // Se o pedido fechar, liberamos a mesa (cliente_id = null) e removemos ocupantes
         await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
         await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id);
       }
@@ -572,7 +528,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               <div className="space-y-4 overflow-y-auto pr-2">
                 <h3 className="font-semibold">Itens do Pedido</h3>
                 {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => {
-                  // Se for o grupo 'Mesa (Geral)', exibimos separadamente para que qualquer um possa pagar
                   if (cliente.id === 'mesa' && itens.length > 0) {
                     return (
                       <div key={cliente.id} className="p-3 border rounded-lg bg-warning/10">
@@ -600,17 +555,15 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                       <p>R$ {precoOriginal.toFixed(2)}</p>
                                     )}
                                   </div>
-                                  {/* Botão de Pagamento Parcial para Item da Mesa */}
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
                                     className="h-8 bg-green-600 hover:bg-green-700 text-white"
                                     onClick={() => handleMesaItemPartialPaymentOpen(item)}
-                                    disabled={!hasActiveOccupants} {/* DESABILITA SE NÃO HOUVER OCUPANTES */}
+                                    disabled={!hasActiveOccupants}
                                   >
                                     <DollarSign className="w-4 h-4" />
                                   </Button>
-                                  {/* Dropdown de Ações */}
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -638,7 +591,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     );
                   }
                   
-                  // Exibição normal para clientes individuais
                   if (cliente.id !== 'mesa' && itens.length > 0) {
                     const isPrincipal = cliente.id === clientePrincipal?.id;
                     const subtotalIndividual = itens.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
@@ -726,7 +678,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                               const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
                               form.setValue("nome_produto", produto.nome);
                               form.setValue("preco", preco);
-                              form.setValue("requer_preparo", produto.requer_preparo); // Define requer_preparo
+                              form.setValue("requer_preparo", produto.requer_preparo);
                               setPopoverOpen(false);
                             }}>
                               <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
@@ -751,7 +703,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     )}/>
                     <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
                     
-                    {/* NOVO BOTÃO DE RESGATE - Agora só verifica se há ocupantes e produtos resgatáveis */}
                     {ocupantes && ocupantes.length > 0 && produtosResgatáveis.length > 0 && (
                       <Button type="button" variant="secondary" className="w-full mt-2" onClick={() => setIsResgateOpen(true)}>
                         <Star className="w-4 h-4 mr-2 fill-yellow-500 text-yellow-500" />
@@ -779,7 +730,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         </DialogContent>
       </Dialog>
       
-      {/* Modal de Pagamento de Itens Individuais */}
       <FinalizarContaParcialDialog
         isOpen={!!clientePagandoIndividual}
         onOpenChange={() => setClientePagandoIndividual(null)}
@@ -790,7 +740,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         isSubmitting={closePartialOrderMutation.isPending}
       />
       
-      {/* Modal de Pagamento Parcial de Item da Mesa */}
       <AlertDialog open={isMesaItemPartialPaymentOpen} onOpenChange={setIsMesaItemPartialPaymentOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -854,7 +803,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               
               <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
                 <span>Total a Pagar:</span>
-                <span>{formatCurrency(calcularPrecoComDesconto({ ...itemMesaToPay, quantidade: 1 }) * quantidadePagarMesa)}</span>
+                <span>{(calcularPrecoComDesconto({ ...itemMesaToPay, quantidade: 1 }) * quantidadePagarMesa).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
               </div>
             </div>
           )}
@@ -877,7 +826,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         item={itemParaDesconto}
         onDiscountRequested={handleDiscountRequested}
       />
-      {/* NOVO MODAL DE RESGATE */}
       <ResgatePontosDialog
         isOpen={isResgateOpen}
         onOpenChange={setIsResgateOpen}
