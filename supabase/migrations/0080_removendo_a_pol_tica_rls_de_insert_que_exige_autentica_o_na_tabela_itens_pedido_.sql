@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Allow anonymous insert for open orders" ON public.itens_pedido;
