@@ -59,119 +59,110 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
     <>
       <div
         className={cn(
-          "relative rounded-lg border border-gray-300 bg-white shadow-lg cursor-pointer overflow-hidden transition-all duration-300 h-40",
-          isUnavailable && "opacity-50 cursor-not-allowed", // Usando isUnavailable aqui
-          isHovered ? "scale-[1.02] shadow-xl" : "scale-100",
+          "relative rounded-lg border border-primary/30 bg-card shadow-xl cursor-pointer overflow-hidden transition-all duration-300 h-64 flex flex-col", // Aumentado o tamanho do card
+          isUnavailable && "opacity-50 cursor-not-allowed",
+          isHovered ? "scale-[1.02] shadow-2xl ring-2 ring-primary/50" : "scale-100",
         )}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={handleOrderClick}
       >
-        {/* Image filling the card on hover */}
-        <div className={cn(
-            "absolute inset-0 transition-opacity duration-300",
-            isHovered ? "opacity-100" : "opacity-0"
-        )}>
+        {/* Área da Imagem */}
+        <div className="h-3/5 w-full overflow-hidden relative">
             {hasImage ? (
                 <img
                     src={produto.imagem_url}
                     alt={produto.nome}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                 />
             ) : (
-                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                    <Utensils className="w-12 h-12 text-gray-500" />
+                <div className="w-full h-full bg-secondary flex items-center justify-center">
+                    <Utensils className="w-12 h-12 text-muted-foreground" />
                 </div>
             )}
-            {/* Overlay for text visibility and interaction prompt */}
-            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4 text-white">
-                <h3 className="text-xl font-bold text-center">{produto.nome}</h3>
-                <p className="text-lg font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
-                {isUnavailable && <p className="text-red-400 font-semibold mt-2">Indisponível</p>}
-                {!isUnavailable && <p className="text-sm mt-2">Clique para Pedir</p>}
-            </div>
+            {/* Badge de Indisponível */}
+            {isUnavailable && (
+                <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                    <p className="text-xl font-bold text-red-500">ESGOTADO</p>
+                </div>
+            )}
         </div>
 
-        {/* Conteúdo Padrão (Visível quando não está em hover) */}
-        <div className={cn(
-          "p-3 flex items-center gap-3 transition-opacity duration-300 h-full",
-          isHovered ? "opacity-0" : "opacity-100"
-        )}>
-          <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-            {hasImage ? (
-              <img
-                src={produto.imagem_url}
-                alt={produto.nome}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <Utensils className="w-6 h-6 text-gray-500" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-gray-900 truncate">{produto.nome}</h3>
-            <p className="text-sm text-gray-600 truncate">{produto.descricao || 'Sem descrição'}</p>
-            <p className="text-sm font-bold text-primary mt-1">{formatCurrency(produto.preco)}</p>
-            {isUnavailable && <p className="text-red-500 font-semibold mt-1">Indisponível</p>}
-          </div>
+        {/* Conteúdo de Texto e Preço */}
+        <div className="flex-1 p-4 flex flex-col justify-between">
+            <div className="min-h-0">
+                <h3 className="text-lg font-bold text-foreground truncate">{produto.nome}</h3>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{produto.descricao || 'Sem descrição'}</p>
+            </div>
+            <div className="flex justify-between items-end mt-2">
+                <p className="text-xl font-extrabold text-primary">{formatCurrency(produto.preco)}</p>
+                <Button 
+                    size="sm" 
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+                    onClick={(e) => { e.stopPropagation(); handleOrderClick(); }}
+                    disabled={isUnavailable}
+                >
+                    Pedir
+                </Button>
+            </div>
         </div>
       </div>
 
       {/* Modal de confirmação */}
       <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <DialogContent className="max-w-md bg-white text-gray-900 p-0">
+        <DialogContent className="max-w-md bg-card text-foreground p-0">
           <DialogHeader className="p-6 pb-0">
-            <DialogTitle className="text-xl font-bold">Adicionar ao Pedido</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-primary">Adicionar ao Pedido</DialogTitle>
           </DialogHeader>
           
           <div className="p-6 space-y-6">
             {/* Bloco de Produto e Quantidade */}
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+            <div className="flex items-center justify-between p-4 border border-border rounded-lg bg-secondary">
               {/* Produto Info */}
               <div className="flex items-center gap-4 flex-1">
                 <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden">
                   {hasImage ? (
                     <img src={produto.imagem_url} alt={produto.nome} className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                      <Utensils className="w-8 h-8 text-gray-500" />
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <Utensils className="w-8 h-8 text-muted-foreground" />
                     </div>
                   )}
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-bold">{produto.nome}</h3>
-                  <p className="text-sm text-gray-600">{formatCurrency(produto.preco)}</p>
+                  <p className="text-sm text-muted-foreground">{formatCurrency(produto.preco)}</p>
                 </div>
               </div>
               
               {/* Quantidade Selector */}
               <div className="flex items-center space-x-1 ml-4">
-                {/* Botão de menos (cinza) */}
+                {/* Botão de menos */}
                 <Button 
                   variant="outline" 
                   size="icon" 
                   onClick={() => handleQuantityChange(-1)} 
                   disabled={quantidade <= 1 || isOrdering} 
-                  className="w-10 h-10 bg-gray-300 border-gray-400 text-gray-900 hover:bg-gray-400"
+                  className="w-10 h-10 bg-card border-border text-foreground hover:bg-secondary"
                 >
                   <Minus className="w-5 h-5" />
                 </Button>
-                {/* Input de quantidade (preto) */}
+                {/* Input de quantidade */}
                 <Input 
                   id="quantidade"
                   type="number" 
                   min="1" 
                   value={quantidade} 
                   onChange={(e) => setQuantidade(Math.max(1, parseInt(e.target.value) || 1))} 
-                  className="w-10 text-center h-10 p-0 bg-gray-900 text-white border-gray-900"
+                  className="w-10 text-center h-10 p-0 bg-card text-foreground border-border"
                   disabled={isOrdering}
                 />
-                {/* Botão de mais (azul) */}
+                {/* Botão de mais */}
                 <Button 
                   size="icon" 
                   onClick={() => handleQuantityChange(1)} 
                   disabled={isOrdering} 
-                  className="w-10 h-10 bg-blue-500 hover:bg-blue-600 text-white"
+                  className="w-10 h-10 bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   <Plus className="w-5 h-5" />
                 </Button>
@@ -186,34 +177,34 @@ export function PublicMenuProductCard({ produto, onInitiateOrder, disabled = fal
                 placeholder="Ex: Sem cebola, bem passado..."
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                className="mt-2 bg-gray-900 text-white border-gray-900 placeholder-gray-400 focus:ring-blue-500"
+                className="mt-2 bg-card text-foreground border-border placeholder-muted-foreground focus:ring-primary"
                 disabled={isOrdering}
               />
             </div>
             
             {/* Total Display */}
-            <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center justify-between pt-2 border-t border-border">
                 <Label className="text-base font-semibold">Total:</Label>
-                <span className="text-xl font-extrabold text-gray-900">{formatCurrency(total)}</span>
+                <span className="text-2xl font-extrabold text-primary">{formatCurrency(total)}</span>
             </div>
           </div>
 
           {/* Footer com Botões */}
-          <DialogFooter className="flex flex-row items-center justify-end p-4 border-t bg-gray-100 gap-3">
-            {/* Botão Cancelar (Preto) */}
+          <DialogFooter className="flex flex-row items-center justify-end p-4 border-t border-border bg-secondary gap-3">
+            {/* Botão Cancelar */}
             <Button 
               variant="outline" 
               onClick={() => setIsConfirmOpen(false)} 
               disabled={isOrdering} 
-              className="text-white bg-gray-900 hover:bg-gray-800 border-gray-900 hover:text-white"
+              className="text-foreground bg-card hover:bg-secondary border-border"
             >
               Cancelar
             </Button>
-            {/* Botão Adicionar (Azul) */}
+            {/* Botão Adicionar */}
             <Button 
               onClick={handleConfirmOrder} 
               disabled={isOrdering || isUnavailable}
-              className="bg-blue-500 hover:bg-blue-600 text-white"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
             >
               Adicionar ao Pedido
             </Button>

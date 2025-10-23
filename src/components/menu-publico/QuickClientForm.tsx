@@ -44,7 +44,7 @@ export function QuickClientForm({ onSubmit, isSubmitting }: QuickClientFormProps
           name="avatar_url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Foto para Reconhecimento</FormLabel>
+              <FormLabel className="text-primary">Foto para Reconhecimento</FormLabel>
               <FormControl>
                 <ImageCapture
                   url={field.value}
@@ -82,7 +82,7 @@ export function QuickClientForm({ onSubmit, isSubmitting }: QuickClientFormProps
           )}
         />
         
-        <Button type="submit" disabled={isSubmitting} className="w-full bg-green-600 hover:bg-green-700 text-white">
+        <Button type="submit" disabled={isSubmitting} className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
           <UserPlus className="w-4 h-4 mr-2" />
           {isSubmitting ? "Cadastrando..." : "Cadastrar e Pedir"}
         </Button>

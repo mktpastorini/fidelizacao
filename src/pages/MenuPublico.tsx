@@ -224,12 +224,12 @@ export default function MenuPublicoPage() {
     return (
       <div className="space-y-6">
         {/* Filtro de Categorias */}
-        <ScrollArea className="w-full whitespace-nowrap rounded-md border bg-gray-800">
+        <ScrollArea className="w-full whitespace-nowrap rounded-md border border-primary/30 bg-card/50 shadow-lg">
           <div className="flex w-max space-x-2 p-2">
             <Button 
               variant={selectedCategory === "all" ? "default" : "ghost"} 
               onClick={() => setSelectedCategory("all")}
-              className={cn(selectedCategory === "all" ? "bg-primary text-primary-foreground" : "text-white hover:bg-gray-700")}
+              className={cn(selectedCategory === "all" ? "bg-primary text-primary-foreground shadow-md" : "text-primary hover:bg-primary/10")}
             >
               Todos
             </Button>
@@ -238,7 +238,7 @@ export default function MenuPublicoPage() {
                 key={cat.id}
                 variant={selectedCategory === cat.id ? "default" : "ghost"}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={cn(selectedCategory === cat.id ? "bg-primary text-primary-foreground" : "text-white hover:bg-gray-700")}
+                className={cn(selectedCategory === cat.id ? "bg-primary text-primary-foreground shadow-md" : "text-white hover:bg-primary/10")}
               >
                 {cat.nome}
               </Button>
@@ -272,21 +272,21 @@ export default function MenuPublicoPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-6 bg-gray-900 min-h-screen">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-black min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="text-white">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="text-white hover:bg-primary/10">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
         {isMesaOcupada && mesaId && (
-          <Button variant="secondary" onClick={() => setIsSummaryOpen(true)}>
+          <Button variant="default" onClick={() => setIsSummaryOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
             <ReceiptText className="w-4 h-4 mr-2" />
             Ver Comanda
           </Button>
         )}
       </div>
       
-      <h1 className="text-3xl font-bold mb-6 text-white text-center flex items-center justify-center gap-2">
+      <h1 className="text-3xl font-serif font-bold mb-6 text-primary text-center flex items-center justify-center gap-2 tracking-wider">
         <Utensils className="w-6 h-6" />
         Cardápio da Mesa {mesaData?.numero || mesaId}
       </h1>

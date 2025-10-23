@@ -59,14 +59,14 @@ export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa
     <>
       <Card
         className={cn(
-          "border transition-all hover:border-primary/50 cursor-pointer flex flex-col justify-between",
+          "border transition-all hover:border-primary/50 cursor-pointer flex flex-col justify-between shadow-lg",
           isOcupada ? "bg-card" : "bg-secondary/50",
-          hasPendingItems && "border-accent ring-2 ring-accent/50"
+          hasPendingItems && "border-warning ring-2 ring-warning/50" // Usando warning para itens pendentes
         )}
       >
         <CardHeader className="flex flex-row items-start justify-between pb-2">
           <div onClick={onClick} className="flex-1">
-            <CardTitle className="text-2xl font-bold">Mesa {mesa.numero}</CardTitle>
+            <CardTitle className="text-2xl font-bold text-primary">Mesa {mesa.numero}</CardTitle>
             <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
               <Users className="w-3 h-3" />
               <span>{ocupantesCount} / {mesa.capacidade}</span>
@@ -114,8 +114,8 @@ export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa
         <CardContent className="flex-1 flex flex-col justify-end" onClick={onClick}>
           {isOcupada ? (
             <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2 font-semibold text-primary">
-                <User className="w-4 h-4" />
+              <div className="flex items-center gap-2 font-semibold text-foreground">
+                <User className="w-4 h-4 text-primary" />
                 <span className="truncate">{mesa.cliente?.nome}</span>
               </div>
               <div className="flex items-center text-muted-foreground text-xs gap-2">
@@ -128,7 +128,7 @@ export function MesaCard({ mesa, ocupantesCount, onClick, onEditMesa, onFreeMesa
               </div>
             </div>
           ) : (
-            <p className="text-sm font-semibold text-green-500">Livre</p>
+            <p className="text-sm font-semibold text-success">Livre</p>
           )}
         </CardContent>
       </Card>

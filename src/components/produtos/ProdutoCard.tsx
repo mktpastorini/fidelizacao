@@ -1,7 +1,7 @@
 import { Produto } from "@/types/supabase";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MoreVertical, Edit, Trash2, Utensils, DollarSign } from "lucide-react";
+import { MoreVertical, Edit, Trash2, Utensils, DollarSign, Star } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,7 +40,7 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
 
   return (
     <Card 
-      className="group relative overflow-hidden shadow-sm transition-all hover:shadow-xl h-56 cursor-pointer"
+      className="group relative overflow-hidden shadow-lg transition-all hover:shadow-xl hover:border-primary/50 h-56 cursor-pointer"
       onClick={onEdit} // Ação principal: Editar
     >
       {/* Imagem de Fundo (Expansível no Hover) */}
@@ -56,10 +56,10 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
           className="h-full w-full object-cover"
         />
         {/* Overlay para escurecer a imagem e centralizar o botão */}
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
           <Button 
             onClick={(e) => { e.stopPropagation(); onEdit(); }} 
-            className="text-white bg-primary hover:bg-primary/90 transition-all scale-0 group-hover:scale-100"
+            className="text-primary-foreground bg-primary hover:bg-primary/90 transition-all scale-0 group-hover:scale-100 shadow-lg"
           >
             <Edit className="w-4 h-4 mr-2" /> Editar Produto
           </Button>
@@ -68,7 +68,6 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
 
       {/* Conteúdo Principal (Visível por padrão, some no Hover) */}
       <CardContent 
-        // Removendo o e.stopPropagation() para permitir que o clique suba para o Card pai (onEdit)
         className={cn(
           "absolute inset-0 p-4 flex flex-col justify-between transition-opacity duration-300 bg-card",
           "group-hover:opacity-0 opacity-100"
@@ -110,8 +109,13 @@ export function ProdutoCard({ produto, onEdit, onDelete }: ProdutoCardProps) {
               <DollarSign className="w-3 h-3" /> Custo: {formatCurrency(produto.valor_compra)}
             </p>
           )}
-          <div className="mt-2">
+          <div className="mt-2 flex items-center justify-between">
             {getStockBadge()}
+            {produto.pontos_resgate && produto.pontos_resgate > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1 bg-primary/20 text-primary">
+                    {produto.pontos_resgate} <Star className="w-3 h-3 fill-primary" />
+                </Badge>
+            )}
           </div>
         </div>
       </CardContent>

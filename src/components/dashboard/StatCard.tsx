@@ -14,9 +14,9 @@ type StatCardProps = {
 export function StatCard({ title, value, icon: Icon, variant, description }: StatCardProps) {
   const colorClasses = {
     blue: "text-blue-500 dark:text-blue-400",
-    green: "text-green-600 dark:text-green-400",
-    orange: "text-orange-500 dark:text-orange-400",
-    purple: "text-purple-600 dark:text-purple-400",
+    green: "text-success dark:text-success",
+    orange: "text-warning dark:text-warning",
+    purple: "text-primary dark:text-primary", // Usando primary para um dos destaques
   };
   
   const iconColor = colorClasses[variant];
@@ -25,7 +25,7 @@ export function StatCard({ title, value, icon: Icon, variant, description }: Sta
   const valueColor = variant === 'purple' ? 'text-foreground' : iconColor;
 
   return (
-    <Card className="border shadow-md transition-all hover:shadow-lg">
+    <Card className="border shadow-lg transition-all hover:shadow-xl hover:border-primary/50">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
         <Icon className={cn("h-5 w-5", iconColor)} />

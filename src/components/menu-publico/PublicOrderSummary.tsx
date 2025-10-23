@@ -62,9 +62,9 @@ export function PublicOrderSummary({ isOpen, onOpenChange, mesaId }: PublicOrder
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg bg-white text-gray-900">
+      <DialogContent className="max-w-lg bg-card text-foreground">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">Sua Comanda</DialogTitle>
+          <DialogTitle className="text-2xl font-bold text-primary">Sua Comanda</DialogTitle>
           <DialogDescription>Itens adicionados ao pedido da mesa.</DialogDescription>
         </DialogHeader>
         
@@ -74,11 +74,11 @@ export function PublicOrderSummary({ isOpen, onOpenChange, mesaId }: PublicOrder
           <div className="space-y-4">
             <Table>
               <TableHeader>
-                <TableRow className="bg-gray-100">
-                  <TableHead>Item</TableHead>
-                  <TableHead className="text-center">Qtd</TableHead>
-                  <TableHead>Consumidor</TableHead>
-                  <TableHead className="text-right">Preço</TableHead>
+                <TableRow className="bg-secondary">
+                  <TableHead className="text-primary">Item</TableHead>
+                  <TableHead className="text-center text-primary">Qtd</TableHead>
+                  <TableHead className="text-primary">Consumidor</TableHead>
+                  <TableHead className="text-right text-primary">Preço</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -89,23 +89,23 @@ export function PublicOrderSummary({ isOpen, onOpenChange, mesaId }: PublicOrder
                     : ocupantesMap.get('mesa');
 
                   return (
-                    <TableRow key={item.id} className="text-sm">
+                    <TableRow key={item.id} className="text-sm hover:bg-secondary/50">
                       <TableCell className="font-medium">{item.nome_produto}</TableCell>
                       <TableCell className="text-center">{item.quantidade}</TableCell>
-                      <TableCell className="text-xs text-gray-600">{consumidorNome}</TableCell>
-                      <TableCell className="text-right font-semibold">{formatCurrency(precoFinal)}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{consumidorNome}</TableCell>
+                      <TableCell className="text-right font-semibold text-primary">{formatCurrency(precoFinal)}</TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-            <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-              <span className="text-lg font-bold flex items-center gap-2"><DollarSign className="w-5 h-5" /> Total Parcial:</span>
-              <span className="text-2xl font-extrabold">{formatCurrency(totalPedido)}</span>
+            <div className="flex justify-between items-center pt-4 border-t border-border">
+              <span className="text-lg font-bold flex items-center gap-2 text-primary"><DollarSign className="w-5 h-5" /> Total Parcial:</span>
+              <span className="text-2xl font-extrabold text-foreground">{formatCurrency(totalPedido)}</span>
             </div>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-600">
+          <div className="text-center py-8 text-muted-foreground">
             <p>Nenhum item adicionado à comanda ainda.</p>
           </div>
         )}

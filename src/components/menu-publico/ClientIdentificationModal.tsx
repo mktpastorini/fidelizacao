@@ -17,14 +17,10 @@ type ItemToOrder = {
   observacoes: string;
 };
 
-type ClientIdentificationModalProps = {
-  isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
-  itemToOrder: ItemToOrder | null;
-  mesaId: string;
-  mesaUserId: string;
-  onOrderConfirmed: (clienteId: string | null) => void; // null se for Mesa (Geral)
-};
+type FaceRecognitionResult = {
+  client: Cliente;
+  distance: number;
+} | null;
 
 // Hook useFaceRecognition modificado para aceitar mesaId
 function useFaceRecognitionForMenu() {
@@ -32,7 +28,7 @@ function useFaceRecognitionForMenu() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const recognize = useCallback(async (imageSrc: string, mesaId: string) => {
+  const recognize = useCallback(async (imageSrc: string, mesaId: string): Promise<FaceRecognitionResult> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -203,7 +199,7 @@ export function ClientIdentificationModal({
     if (displayError) {
       return (
         <div className="text-center py-4 space-y-4">
-          <p className="text-lg font-bold text-red-500">Erro de Câmera/Reconhecimento</p>
+          <p className="text-lg font-bold text-destructive">Erro de Câmera/Reconhecimento</p>
           <p className="text-sm text-muted-foreground">{displayError}</p>
           <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
         </div>
@@ -214,7 +210,7 @@ export function ClientIdentificationModal({
       case 'capture':
         return (
           <div className="flex flex-col items-center gap-4">
-            <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-dashed flex items-center justify-center bg-black">
+            <div className="w-64 h-64 rounded-full overflow-hidden border-2 border-primary/50 flex items-center justify-center bg-black shadow-xl">
               <Webcam 
                 audio={false} 
                 ref={webcamRef} 
@@ -225,7 +221,7 @@ export function ClientIdentificationModal({
                 onUserMediaError={handleMediaError} // Captura erros de mídia
               />
             </div>
-            <Button onClick={handleCapture} disabled={!isReady} className="w-full max-w-xs">
+            <Button onClick={handleCapture} disabled={!isReady} className="w-full max-w-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
               <Camera className="w-4 h-4 mr-2" /> Capturar Rosto
             </Button>
           </div>
@@ -234,13 +230,13 @@ export function ClientIdentificationModal({
         return (
           <div className="text-center py-8">
             <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2 text-primary" />
-            <p className="text-lg">Analisando...</p>
+            <p className="text-lg text-primary">Analisando...</p>
           </div>
         );
       case 'match':
         return (
           <div className="text-center py-4 space-y-4">
-            <Avatar className="w-20 h-20 mx-auto">
+            <Avatar className="w-20 h-20 mx-auto ring-2 ring-primary ring-offset-2 ring-offset-card">
               <AvatarImage src={match?.avatar_url || undefined} />
               <AvatarFallback><User className="w-8 h-8" /></AvatarFallback>
             </Avatar>
@@ -248,7 +244,7 @@ export function ClientIdentificationModal({
             <p className="text-sm text-muted-foreground">Deseja atribuir o pedido a você?</p>
             <div className="flex gap-2 justify-center pt-2">
               <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
-              <Button onClick={handleConfirmMatch}><Check className="w-4 h-4 mr-2" />Confirmar Pedido</Button>
+              <Button onClick={handleConfirmMatch} className="bg-primary hover:bg-primary/90 text-primary-foreground"><Check className="w-4 h-4 mr-2" />Confirmar Pedido</Button>
             </div>
           </div>
         );
@@ -259,8 +255,8 @@ export function ClientIdentificationModal({
             <p className="text-sm text-muted-foreground">O que deseja fazer?</p>
             <div className="flex flex-col gap-2 pt-2">
               <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
-              <Button onClick={() => setStep('quick_register')}><UserPlus className="w-4 h-4 mr-2" />Cadastrar Rápido</Button>
-              <Button variant="ghost" onClick={handleCancelIdentification}>
+              <Button onClick={() => setStep('quick_register')} className="bg-primary hover:bg-primary/90 text-primary-foreground"><UserPlus className="w-4 h-4 mr-2" />Cadastrar Rápido</Button>
+              <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
                 <X className="w-4 h-4 mr-2" /> Continuar como Mesa (Geral)
               </Button>
             </div>
@@ -291,9 +287,9 @@ export function ClientIdentificationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md bg-card text-foreground">
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogTitle className="text-xl font-bold text-primary">{dialogTitle}</DialogTitle>
           {step !== 'quick_register' && (
             <DialogDescription>
               {itemToOrder?.produto.nome} (x{itemToOrder?.quantidade})
@@ -305,7 +301,7 @@ export function ClientIdentificationModal({
         </div>
         {step === 'capture' && !mediaError && (
           <DialogFooter>
-            <Button variant="ghost" onClick={handleCancelIdentification}>
+            <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4 mr-2" /> Pedir como Mesa (Geral)
             </Button>
           </DialogFooter>

@@ -26,12 +26,12 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
   const preferenciaPrincipal = cliente.gostos?.pizza_favorita ? `Gosta de ${cliente.gostos.pizza_favorita}` : 'Sem preferências registradas.';
 
   return (
-    <Card className="bg-card border hover:border-primary/50 transition-colors">
+    <Card className="bg-card border hover:border-primary/50 transition-colors shadow-lg">
       <CardContent className="p-4 flex flex-col justify-between h-full">
         <div>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-4">
-              <Avatar className="h-12 w-12">
+              <Avatar className="h-12 w-12 ring-2 ring-primary/50">
                 <AvatarImage src={cliente.avatar_url || undefined} />
                 <AvatarFallback>
                   <User className="h-6 w-6 text-muted-foreground" />
@@ -63,12 +63,15 @@ export function ClienteCard({ cliente, onView, onEdit, onDelete }: ClienteCardPr
             <p className="text-foreground italic text-xs">"{preferenciaPrincipal}"</p>
             {cliente.whatsapp && <InfoLine icon={Phone} text={cliente.whatsapp} />}
             <InfoLine icon={DoorOpen} text={`${cliente.visitas || 0} visita(s)`} />
-            <InfoLine icon={Star} text={`${cliente.pontos || 0} ponto(s) acumulado(s)`} />
+            <div className="flex items-center text-xs text-primary font-semibold">
+                <Star className="w-3 h-3 mr-2 fill-primary" />
+                <span>{cliente.pontos || 0} ponto(s) acumulado(s)</span>
+            </div>
           </div>
         </div>
 
         <div className="pt-4 mt-auto">
-            <Button variant="outline" className="w-full" onClick={onView}>
+            <Button variant="outline" className="w-full hover:bg-primary hover:text-primary-foreground" onClick={onView}>
                 <Eye className="w-4 h-4 mr-2" />
                 Ver Perfil
             </Button>
