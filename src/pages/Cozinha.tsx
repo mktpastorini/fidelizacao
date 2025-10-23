@@ -2,9 +2,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
+import { CookPerformanceReport } from "@/components/cozinha/CookPerformanceReport"; // Importado
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Importado Tabs
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -123,21 +125,34 @@ export default function CozinhaPage() {
         <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
       </div>
 
-      {isLoading ? (
-        <div className="flex-1 flex gap-6">
-          <Skeleton className="flex-1" />
-          <Skeleton className="flex-1" />
-          <Skeleton className="flex-1" />
-        </div>
-      ) : isError ? (
-        <p className="text-destructive">Erro ao carregar os pedidos.</p>
-      ) : (
-        <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
-          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
-          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
-        </div>
-      )}
+      <Tabs defaultValue="kanban" className="flex-1 flex flex-col">
+        <TabsList className="grid w-full grid-cols-2 max-w-md shrink-0">
+          <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
+          <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="kanban" className="mt-6 flex-1 min-h-0">
+          {isLoading ? (
+            <div className="flex-1 flex gap-6">
+              <Skeleton className="flex-1" />
+              <Skeleton className="flex-1" />
+              <Skeleton className="flex-1" />
+            </div>
+          ) : isError ? (
+            <p className="text-destructive">Erro ao carregar os pedidos.</p>
+          ) : (
+            <div className="flex-1 flex gap-6 h-full">
+              <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
+              <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
+              <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
+            </div>
+          )}
+        </TabsContent>
+        
+        <TabsContent value="relatorio" className="mt-6 flex-1 min-h-0">
+          <CookPerformanceReport />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
