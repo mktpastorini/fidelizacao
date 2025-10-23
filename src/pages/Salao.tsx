@@ -100,12 +100,16 @@ export default function SalaoPage() {
   
   // Se o usuário precisar do ID do Superadmin, esperamos que ele carregue. Caso contrário, passamos null.
   const idForFetch = needsSuperadminId ? superadminId : null;
-  const shouldWait = needsSuperadminId && isLoadingSuperadminId;
+  
+  // A condição de habilitação agora é:
+  // 1. Se não precisa do ID do Superadmin (garcom/balcao), sempre habilitado (idForFetch é null).
+  // 2. Se precisa do ID do Superadmin (gerente/admin/superadmin), habilitado APENAS se o ID já foi resolvido (não está mais carregando).
+  const isSuperadminIdResolved = !needsSuperadminId || !isLoadingSuperadminId;
 
   const { data, isLoading } = useQuery({
     queryKey: ["salaoData", idForFetch],
     queryFn: () => fetchSalaoData(idForFetch),
-    enabled: !shouldWait, // Só espera se for um dos roles que precisa do ID
+    enabled: isSuperadminIdResolved,
     refetchInterval: 30000,
   });
 
@@ -402,7 +406,7 @@ export default function SalaoPage() {
     setIsArrivalOpen(true);
   };
 
-  if (isLoading || shouldWait) {
+  if (isLoading || (needsSuperadminId && isLoadingSuperadminId)) {
     return <Skeleton className="h-screen w-full" />;
   }
   
