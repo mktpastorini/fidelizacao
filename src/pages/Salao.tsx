@@ -20,6 +20,7 @@ import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useApprovalRequest } from "@/hooks/useApprovalRequest";
+import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -70,6 +71,7 @@ async function fetchSalaoData(): Promise<SalaoData> {
 export default function SalaoPage() {
   const queryClient = useQueryClient();
   const { requestApproval, isRequesting } = useApprovalRequest();
+  const { userRole } = useSettings(); // Usando useSettings para obter a função do usuário
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -90,6 +92,9 @@ export default function SalaoPage() {
 
   const isClosed = data?.settings?.establishment_is_closed || false;
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
+  
+  // Permite fechar o dia para Superadmin, Admin e Gerente
+  const canCloseDay = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
   const allocatedClientIds = data?.mesas
     .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
@@ -406,7 +411,7 @@ export default function SalaoPage() {
                   <div tabIndex={0}>
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady}>
+                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady || !canCloseDay}>
                           <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
                         </Button>
                       </AlertDialogTrigger>
@@ -428,6 +433,11 @@ export default function SalaoPage() {
                 {!isCloseDayReady && (
                   <TooltipContent>
                     <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
+                  </TooltipContent>
+                )}
+                {!canCloseDay && isCloseDayReady && (
+                  <TooltipContent>
+                    <p>Apenas Gerentes, Admins e Superadmins podem fechar o dia.</p>
                   </TooltipContent>
                 )}
               </Tooltip>
