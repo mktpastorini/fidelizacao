@@ -64,29 +64,47 @@ serve(async (req) => {
     if (newStatus === 'approved') {
       switch (request.action_type) {
         case 'free_table': {
-          // Chama a função RPC que já contém a lógica de verificação de preparo, cancelamento de itens pendentes do cliente principal e liberação da mesa.
-          const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_free_table_request', {
-            p_request_id: request_id,
-            p_approved_by: user.id,
-          });
-          
-          if (rpcError) {
-            // Se a função SQL levantar uma exceção (ex: itens em preparo), o erro é capturado aqui.
-            // O erro do RPC é um objeto com a mensagem de erro do PostgreSQL.
-            console.error("Erro RPC process_free_table_request:", rpcError);
-            throw new Error(rpcError.message);
+          try {
+            // Chama a função RPC que já contém a lógica de verificação de preparo, cancelamento de itens pendentes do cliente principal e liberação da mesa.
+            const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc('process_free_table_request', {
+              p_request_id: request_id,
+              p_approved_by: user.id,
+            });
+            
+            if (rpcError) {
+              // Se a função SQL levantar uma exceção (ex: itens em preparo), o erro é capturado aqui.
+              // O erro do RPC é um objeto com a mensagem de erro do PostgreSQL.
+              console.error("Erro RPC process_free_table_request:", rpcError);
+              
+              // Se o erro for sobre itens em preparo, rejeitamos a requisição no banco
+              if (rpcError.message.includes('existem itens em preparo')) {
+                  await supabaseAdmin
+                      .from('approval_requests')
+                      .update({ 
+                          status: 'rejected', 
+                          approved_by: user.id, 
+                          approved_at: new Date().toISOString(),
+                          payload: { ...request.payload, rejection_reason: rpcError.message }
+                      })
+                      .eq('id', request_id);
+                  throw new Error(rpcError.message);
+              }
+              
+              throw new Error(rpcError.message);
+            }
+            
+            // O RPC já atualizou o status da solicitação para 'approved' e o payload com detalhes do cancelamento.
+            const resultData = rpcResult as { message?: string };
+            message = resultData.message || `Mesa ${request.payload.mesa_numero} liberada.`;
+            
+            return new Response(JSON.stringify({ success: true, message }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200,
+            });
+          } catch (rpcError) {
+              // Se houver um erro durante a execução do RPC, ele é propagado
+              throw rpcError;
           }
-          
-          // O RPC retorna um JSON, precisamos garantir que rpcResult seja tratado como tal.
-          const resultData = rpcResult as { message?: string };
-          message = resultData.message || `Mesa ${request.payload.mesa_numero} liberada.`;
-          
-          // O RPC já atualizou o status da solicitação para 'approved' e o payload com detalhes do cancelamento.
-          // Pulamos a atualização de status no passo 5 para esta ação.
-          return new Response(JSON.stringify({ success: true, message }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
         }
         case 'apply_discount': {
           const itemId = request.target_id;
@@ -106,7 +124,7 @@ serve(async (req) => {
       }
     }
 
-    // 5. Atualizar o status da solicitação (Apenas para ações que não usam process_free_table_request)
+    // 5. Atualizar o status da solicitação (Para rejeição ou ações que não usam process_free_table_request)
     const { error: updateError } = await supabaseAdmin
       .from('approval_requests')
       .update({ 
