@@ -16,6 +16,9 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
   // Itens entregues são mantidos por 30 minutos para visualização
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
+  // A query agora busca:
+  // 1. Itens pendentes OU em preparo E que requerem preparo.
+  // 2. OU Itens entregues (independentemente de requerer preparo, se foram atualizados recentemente).
   const { data, error } = await supabase
     .from("itens_pedido")
     .select(`
@@ -23,8 +26,10 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
       pedido:pedidos!inner(status, mesa:mesas(numero)),
       cliente:clientes!consumido_por_cliente_id(nome)
     `)
-    // Busca itens pendentes, em preparo, OU entregues (se atualizados nos últimos 30 minutos)
-    .or(`status.in.("pendente","preparando"),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`)
+    .or(`
+      and(status.in.("pendente","preparando"),requer_preparo.eq.true),
+      and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})
+    `)
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
