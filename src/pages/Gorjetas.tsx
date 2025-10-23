@@ -7,7 +7,7 @@ import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfDay, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DollarSign, User, BarChart2 } from "lucide-react";
+import { DollarSign, User, BarChart2, User as UserIcon } from "lucide-react"; // Adicionado UserIcon
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
