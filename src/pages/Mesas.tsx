@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Mesa, Cliente } from "@/types/supabase";
+import { Mesa, Cliente, Pedido, ItemPedido } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -21,20 +21,35 @@ import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
-import { useApprovalRequest } from "@/hooks/useApprovalRequest"; // Importado
+import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
+type PedidoAberto = Pedido & { itens_pedido: ItemPedido[] };
 
-async function fetchMesas(): Promise<MesaComOcupantes[]> {
-  const { data, error } = await supabase
+async function fetchMesas(): Promise<(MesaComOcupantes & { pedido: PedidoAberto | null })[]> {
+  const { data: mesasData, error: mesasError } = await supabase
     .from("mesas")
     .select("*, cliente:clientes(id, nome), ocupantes_count:mesa_ocupantes(count)")
     .order("numero", { ascending: true });
-  if (error) throw new Error(error.message);
+  if (mesasError) throw new Error(mesasError.message);
   
-  return (data || []).map(m => ({
+  const mesas = (mesasData || []).map(m => ({
     ...m,
     ocupantes_count: m.ocupantes_count[0]?.count || (m.cliente ? 1 : 0),
+  }));
+  
+  // Busca pedidos abertos separadamente
+  const { data: pedidosAbertos, error: pedidosError } = await supabase
+    .from("pedidos")
+    .select("*, itens_pedido(*)")
+    .eq("status", "aberto");
+  if (pedidosError) throw new Error(pedidosError.message);
+  
+  const pedidosMap = new Map(pedidosAbertos.map(p => [p.mesa_id, p]));
+
+  return mesas.map(mesa => ({
+    ...mesa,
+    pedido: pedidosMap.get(mesa.id) || null,
   }));
 }
 
@@ -46,13 +61,13 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MesasPage() {
   const queryClient = useQueryClient();
-  const { requestApproval, isRequesting } = useApprovalRequest(); // Usando o hook
+  const { requestApproval, isRequesting } = useApprovalRequest();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [editingMesa, setEditingMesa] = useState<Mesa | null>(null);
-  const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
+  const [mesaToFree, setMesaToFree] = useState<(Mesa & { pedido: PedidoAberto | null }) | null>(null);
   const [mesaToDelete, setMesaToDelete] = useState<Mesa | null>(null);
 
   const { data: mesas, isLoading, isError } = useQuery({ queryKey: ["mesas"], queryFn: fetchMesas });
@@ -79,15 +94,16 @@ export default function MesasPage() {
     const request: any = {
       action_type: 'free_table',
       target_id: mesaToFree.id,
-      payload: { mesa_numero: mesaToFree.numero },
+      payload: { 
+        mesa_numero: mesaToFree.numero,
+        pedido_id: mesaToFree.pedido?.id || null, // Passa o ID do pedido aberto
+      },
     };
 
     const executed = await requestApproval(request);
     if (executed) {
-      // Se a ação foi executada diretamente (Admin/Gerente), o hook já mostrou o toast.
       setMesaToFree(null);
     } else if (isRequesting) {
-      // Se a solicitação foi enviada (Garçom/Balcão), o hook já mostrou o toast.
       setMesaToFree(null);
     }
   };
@@ -281,19 +297,25 @@ export default function MesasPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Liberar Mesa {mesaToFree?.numero}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação irá desassociar o cliente da mesa e cancelar qualquer pedido aberto associado. Deseja continuar?
+              Esta ação irá desassociar o cliente da mesa e **cancelar** qualquer pedido aberto associado. Deseja continuar?
+              {mesaToFree?.pedido?.itens_pedido.some(item => item.status === 'preparando') && (
+                <p className="text-destructive font-bold mt-2">ATENÇÃO: Esta mesa possui itens em preparo e não pode ser liberada até que o pedido seja pago.</p>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Não</AlertDialogCancel>
-            <AlertDialogAction onClick={handleFreeMesa} disabled={isRequesting}>
+            <AlertDialogAction 
+              onClick={handleFreeMesa} 
+              disabled={isRequesting || mesaToFree?.pedido?.itens_pedido.some(item => item.status === 'preparando')}
+            >
               {isRequesting ? "Solicitando..." : "Sim, Liberar Mesa"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Novo AlertDialog para confirmar a exclusão da mesa */}
+      {/* AlertDialog para confirmar a exclusão da mesa */}
       <AlertDialog open={!!mesaToDelete} onOpenChange={() => setMesaToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

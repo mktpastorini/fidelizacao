@@ -59,25 +59,46 @@ export function useApprovalRequest() {
         switch (action_type) {
             case 'free_table': {
                 const mesaId = target_id;
+                const pedidoId = payload.pedido_id;
                 
-                // 1. Tenta cancelar o pedido aberto (se existir)
+                // 1. VERIFICAÇÃO DE TRAVAMENTO (Se houver pedido, verifica itens em preparo)
+                if (pedidoId) {
+                    const { count: preparingItemsCount, error: countError } = await supabase
+                        .from('itens_pedido')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('pedido_id', pedidoId)
+                        .eq('status', 'preparando');
+                        
+                    if (countError) throw countError;
+
+                    if (preparingItemsCount && preparingItemsCount > 0) {
+                        throw new Error(`Mesa travada: ${preparingItemsCount} item(s) em preparo. Finalize o pedido ou aguarde o pagamento.`);
+                    }
+                }
+                
+                // 2. Tenta cancelar o pedido aberto (se existir)
                 const { data: openOrder, error: findError } = await supabase.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').maybeSingle();
                 if (findError && findError.code !== 'PGRST116') throw findError;
 
                 let orderWasCancelled = false;
                 if (openOrder) {
+                    // Regra de Negócio: Se a mesa for liberada, os pedidos pendentes devem ser cancelados.
+                    // Deletamos todos os itens pendentes/em preparo/entregues
+                    await supabase.from('itens_pedido').delete().eq('pedido_id', openOrder.id).in('status', ['pendente', 'preparando', 'entregue']);
+                    
                     const { error: updateError } = await supabase.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
                     if (updateError) throw updateError;
                     orderWasCancelled = true;
                 }
 
-                // 2. Libera a mesa e remove ocupantes
+                // 3. Libera a mesa e remove ocupantes
                 await supabase.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
                 await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
                 
                 queryClient.invalidateQueries({ queryKey: ["mesas"] });
                 queryClient.invalidateQueries({ queryKey: ["salaoData"] });
                 queryClient.invalidateQueries({ queryKey: ["clientes"] });
+                queryClient.invalidateQueries({ queryKey: ["kitchenItems"] }); // Invalida itens da cozinha
                 
                 if (orderWasCancelled) {
                     showSuccess("Mesa liberada e pedido cancelado!");

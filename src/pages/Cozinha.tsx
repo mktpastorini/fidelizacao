@@ -4,6 +4,11 @@ import { ItemPedido } from "@/types/supabase";
 import { KanbanColumn } from "@/components/cozinha/KanbanColumn";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { UserPlus } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { usePageActions } from "@/contexts/PageActionsContext";
+import { useEffect } from "react";
 
 type KitchenItem = ItemPedido & {
   pedido: {
@@ -35,6 +40,8 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { setPageActions } = usePageActions();
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
@@ -42,26 +49,47 @@ export default function CozinhaPage() {
     refetchInterval: 15000, // Atualiza a cada 15 segundos
   });
 
+  // Define os botões da página no Header
+  useEffect(() => {
+    const pageButtons = (
+      <Button onClick={() => navigate("/cozinheiros")}>
+        <UserPlus className="w-4 h-4 mr-2" /> Gerenciar Cozinheiros
+      </Button>
+    );
+    setPageActions(pageButtons);
+
+    return () => setPageActions(null);
+  }, [setPageActions, navigate]);
+
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ itemId, newStatus }: { itemId: string; newStatus: 'preparando' | 'entregue' }) => {
-      const { error } = await supabase
-        .from("itens_pedido")
-        .update({ status: newStatus })
-        .eq("id", itemId);
-      if (error) throw error;
+    mutationFn: async ({ itemId, newStatus, imageUrl }: { itemId: string; newStatus: 'preparando' | 'entregue'; imageUrl?: string }) => {
+      if (imageUrl) {
+        // Se houver imagem, usamos o Edge Function para validação facial
+        const { data, error } = await supabase.functions.invoke('process-kitchen-action', {
+          body: { itemId, newStatus, image_url: imageUrl },
+        });
+        if (error) throw new Error(error.message);
+        return data;
+      } else {
+        // Se não houver imagem (apenas para itens sem preparo marcados por Garçom/Balcão), usamos o update direto
+        const { error } = await supabase
+          .from("itens_pedido")
+          .update({ status: newStatus })
+          .eq("id", itemId);
+        if (error) throw error;
+        return { message: "Status do item atualizado!" };
+      }
     },
-    onSuccess: () => {
-      // Força o refetch para atualizar o Kanban imediatamente
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      // Invalida também os pedidos pendentes do sininho
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
-      showSuccess("Status do item atualizado!");
+      showSuccess(data.message || "Status do item atualizado!");
     },
     onError: (err: Error) => showError(err.message),
   });
 
-  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue') => {
-    updateStatusMutation.mutate({ itemId, newStatus });
+  const handleStatusChange = (itemId: string, newStatus: 'preparando' | 'entregue', imageUrl?: string) => {
+    updateStatusMutation.mutate({ itemId, newStatus, imageUrl });
   };
 
   // Filtra itens para o Kanban
@@ -79,8 +107,6 @@ export default function CozinhaPage() {
     }
     
     // 3. Inclui itens que foram entregues recentemente (para a coluna "Pronto/Entregue")
-    // NOTA: Itens de venda direta que não requerem preparo são marcados como 'entregue' na inserção.
-    // Se quisermos que eles apareçam na coluna 'Pronto/Entregue' por 30 minutos, mantemos esta lógica.
     if (item.status === 'entregue') {
       return true;
     }
@@ -109,9 +135,27 @@ export default function CozinhaPage() {
         <p className="text-destructive">Erro ao carregar os pedidos.</p>
       ) : (
         <div className="flex-1 flex gap-6">
-          <KanbanColumn title="Pendente" items={pendingItems} onStatusChange={handleStatusChange} borderColor="border-warning" />
-          <KanbanColumn title="Em Preparo" items={preparingItems} onStatusChange={handleStatusChange} borderColor="border-primary" />
-          <KanbanColumn title="Pronto/Entregue" items={deliveredItems} onStatusChange={handleStatusChange} borderColor="border-success" />
+          <KanbanColumn 
+            title="Pendente" 
+            items={pendingItems} 
+            onStatusChange={handleStatusChange} 
+            borderColor="border-warning" 
+            isUpdating={updateStatusMutation.isPending}
+          />
+          <KanbanColumn 
+            title="Em Preparo" 
+            items={preparingItems} 
+            onStatusChange={handleStatusChange} 
+            borderColor="border-primary" 
+            isUpdating={updateStatusMutation.isPending}
+          />
+          <KanbanColumn 
+            title="Pronto/Entregue" 
+            items={deliveredItems} 
+            onStatusChange={handleStatusChange} 
+            borderColor="border-success" 
+            isUpdating={updateStatusMutation.isPending}
+          />
         </div>
       )}
     </div>

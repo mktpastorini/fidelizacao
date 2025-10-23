@@ -66,6 +66,34 @@ serve(async (req) => {
         case 'free_table': {
           const mesaId = request.target_id;
           
+          // --- NOVO BLOCO DE VERIFICAÇÃO DE TRAVAMENTO ---
+          const { count: preparingItemsCount, error: countError } = await supabaseAdmin
+            .from('itens_pedido')
+            .select('id', { count: 'exact', head: true })
+            .eq('pedido_id', request.payload.pedido_id) // Assumindo que o payload contém o pedido_id
+            .eq('status', 'preparando');
+            
+          if (countError) throw countError;
+
+          if (preparingItemsCount && preparingItemsCount > 0) {
+              // Se houver itens em preparo, a mesa está travada. Rejeita a aprovação.
+              await supabaseAdmin
+                .from('approval_requests')
+                .update({ 
+                  status: 'rejected', 
+                  approved_by: user.id, 
+                  approved_at: new Date().toISOString(),
+                  payload: { ...request.payload, rejection_reason: "Mesa travada: Itens em preparo." }
+                })
+                .eq('id', request_id);
+              
+              return new Response(JSON.stringify({ success: false, message: `Rejeitado: Mesa ${request.payload.mesa_numero} possui ${preparingItemsCount} item(s) em preparo e não pode ser liberada.` }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 400,
+              });
+          }
+          // --- FIM DO BLOCO DE VERIFICAÇÃO DE TRAVAMENTO ---
+          
           // Tenta encontrar o pedido aberto
           const { data: openOrder, error: findError } = await supabaseAdmin
             .from('pedidos')
@@ -80,7 +108,23 @@ serve(async (req) => {
           let occupants = [];
 
           if (openOrder) {
-            // Captura os itens e ocupantes antes de cancelar
+            // Regra de Negócio: Se a mesa for liberada, os pedidos pendentes devem ser cancelados.
+            // Itens 'entregue' ou 'preparando' (se a verificação acima falhar) serão cancelados.
+            
+            // 1. Cancela todos os itens pendentes/em preparo/entregues (exceto os pagos, que não estariam aqui)
+            const { error: cancelItemsError } = await supabaseAdmin
+                .from('itens_pedido')
+                .delete()
+                .eq('pedido_id', openOrder.id)
+                .in('status', ['pendente', 'preparando', 'entregue']);
+            
+            if (cancelItemsError) throw cancelItemsError;
+            
+            // 2. Cancela o pedido principal
+            const { error: updateError } = await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
+            if (updateError) throw updateError;
+            
+            // Atualiza o payload para refletir o cancelamento
             cancelledItems = openOrder.itens_pedido.map((item: any) => ({
                 nome: item.nome_produto,
                 quantidade: item.quantidade,
@@ -88,10 +132,6 @@ serve(async (req) => {
                 consumidor_id: item.consumido_por_cliente_id,
             }));
             occupants = openOrder.acompanhantes || [];
-
-            // Cancela o pedido
-            const { error: updateError } = await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
-            if (updateError) throw updateError;
           } else {
             // Se não houver pedido, apenas busca os ocupantes atuais
             const { data: currentOccupants, error: occError } = await supabaseAdmin
@@ -150,7 +190,6 @@ serve(async (req) => {
       .eq('id', request_id);
 
     if (updateError) {
-      // Se a atualização falhar, tentamos reverter a ação se ela foi executada
       console.error("Erro ao atualizar status da solicitação:", updateError);
       throw new Error("Ação executada, mas falha ao registrar o status. Contate o suporte.");
     }
