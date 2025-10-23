@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.finalizar_pagamento_parcial(p_pedido_id uuid, p_cliente_id_pagando uuid);

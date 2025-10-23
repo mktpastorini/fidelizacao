@@ -91,6 +91,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const [isResgateOpen, setIsResgateOpen] = useState(false);
   
+  // Novo estado para armazenar os itens da mesa que o cliente selecionou para pagar
+  const [mesaItemsToPay, setMesaItemsToPay] = useState<ItemPedido[]>([]);
+  const [isPartialDialogValid, setIsPartialDialogValid] = useState(false); // Estado para validar o pagamento parcial
+
   const form = useForm<z.infer<typeof itemSchema>>({
     resolver: zodResolver(itemSchema),
     defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
@@ -144,6 +148,24 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     return { itensAgrupados: agrupados, totalPedido: total, itensMesaGeral: mesaGeral };
   }, [pedido, ocupantes]);
 
+  // Função para obter os itens a serem pagos pelo cliente (apenas os individuais)
+  const getItemsToPayIndividual = (clienteId: string) => {
+    return itensAgrupados.get(clienteId)?.itens || [];
+  };
+  
+  // Função para obter a lista final de itens para o modal de pagamento parcial
+  const getItemsForPartialPayment = (clienteId: string) => {
+    const itensIndividuais = getItemsToPayIndividual(clienteId);
+    
+    // Se o cliente for o principal, ele paga os itens da mesa que ainda não foram pagos
+    if (clientePrincipal?.id === clienteId) {
+        return [...itensIndividuais, ...itensMesaGeral];
+    }
+    
+    // Se for acompanhante, ele só paga os itens individuais dele.
+    return itensIndividuais;
+  };
+
   const addItemMutation = useMutation({
     mutationFn: async (novoItem: z.infer<typeof itemSchema>) => {
       if (!mesa || !mesa.cliente_id) throw new Error("Mesa ou cliente não selecionado.");
@@ -187,20 +209,61 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   });
 
   const closePartialOrderMutation = useMutation({
-    mutationFn: async (clienteId: string) => {
+    mutationFn: async ({ clienteId, itemIdsToPay }: { clienteId: string, itemIdsToPay: string[] }) => {
       if (!pedido) throw new Error("Pedido não encontrado.");
-      const { error } = await supabase.rpc('finalizar_pagamento_parcial', {
-        p_pedido_id: pedido.id,
-        p_cliente_id_pagando: clienteId,
-      });
-      if (error) throw error;
+      
+      // 1. Mover os itens selecionados para o novo pedido "recibo"
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não autenticado.");
+
+      // Criar um novo pedido "recibo"
+      const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
+        user_id: user.id, 
+        cliente_id: clienteId, 
+        status: 'pago', 
+        closed_at: new Date().toISOString(), 
+        mesa_id: mesa!.id, 
+        acompanhantes: pedido.acompanhantes,
+      }).select("id").single();
+      if (newPedidoError) throw newPedidoError;
+      const newPedidoId = newPedido.id;
+
+      // Mover os itens selecionados para o novo pedido
+      const { error: updateItemsError } = await supabase.from("itens_pedido")
+        .update({ 
+            pedido_id: newPedidoId, 
+            consumido_por_cliente_id: clienteId // Atribui todos os itens pagos ao cliente
+        })
+        .in("id", itemIdsToPay);
+      if (updateItemsError) throw updateItemsError;
+
+      // 2. Verificar se o cliente pagando é o principal e se ele ainda está na mesa
+      const isPrincipal = clientePrincipal?.id === clienteId;
+      
+      // 3. Se o cliente pagando for o principal, e ele pagou todos os itens da mesa,
+      // e não há mais itens individuais de outros clientes, liberamos a mesa.
+      
+      // 4. Remover o cliente da lista de ocupantes da mesa
+      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
+
+      // 5. Verificar se o pedido original ainda tem itens
+      const { count: remainingItemsCount } = await supabase.from("itens_pedido")
+        .select('*', { count: 'exact', head: true })
+        .eq("pedido_id", pedido.id);
+
+      // 6. Se o pedido original estiver vazio, fechar a mesa e o pedido original
+      if (remainingItemsCount === 0) {
+        await supabase.from('pedidos').update({ status: 'pago', closed_at: new Date().toISOString() }).eq('id', pedido.id);
+        await supabase.from('mesas').update({ cliente_id: null }).eq('id', mesa!.id);
+      }
     },
-    onSuccess: (_, clienteId) => {
+    onSuccess: (_, { clienteId }) => {
       queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["ocupantes", mesa?.id] });
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] }); // Adicionado invalidação para o sininho
+      queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
+      queryClient.invalidateQueries({ queryKey: ["clientes"] }); // Invalida clientes para atualizar pontos
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagando(null);
@@ -215,6 +278,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       if (!user) throw new Error("Usuário não autenticado.");
 
       // 1. Chamar a nova função RPC para fechar o pedido e liberar a mesa
+      // Esta função já atribui todos os itens restantes (Mesa Geral) ao cliente principal
       const { error: rpcError } = await supabase.rpc('finalizar_pagamento_total', {
         p_pedido_id: pedido.id,
         p_mesa_id: mesa.id,
@@ -289,16 +353,18 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     });
   };
   
-  // Função para obter os itens a serem pagos pelo cliente
-  const getItemsToPay = (clienteId: string) => {
-    const itensIndividuais = itensAgrupados.get(clienteId)?.itens || [];
-    
-    // Se o cliente for o principal, adiciona os itens da mesa geral
-    if (clientePrincipal?.id === clienteId) {
-      return [...itensIndividuais, ...itensMesaGeral];
+  // Função para abrir o modal de pagamento parcial
+  const handlePartialPaymentOpen = (cliente: Cliente) => {
+    setClientePagando(cliente);
+    // Inicializa a seleção de itens da mesa (se houver)
+    if (clientePrincipal?.id === cliente.id) {
+        setMesaItemsToPay(itensMesaGeral);
+    } else {
+        setMesaItemsToPay([]);
     }
-    
-    return itensIndividuais;
+    // Valida se há itens para pagar (individuais + mesa, se for o principal)
+    const items = getItemsForPartialPayment(cliente.id);
+    setIsPartialDialogValid(items.length > 0);
   };
 
   return (
@@ -336,14 +402,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               <div className="space-y-4 overflow-y-auto pr-2">
                 <h3 className="font-semibold">Itens do Pedido</h3>
                 {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => {
-                  // Se for o grupo 'Mesa (Geral)' e houver um cliente principal, pulamos a exibição
-                  // pois os itens da mesa serão pagos pelo cliente principal.
-                  if (cliente.id === 'mesa' && clientePrincipal) {
-                    return null;
-                  }
-                  
-                  // Se for o grupo 'Mesa (Geral)' e NÃO houver cliente principal, exibimos.
-                  if (cliente.id === 'mesa' && !clientePrincipal && itens.length > 0) {
+                  // Se for o grupo 'Mesa (Geral)', exibimos separadamente para que qualquer um possa pagar
+                  if (cliente.id === 'mesa' && itens.length > 0) {
                     return (
                       <div key={cliente.id} className="p-3 border rounded-lg bg-warning/10">
                         <h4 className="font-semibold text-warning-foreground">Mesa (Geral) - Itens Pendentes</h4>
@@ -370,7 +430,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                       <p>R$ {precoOriginal.toFixed(2)}</p>
                                     )}
                                   </div>
-                                  {/* Ações para itens da mesa sem cliente principal */}
+                                  {/* Ações para itens da mesa */}
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                       <Button variant="ghost" size="icon" className="h-6 w-6">
@@ -398,31 +458,28 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     );
                   }
                   
-                  // Exibição normal para clientes individuais (incluindo o principal)
+                  // Exibição normal para clientes individuais
                   if (cliente.id !== 'mesa' && itens.length > 0) {
                     const isPrincipal = cliente.id === clientePrincipal?.id;
-                    const itensParaPagar = getItemsToPay(cliente.id);
-                    const subtotalParaPagar = itensParaPagar.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
+                    const subtotalIndividual = itens.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
 
                     return (
                       <div key={cliente.id} className="p-3 border rounded-lg">
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="font-semibold">{cliente.nome} {isPrincipal && "(Principal)"}</h4>
-                          <Button size="sm" variant="outline" onClick={() => setClientePagando(cliente as Cliente)}>
+                          <Button size="sm" variant="outline" onClick={() => handlePartialPaymentOpen(cliente as Cliente)}>
                             <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
                           </Button>
                         </div>
                         <ul className="space-y-2">
-                          {itensParaPagar.map((item) => {
+                          {itens.map((item) => {
                             const precoOriginal = (item.preco || 0) * item.quantidade;
                             const precoFinal = calcularPrecoComDesconto(item);
-                            const isMesaItem = item.consumido_por_cliente_id === null;
                             
                             return (
                               <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
                                 <div>
                                   <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
-                                  {isMesaItem && <Badge variant="outline" className="mt-1 bg-warning/20 text-warning-foreground">Mesa (Geral)</Badge>}
                                   {item.desconto_percentual && item.desconto_percentual > 0 && (
                                     <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
                                   )}
@@ -460,7 +517,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                             );
                           })}
                         </ul>
-                        <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotalParaPagar.toFixed(2)}</p>
+                        <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotalIndividual.toFixed(2)}</p>
                       </div>
                     );
                   }
@@ -545,9 +602,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         isOpen={!!clientePagando}
         onOpenChange={() => setClientePagando(null)}
         cliente={clientePagando}
-        itens={getItemsToPay(clientePagando?.id || '')} // Passa a lista correta de itens
-        onConfirm={() => clientePagando && closePartialOrderMutation.mutate(clientePagando.id)}
+        itensIndividuais={getItemsToPayIndividual(clientePagando?.id || '')}
+        itensMesaGeral={itensMesaGeral}
+        clientePrincipalId={clientePrincipal?.id || null}
+        onConfirm={(itemIdsToPay) => clientePagando && closePartialOrderMutation.mutate({ clienteId: clientePagando.id, itemIdsToPay })}
         isSubmitting={closePartialOrderMutation.isPending}
+        isPartialDialogValid={isPartialDialogValid}
       />
       <AplicarDescontoDialog
         isOpen={!!itemParaDesconto}
