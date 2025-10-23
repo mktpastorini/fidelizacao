@@ -19,8 +19,8 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError || !superadminProfile) {
-    console.error("[recognize-cook-compreface] Erro ao buscar Superadmin:", profileError);
-    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+    console.error("[recognize-cook-compreface] Erro ao buscar Superadmin:", profileError?.message || "Perfil não encontrado.");
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal."), superadminId: null };
   }
   
   const superadminId = superadminProfile.id;
@@ -34,12 +34,12 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .single();
 
   if (settingsError) {
-    console.error(`[recognize-cook-compreface] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
+    console.error(`[recognize-cook-compreface] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError.message);
+    return { settings: null, error: new Error("Falha ao carregar configurações do sistema."), superadminId };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'."), superadminId };
   }
 
   return { settings, error: null, superadminId };
@@ -83,10 +83,15 @@ serve(async (req) => {
     const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
+      // Se houver erro nas configurações, retorna 400 para o cliente
       return new Response(JSON.stringify({ error: settingsError.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       });
+    }
+    if (!superadminId) {
+        // Isso não deve acontecer se settingsError for null, mas é um fallback seguro
+        throw new Error("ID do Superadmin não encontrado após buscar configurações.");
     }
 
     console.log("[recognize-cook-compreface] 3/7: Configurações carregadas.");
@@ -129,6 +134,11 @@ serve(async (req) => {
         .single();
 
       if (cookError) {
+        // Se o cozinheiro não for encontrado (ex: foi deletado do banco mas não do CompreFace)
+        if (cookError.code === 'PGRST116') {
+            console.warn(`[recognize-cook-compreface] Cozinheiro ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
+            return new Response(JSON.stringify({ cook: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cozinheiro: ${cookError.message}`);
       }
       console.log("[recognize-cook-compreface] Dados do cozinheiro recuperados com sucesso.");
