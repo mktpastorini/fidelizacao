@@ -1,0 +1,1 @@
+SELECT id, nome, tipo, requer_preparo FROM public.produtos WHERE nome ILIKE '%Rodizio Pizza%';
