@@ -58,28 +58,17 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[recognize-multiple-faces] 1/6: Parsing body da requisição...");
+    console.log("[recognize-multiple-faces] 1/5: Parsing body da requisição...");
     const { image_url } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
-    console.log("[recognize-multiple-faces] 1/6: Body recebido.");
+    console.log("[recognize-multiple-faces] 1/5: Body recebido.");
 
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
     }
-
-    // 2. Autenticação do usuário logado para obter o ID (necessário para buscar os clientes dele)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
-    }
     
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userIdForClients = user.id;
-    console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userIdForClients}`);
-    
-    // 3. Buscando configurações do CompreFace do Superadmin
+    // 2. Buscando configurações do CompreFace do Superadmin
     const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
@@ -89,10 +78,10 @@ serve(async (req) => {
       });
     }
 
-    console.log("[recognize-multiple-faces] 3/6: Configurações carregadas.");
+    console.log("[recognize-multiple-faces] 3/5: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[recognize-multiple-faces] 4/6: Enviando para CompreFace para reconhecimento de múltiplas faces...");
+    console.log("[recognize-multiple-faces] 4/5: Enviando para CompreFace para reconhecimento de múltiplas faces...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=0`, {
       method: 'POST',
       headers: {
@@ -102,14 +91,21 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[recognize-multiple-faces] 5/6: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[recognize-multiple-faces] 5/5: Resposta recebida do CompreFace com status: ${response.status}`);
     if (!response.ok) {
       const errorBody = await response.json().catch(() => response.text());
       if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
         console.log("[recognize-multiple-faces] CompreFace não encontrou nenhum rosto na imagem.");
         return new Response(JSON.stringify({ matches: [], message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
-      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
+      
+      const errorDetail = typeof errorBody === 'string' ? errorBody : JSON.stringify(errorBody);
+      console.error(`[recognize-multiple-faces] Erro da API do CompreFace: ${errorDetail}`);
+      
+      return new Response(JSON.stringify({ error: `Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${errorDetail}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
 
     const data = await response.json();
@@ -127,7 +123,7 @@ serve(async (req) => {
             .from('clientes')
             .select('id, nome, avatar_url, gostos, casado_com, visitas')
             .eq('id', bestSubject.subject)
-            .eq('user_id', superadminId) // <--- USANDO O ID DO SUPERADMIN AQUI
+            .eq('user_id', superadminId) // USANDO O ID DO SUPERADMIN AQUI
             .single();
 
           if (clientError) {
@@ -144,7 +140,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[recognize-multiple-faces] 6/6: ${recognizedFaces.length} cliente(s) reconhecido(s).`);
+    console.log(`[recognize-multiple-faces] 5/5: ${recognizedFaces.length} cliente(s) reconhecido(s).`);
     return new Response(JSON.stringify({ matches: recognizedFaces }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
