@@ -30,7 +30,7 @@ const allNavItems = [
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha', 'garcom'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
-  { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin', 'cozinha'] }, // Removido 'gerente'
+  { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin'] }, // Removido 'cozinha'
   { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
 ];
 

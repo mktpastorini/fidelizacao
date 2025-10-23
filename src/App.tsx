@@ -68,8 +68,8 @@ const App = () => (
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
                 
-                {/* Configurações: Apenas Superadmin, Admin e Cozinha */}
-                <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'cozinha']}><Configuracoes /></RoleGuard>} />
+                {/* Configurações: Apenas Superadmin e Admin */}
+                <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin']}><Configuracoes /></RoleGuard>} />
                 
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
