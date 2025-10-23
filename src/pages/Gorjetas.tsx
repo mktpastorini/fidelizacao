@@ -5,7 +5,7 @@ import { StaffProfile } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
-import { startOfMonth, endOfDay, format, startOfDay } from "date-fns"; // Adicionado startOfDay
+import { startOfMonth, endOfDay, format, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DollarSign, User, BarChart2, User as UserIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,8 +55,9 @@ export default function GorjetasPage() {
   });
 
   const userIdToFetch = useMemo(() => {
-    // Apenas Superadmin, Admin e Gerente podem ver as gorjetas (que são associadas ao Superadmin)
-    if (userRole && ['superadmin', 'admin', 'gerente'].includes(userRole)) {
+    // Superadmin, Admin, Gerente E Garçom podem ver as gorjetas.
+    // Os dados são sempre associados ao Superadmin.
+    if (userRole && ['superadmin', 'admin', 'gerente', 'garcom'].includes(userRole)) {
       return superadminId;
     }
     return null;
@@ -78,10 +79,14 @@ export default function GorjetasPage() {
     return <Skeleton className="h-96 w-full" />;
   }
   
+  // Se o usuário for garçom, ele terá userIdToFetch, então a tela será renderizada.
+  // Se o usuário não tiver permissão (ex: balcao, cozinha), o RoleGuard no App.tsx já o bloqueou.
+  // Se o userIdToFetch for null aqui, é porque o RoleGuard falhou ou o userRole não está na lista permitida.
   if (!userIdToFetch) {
+    // Este bloco só deve ser atingido se o RoleGuard no App.tsx falhar, mas mantemos a mensagem de erro genérica.
     return (
       <div className="p-8">
-        <p className="text-destructive">Acesso negado. Apenas gerentes e administradores podem visualizar as gorjetas.</p>
+        <p className="text-destructive">Acesso negado. Sua função não está autorizada a ver esta página.</p>
       </div>
     );
   }
