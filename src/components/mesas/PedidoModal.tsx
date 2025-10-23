@@ -357,6 +357,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
+      queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagandoIndividual(null);
@@ -853,7 +854,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                 <Select 
                   value={clientePagandoMesaId || ''} 
                   onValueChange={setClientePagandoMesaId}
-                  disabled={ocupantes.length === 0 || payMesaItemPartialPaymentOpen}
+                  disabled={ocupantes.length === 0 || payMesaItemPartialMutation.isPending}
                 >
                   <SelectTrigger id="cliente-pagando-mesa" className="mt-1">
                     <SelectValue placeholder="Selecione o cliente" />
@@ -875,7 +876,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     variant="outline" 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.max(1, prev - 1))} 
-                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialPaymentOpen}
+                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialMutation.isPending}
                   >
                     <Minus className="w-4 h-4" />
                   </Button>
@@ -886,12 +887,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     value={quantidadePagarMesa} 
                     onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.quantidade, parseInt(e.target.value) || 1)))} 
                     className="w-16 text-center"
-                    disabled={payMesaItemPartialPaymentOpen}
+                    disabled={payMesaItemPartialMutation.isPending}
                   />
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.quantidade, prev + 1))} 
-                    disabled={quantidadePagarMesa >= itemMesaToPay.quantidade || payMesaItemPartialPaymentOpen}
+                    disabled={quantidadePagarMesa >= itemMesaToPay.quantidade || payMesaItemPartialMutation.isPending}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -906,12 +907,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={payMesaItemPartialPaymentOpen}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={payMesaItemPartialMutation.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmMesaItemPayment} 
-              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialPaymentOpen}
+              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialMutation.isPending}
             >
-              {payMesaItemPartialPaymentOpen ? "Processando..." : "Confirmar Pagamento"}
+              {payMesaItemPartialMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
