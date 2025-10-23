@@ -48,7 +48,10 @@ async function fetchPendingOrderItems(): Promise<PendingOrderItem[]> {
   if (error) throw new Error(error.message);
   
   // Mapeia e filtra para garantir que apenas itens com mesa associada sejam retornados
-  return data.filter(item => item.pedido?.mesa)
+  return data.filter(item => 
+    item.pedido?.mesa && 
+    !item.nome_produto.toUpperCase().includes('[RODIZIO]') // Exclui itens de rodízio
+  )
     .map(item => ({
       ...item,
       mesa: item.pedido?.mesa,
