@@ -1,9 +1,10 @@
 import { ApprovalRequest, UserRole } from "@/types/supabase";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, Table, Tag, User, Loader2 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Table, Tag, User, Loader2, ReceiptText, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
 
 type ApprovalRequestItemProps = {
   request: ApprovalRequest;
@@ -29,10 +30,9 @@ function getRelationshipObject<T>(data: T | T[] | null | undefined): T | null {
   return data;
 }
 
+const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
 export function ApprovalRequestItem({ request, onProcess, isProcessing }: ApprovalRequestItemProps) {
-  
-  // Adicionando log para debug
-  console.log("Dados da Solicitação:", request);
   
   // Acessando dados do solicitante
   const requesterProfile = getRelationshipObject(request.requester);
@@ -52,6 +52,7 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
   let description = "";
   let IconComponent: React.ElementType = Clock;
   let iconColor = "text-yellow-500";
+  let detailsContent: React.ReactNode = null;
 
   // Acessando os dados da relação
   const mesa = getRelationshipObject(request.mesa);
@@ -63,13 +64,28 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
 
   switch (request.action_type) {
     case 'free_table':
-      // Se o número da mesa não vier, usamos o target_id (que é o ID da mesa) como fallback na descrição
       const mesaDisplay = mesaNumero ? `Mesa ${mesaNumero}` : `Mesa ID: ${request.target_id.substring(0, 8)}...`;
       title = `Liberar Mesa ${mesaNumero || '?'}`;
       description = `${requesterDetail} solicitou liberar a mesa.`;
       IconComponent = Table;
       iconColor = "text-blue-500";
+      
+      // Detalhes do cancelamento (visível após aprovação/rejeição)
+      if (request.status !== 'pending') {
+        const cancelledItems = request.payload.cancelled_items || [];
+        const occupants = request.payload.occupants_at_cancellation || [];
+        const totalCancelled = cancelledItems.reduce((acc: number, item: any) => acc + (item.preco || 0) * item.quantidade, 0);
+        
+        detailsContent = (
+          <div className="mt-3 space-y-2 text-xs bg-muted p-3 rounded-md">
+            <p className="font-semibold flex items-center gap-1"><Users className="w-3 h-3" /> Clientes: {occupants.map((o: any) => o.nome).join(', ') || 'N/A'}</p>
+            <p className="font-semibold flex items-center gap-1"><ReceiptText className="w-3 h-3" /> Itens Cancelados: {cancelledItems.length}</p>
+            <p className="font-semibold">Valor Cancelado: {formatCurrency(totalCancelled)}</p>
+          </div>
+        );
+      }
       break;
+      
     case 'apply_discount':
       const itemNome = itemPedido?.nome_produto || 'Item do Pedido';
       const desconto = request.payload.desconto_percentual;
@@ -81,6 +97,10 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
       iconColor = "text-green-500";
       break;
   }
+
+  const isPending = request.status === 'pending';
+  const isApproved = request.status === 'approved';
+  const isRejected = request.status === 'rejected';
 
   return (
     <div className="p-4 border rounded-lg bg-card shadow-sm space-y-3">
@@ -94,8 +114,19 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
             <p className="text-xs text-muted-foreground max-w-xs">{description}</p>
           </div>
         </div>
+        {/* Status Badge */}
+        {!isPending && (
+            <Badge 
+                variant={isApproved ? 'default' : 'destructive'} 
+                className={cn(isApproved && "bg-green-500 hover:bg-green-600 text-primary-foreground")}
+            >
+                {isApproved ? 'Aprovado' : 'Rejeitado'}
+            </Badge>
+        )}
       </div>
       
+      {detailsContent}
+
       <div className="text-xs text-muted-foreground flex justify-between items-center border-t pt-3">
         <div className="flex items-center gap-1">
             <User className="w-3 h-3" />
@@ -104,27 +135,29 @@ export function ApprovalRequestItem({ request, onProcess, isProcessing }: Approv
         <span>{timeAgo}</span>
       </div>
 
-      <div className="flex gap-2 pt-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-          onClick={() => onProcess(request.id, 'approve')}
-          disabled={isProcessing}
-        >
-          {isProcessing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
-          Aprovar
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1 bg-destructive hover:bg-red-700 text-white"
-          onClick={() => onProcess(request.id, 'reject')}
-          disabled={isProcessing}
-        >
-          <XCircle className="w-4 h-4 mr-1" /> Rejeitar
-        </Button>
-      </div>
+      {isPending && (
+        <div className="flex gap-2 pt-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+            onClick={() => onProcess(request.id, 'approve')}
+            disabled={isProcessing}
+          >
+            {isProcessing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-1" />}
+            Aprovar
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 bg-destructive hover:bg-red-700 text-white"
+            onClick={() => onProcess(request.id, 'reject')}
+            disabled={isProcessing}
+          >
+            <XCircle className="w-4 h-4 mr-1" /> Rejeitar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

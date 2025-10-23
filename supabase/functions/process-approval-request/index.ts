@@ -66,19 +66,59 @@ serve(async (req) => {
         case 'free_table': {
           const mesaId = request.target_id;
           
-          // Tenta cancelar o pedido aberto (se existir)
-          const { data: openOrder, error: findError } = await supabaseAdmin.from('pedidos').select('id').eq('mesa_id', mesaId).eq('status', 'aberto').maybeSingle();
+          // Tenta encontrar o pedido aberto
+          const { data: openOrder, error: findError } = await supabaseAdmin
+            .from('pedidos')
+            .select('id, itens_pedido(*), acompanhantes')
+            .eq('mesa_id', mesaId)
+            .eq('status', 'aberto')
+            .maybeSingle();
+          
           if (findError && findError.code !== 'PGRST116') throw findError;
 
+          let cancelledItems = [];
+          let occupants = [];
+
           if (openOrder) {
+            // Captura os itens e ocupantes antes de cancelar
+            cancelledItems = openOrder.itens_pedido.map((item: any) => ({
+                nome: item.nome_produto,
+                quantidade: item.quantidade,
+                preco: item.preco,
+                consumidor_id: item.consumido_por_cliente_id,
+            }));
+            occupants = openOrder.acompanhantes || [];
+
+            // Cancela o pedido
             const { error: updateError } = await supabaseAdmin.from('pedidos').update({ status: 'cancelado' }).eq('id', openOrder.id);
             if (updateError) throw updateError;
+          } else {
+            // Se não houver pedido, apenas busca os ocupantes atuais
+            const { data: currentOccupants, error: occError } = await supabaseAdmin
+                .from('mesa_ocupantes')
+                .select('cliente:clientes(id, nome)')
+                .eq('mesa_id', mesaId);
+            if (occError) throw occError;
+            
+            occupants = currentOccupants.map((o: any) => ({ id: o.cliente.id, nome: o.cliente.nome }));
           }
 
+          // Atualiza o payload da solicitação com os detalhes do cancelamento
+          const updatedPayload = {
+              ...request.payload,
+              cancelled_items: cancelledItems,
+              occupants_at_cancellation: occupants,
+              cancellation_time: new Date().toISOString(),
+          };
+          
           // Libera a mesa e remove ocupantes
           await supabaseAdmin.from("mesas").update({ cliente_id: null }).eq("id", mesaId);
           await supabaseAdmin.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
-          message = `Mesa ${mesaId} liberada com sucesso.`;
+          
+          // Atualiza a solicitação com o novo payload
+          await supabaseAdmin.from('approval_requests').update({ payload: updatedPayload }).eq('id', request_id);
+
+          message = `Mesa ${request.payload.mesa_numero} liberada e pedido cancelado (se existia).`;
           break;
         }
         case 'apply_discount': {

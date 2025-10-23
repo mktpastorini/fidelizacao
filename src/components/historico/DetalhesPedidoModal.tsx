@@ -34,6 +34,10 @@ export function DetalhesPedidoModal({ isOpen, onOpenChange, pedido }: DetalhesPe
   }, 0);
 
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  
+  // Filtra o cliente principal da lista de acompanhantes para evitar duplicidade na exibição
+  const acompanhantesExibicao = (pedido.acompanhantes || [])
+    .filter(a => a.id !== pedido.cliente_id);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -45,14 +49,17 @@ export function DetalhesPedidoModal({ isOpen, onOpenChange, pedido }: DetalhesPe
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 space-y-4">
-          <p><strong>Cliente:</strong> {pedido.cliente?.nome || "Não identificado"}</p>
+          <p><strong>Cliente Principal:</strong> {pedido.cliente?.nome || "Não identificado"}</p>
           
+          {/* Exibe todos os clientes que estavam na mesa (principal + acompanhantes) */}
           {pedido.acompanhantes && pedido.acompanhantes.length > 0 && (
             <div className="flex items-start gap-2 text-sm">
               <Users className="w-4 h-4 mt-1 text-gray-600" />
               <div>
-                <strong className="font-semibold">Acompanhantes:</strong>
-                <span className="text-gray-700 ml-1">{pedido.acompanhantes.map(a => a.nome).join(', ')}</span>
+                <strong className="font-semibold">Clientes na Mesa:</strong>
+                <span className="text-gray-700 ml-1">
+                  {pedido.acompanhantes.map(a => a.nome).join(', ')}
+                </span>
               </div>
             </div>
           )}
