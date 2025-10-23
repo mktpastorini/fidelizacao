@@ -17,6 +17,7 @@ type KanbanCardProps = {
       mesa: { numero: number } | null;
     } | null;
     cliente: { nome: string } | null;
+    cozinheiro: { nome: string } | null; // Adicionado o nome do cozinheiro
   };
   onStatusChange: (itemId: string, newStatus: 'preparando' | 'entregue', cookId: string | null) => void;
 };
@@ -94,10 +95,10 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
               <Clock className="w-4 h-4 mr-2" />
               <span className={cn(isOverdue ? "text-destructive font-semibold" : "")}>Há {tempoDesdePedido}</span>
             </div>
-            {item.cozinheiro_id && (
+            {item.cozinheiro?.nome && (
                 <div className="flex items-center text-xs text-primary">
                     <Utensils className="w-3 h-3 mr-2" />
-                    <span>Cozinheiro ID: {item.cozinheiro_id.substring(0, 8)}...</span>
+                    <span>Responsável: {item.cozinheiro.nome}</span>
                 </div>
             )}
           </div>

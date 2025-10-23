@@ -88,11 +88,12 @@ export type ItemPedido = {
   consumido_por_cliente_id?: string | null;
   desconto_percentual?: number | null;
   desconto_motivo?: string | null;
-  status: 'pendente' | 'preparando' | 'entregue';
+  status: 'pendente' | 'preparando' | 'entregue' | 'cancelado';
   requer_preparo: boolean;
   created_at: string;
   updated_at: string;
   cozinheiro_id: string | null;
+  cozinheiro?: { nome: string } | null; // NOVO CAMPO DE RELAÇÃO
   hora_inicio_preparo: string | null; // NOVO CAMPO
   hora_entrega: string | null; // NOVO CAMPO
 };
