@@ -20,7 +20,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 
   if (profileError || !superadminProfile) {
     console.error("[recognize-multiple-faces] Erro ao buscar Superadmin:", profileError);
-    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal. Verifique se há um usuário com a função 'superadmin' e se o RLS permite a leitura de perfis.") };
   }
   
   const superadminId = superadminProfile.id;
@@ -33,9 +33,9 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .eq('id', superadminId)
     .single();
 
-  if (settingsError) {
-    console.error(`[recognize-multiple-faces] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
+  if (settingsError || !settings) {
+    console.error("[recognize-multiple-faces] Erro ao buscar user_settings:", settingsError);
+    return { settings: null, error: new Error("Configurações do sistema (user_settings) não encontradas para o Superadmin.") };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
@@ -68,7 +68,7 @@ serve(async (req) => {
       imageData = image_url.split(',')[1];
     }
 
-    // 2. Autenticação do usuário logado para obter o ID (necessário para buscar os clientes dele)
+    // 2. Autenticação do usuário logado (necessário para garantir que a requisição é válida)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
@@ -76,8 +76,8 @@ serve(async (req) => {
     
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userIdForClients = user.id;
-    console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userIdForClients}`);
+    // const userIdForClients = user.id; // Não precisamos mais do ID do usuário logado para buscar clientes, usamos o Superadmin ID.
+    console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${user.id}`);
     
     // 3. Buscando configurações do CompreFace do Superadmin
     const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);

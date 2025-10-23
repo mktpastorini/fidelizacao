@@ -8,6 +8,7 @@ const corsHeaders = {
 
 // Função auxiliar para buscar as configurações do Superadmin
 async function getComprefaceSettings(supabaseAdmin: any) {
+  // 1. Buscar o ID do Superadmin
   const { data: superadminProfile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('id')
@@ -16,19 +17,26 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError || !superadminProfile) {
-    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+    console.error("[recognize-cook-face] Erro ao buscar Superadmin:", profileError);
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal. Verifique se há um usuário com a função 'superadmin' e se o RLS permite a leitura de perfis.") };
   }
   
   const superadminId = superadminProfile.id;
 
+  // 2. Buscar as configurações do Superadmin
   const { data: settings, error: settingsError } = await supabaseAdmin
     .from('user_settings')
     .select('compreface_url, compreface_api_key')
     .eq('id', superadminId)
     .single();
 
-  if (settingsError || !settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin.") };
+  if (settingsError || !settings) {
+    console.error("[recognize-cook-face] Erro ao buscar user_settings:", settingsError);
+    return { settings: null, error: new Error("Configurações do sistema (user_settings) não encontradas para o Superadmin.") };
+  }
+
+  if (!settings?.compreface_url || !settings?.compreface_api_key) {
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
   return { settings, error: null, superadminId };
@@ -56,7 +64,7 @@ serve(async (req) => {
     // 1. Autenticação do usuário logado (para obter o ID do estabelecimento)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error("Usuário não autenticado.");
+        throw new Error("Usuário não autenticado. O reconhecimento facial requer autenticação.");
     }
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
