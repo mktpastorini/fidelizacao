@@ -16,11 +16,9 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
   // Itens entregues são mantidos por 30 minutos para visualização
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
 
-  // A query agora busca:
-  // 1. Itens pendentes OU em preparo E que requerem preparo.
-  // 2. OU Itens entregues (independentemente de requerer preparo, se foram atualizados recentemente).
-  // A sintaxe foi compactada para evitar o erro 400 do PostgREST.
-  const orFilter = `and(status.in.("pendente","preparando"),requer_preparo.eq.true),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`;
+  // Buscamos todos os itens pendentes/em preparo E itens entregues recentes.
+  // A filtragem de itens de rodízio (que não devem aparecer) será feita no frontend.
+  const orFilter = `status.in.("pendente","preparando"),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`;
 
   const { data, error } = await supabase
     .from("itens_pedido")
@@ -67,9 +65,16 @@ export default function CozinhaPage() {
     updateStatusMutation.mutate({ itemId, newStatus });
   };
 
-  const pendingItems = items?.filter(item => item.status === 'pendente') || [];
-  const preparingItems = items?.filter(item => item.status === 'preparando') || [];
-  const deliveredItems = items?.filter(item => item.status === 'entregue') || [];
+  // Filtra itens de rodízio/componente de rodízio (que geralmente têm nome_produto começando com [RESGATE] ou [RODIZIO])
+  // E também filtra itens que já foram entregues, mas que não requerem preparo (para evitar duplicidade se o garçom já entregou)
+  const filteredItems = items?.filter(item => 
+    !item.nome_produto.startsWith('[RESGATE]') && 
+    !item.nome_produto.startsWith('[RODIZIO]')
+  ) || [];
+
+  const pendingItems = filteredItems.filter(item => item.status === 'pendente');
+  const preparingItems = filteredItems.filter(item => item.status === 'preparando');
+  const deliveredItems = filteredItems.filter(item => item.status === 'entregue');
 
   return (
     <div className="h-full flex flex-col">

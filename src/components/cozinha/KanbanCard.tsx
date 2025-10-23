@@ -35,8 +35,11 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
 
   const isNonPrepItem = !item.requer_preparo;
   
-  // Apenas Cozinha, Superadmin, Admin e Gerente podem iniciar o preparo
-  const canStartPreparation = userRole && ['cozinha', 'superadmin', 'admin', 'gerente'].includes(userRole);
+  // Apenas Cozinha, Superadmin, Admin e Gerente podem iniciar o preparo ou marcar como pronto
+  const canManagePreparation = userRole && ['cozinha', 'superadmin', 'admin', 'gerente'].includes(userRole);
+  
+  // Garçons e Balcões podem marcar itens SEM PREPARO como entregues
+  const canDeliverNonPrep = userRole && ['garcom', 'balcao', 'superadmin', 'admin', 'gerente'].includes(userRole);
 
   return (
     <Card className="mb-4 bg-background shadow-md">
@@ -58,8 +61,14 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
         <div className="pt-2">
           {item.status === 'pendente' && (
             isNonPrepItem ? (
-              // Item sem preparo: Garçom/Balcão pode marcar como entregue (Permissão RLS já adicionada)
-              <Button size="sm" variant="outline" className="w-full bg-green-600 hover:bg-green-700 text-white" onClick={() => onStatusChange(item.id, 'entregue')}>
+              // Item sem preparo: Garçom/Balcão pode marcar como entregue
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-full bg-green-600 hover:bg-green-700 text-white" 
+                onClick={() => onStatusChange(item.id, 'entregue')}
+                disabled={!canDeliverNonPrep}
+              >
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Entregar ao Cliente
               </Button>
@@ -70,12 +79,12 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
                   size="sm" 
                   className="w-full" 
                   onClick={() => onStatusChange(item.id, 'preparando')}
-                  disabled={!canStartPreparation}
+                  disabled={!canManagePreparation}
                 >
                   <Utensils className="w-4 h-4 mr-2" />
                   Preparar
                 </Button>
-                {!canStartPreparation && (
+                {!canManagePreparation && (
                   <div className="mt-2 text-xs text-warning-foreground bg-warning/10 p-2 rounded-md flex items-center">
                     <AlertTriangle className="w-3 h-3 mr-1 shrink-0" />
                     Apenas a Cozinha/Gerência pode iniciar o preparo.
@@ -90,7 +99,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
               size="sm" 
               className="w-full bg-green-600 hover:bg-green-700 text-primary-foreground" 
               onClick={() => onStatusChange(item.id, 'entregue')}
-              disabled={!canStartPreparation} // Também restringe a finalização do preparo
+              disabled={!canManagePreparation} // Também restringe a finalização do preparo
             >
               <CheckCircle className="w-4 h-4 mr-2" />
               Pronto
