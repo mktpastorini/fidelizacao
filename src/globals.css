@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 98%; /* Quase branco, mas suave */
     --foreground: 240 10% 3.9%;
 
     --card: 0 0% 100%;
@@ -13,8 +13,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
 
-    --primary: 217.2 91.2% 59.8%; /* Azul padrão (Light) */
-    --primary-rgb: 217.2, 91.2%, 59.8%;
+    --primary: 210 40% 40%; /* Azul mais profundo e corporativo (Light) */
+    --primary-rgb: 210, 40%, 40%;
     --primary-foreground: 0 0% 98%;
 
     --secondary: 240 4.8% 95.9%;
@@ -31,7 +31,7 @@
 
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
+    --ring: 210 40% 40%;
 
     --radius: 0.5rem;
   }

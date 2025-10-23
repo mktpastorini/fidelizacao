@@ -238,7 +238,7 @@ export default function MenuPublicoPage() {
                 key={cat.id}
                 variant={selectedCategory === cat.id ? "default" : "ghost"}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={cn(selectedCategory === cat.id ? "bg-primary text-primary-foreground shadow-md" : "text-white hover:bg-primary/10")}
+                className={cn(selectedCategory === cat.id ? "bg-primary text-primary-foreground shadow-md" : "text-foreground hover:bg-primary/10")}
               >
                 {cat.nome}
               </Button>
@@ -264,7 +264,7 @@ export default function MenuPublicoPage() {
               );
             })
           ) : (
-            <p className="col-span-full text-center text-gray-400 py-10">Nenhum produto nesta categoria.</p>
+            <p className="col-span-full text-center text-muted-foreground py-10">Nenhum produto nesta categoria.</p>
           )}
         </div>
       </div>
@@ -272,9 +272,9 @@ export default function MenuPublicoPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-black min-h-screen">
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
       <div className="flex justify-between items-center mb-6">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="text-white hover:bg-primary/10">
+        <Button variant="ghost" onClick={() => navigate(-1)} className="text-foreground hover:bg-primary/10">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Voltar
         </Button>
