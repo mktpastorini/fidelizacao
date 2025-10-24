@@ -63,33 +63,14 @@ export default function CozinhaPage() {
         }
       }
       
-      // 1. Atualiza o status do item
       const { error } = await supabase
         .from("itens_pedido")
         .update(updatePayload)
         .eq("id", itemId);
       if (error) throw error;
 
-      // 2. Verifica se o pedido é de delivery e se todos os itens estão prontos
+      // Notifica o iFood se for um pedido de delivery
       const item = items?.find(i => i.id === itemId);
-      const pedidoId = item?.pedido?.id;
-      const isDelivery = item?.pedido?.order_type === 'IFOOD' || item?.pedido?.order_type === 'DELIVERY';
-
-      if (newStatus === 'entregue' && isDelivery && pedidoId) {
-        const { data: isReady, error: readinessError } = await supabase.rpc('check_delivery_order_readiness', { p_pedido_id: pedidoId }).single();
-        
-        if (readinessError) {
-          console.error("Erro ao verificar prontidão do pedido:", readinessError);
-        } else if (isReady) {
-          // Se todos os itens estiverem 'entregue', move o pedido para 'ready_for_delivery'
-          await supabase.from('pedidos')
-            .update({ delivery_status: 'ready_for_delivery' })
-            .eq('id', pedidoId)
-            .not('delivery_status', 'in', '("out_for_delivery", "delivered", "cancelled")');
-        }
-      }
-
-      // 3. Notifica o iFood se for um pedido de iFood
       if (item?.pedido?.order_type === 'IFOOD') {
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
           body: { pedido_id: item.pedido.id, new_status: newStatus },
@@ -104,7 +85,6 @@ export default function CozinhaPage() {
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] }); // Adicionado para atualizar o painel de delivery
       showSuccess("Status do item atualizado!");
     },
     onError: (err: Error) => showError(err.message),
@@ -141,14 +121,16 @@ export default function CozinhaPage() {
       </div>
 
       <Tabs defaultValue="kanban" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-2 max-w-md shrink-0">
-          <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
-          <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
-        </TabsList>
+        <div className="flex items-center justify-between mb-4 shrink-0">
+          <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
+            <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
+          </TabsList>
+        </div>
         
-        <TabsContent value="kanban" className="mt-6 flex-1 flex flex-col min-h-0">
-          <div className="flex justify-between items-center mb-4 shrink-0">
-            <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
+        <TabsContent value="kanban" className="mt-0 flex-1 flex flex-col min-h-0">
+          <div className="flex justify-end items-center mb-4 shrink-0">
             <Button 
               variant="outline" 
               size="sm" 
