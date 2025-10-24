@@ -136,9 +136,16 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      let finalStatus = newStatus;
-
+      // Lógica específica para a transição de 'awaiting_confirmation' para 'in_preparation'
       if (newStatus === 'in_preparation') {
+        // 1. Atualiza o status principal do pedido para movê-lo para a coluna "Em Preparo"
+        const { error: orderError } = await supabase
+          .from("pedidos")
+          .update({ delivery_status: 'in_preparation' })
+          .eq("id", orderId);
+        if (orderError) throw orderError;
+
+        // 2. Atualiza os itens que precisam de preparo para 'preparando'
         await supabase
           .from("itens_pedido")
           .update({ status: 'preparando' })
@@ -146,34 +153,28 @@ export default function DeliveryPage() {
           .eq('status', 'pendente')
           .eq('requer_preparo', true);
 
+        // 3. Atualiza os itens que NÃO precisam de preparo para 'entregue'
+        // O gatilho no banco de dados cuidará de mover o pedido para 'ready_for_delivery' se este for o último item.
         await supabase
           .from("itens_pedido")
           .update({ status: 'entregue' })
           .eq('pedido_id', orderId)
           .eq('status', 'pendente')
           .eq('requer_preparo', false);
-        
-        const { count: remainingPrepItems } = await supabase
-            .from('itens_pedido')
-            .select('*', { count: 'exact', head: true })
-            .eq('pedido_id', orderId)
-            .eq('status', 'preparando');
-
-        if (remainingPrepItems === 0) {
-            finalStatus = 'ready_for_delivery';
-        }
+      } else {
+        // Para todas as outras transições de status (ex: 'out_for_delivery', 'delivered')
+        const { error: orderError } = await supabase
+          .from("pedidos")
+          .update({ delivery_status: newStatus })
+          .eq("id", orderId);
+        if (orderError) throw orderError;
       }
 
-      const { error: orderError } = await supabase
-        .from("pedidos")
-        .update({ delivery_status: finalStatus })
-        .eq("id", orderId);
-      if (orderError) throw orderError;
-
+      // Comunicação com a API do iFood, se aplicável
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
-          body: { pedido_id: orderId, new_status: finalStatus },
+          body: { pedido_id: orderId, new_status: newStatus },
         });
         if (ifoodError) {
           showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
