@@ -136,31 +136,12 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      // Lógica específica para a transição de 'awaiting_confirmation' para 'in_preparation'
       if (newStatus === 'in_preparation') {
-        // 1. Atualiza o status principal do pedido para movê-lo para a coluna "Em Preparo"
-        const { error: orderError } = await supabase
-          .from("pedidos")
-          .update({ delivery_status: 'in_preparation' })
-          .eq("id", orderId);
-        if (orderError) throw orderError;
-
-        // 2. Atualiza os itens que precisam de preparo para 'preparando'
-        await supabase
-          .from("itens_pedido")
-          .update({ status: 'preparando' })
-          .eq('pedido_id', orderId)
-          .eq('status', 'pendente')
-          .eq('requer_preparo', true);
-
-        // 3. Atualiza os itens que NÃO precisam de preparo para 'entregue'
-        // O gatilho no banco de dados cuidará de mover o pedido para 'ready_for_delivery' se este for o último item.
-        await supabase
-          .from("itens_pedido")
-          .update({ status: 'entregue' })
-          .eq('pedido_id', orderId)
-          .eq('status', 'pendente')
-          .eq('requer_preparo', false);
+        // Chama a nova função RPC para lidar com a confirmação de forma atômica
+        const { error: rpcError } = await supabase.rpc('confirm_delivery_order', {
+          p_pedido_id: orderId,
+        });
+        if (rpcError) throw rpcError;
       } else {
         // Para todas as outras transições de status (ex: 'out_for_delivery', 'delivered')
         const { error: orderError } = await supabase
