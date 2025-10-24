@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
@@ -638,6 +638,25 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     return itemMesaToPay.subtotal / itemMesaToPay.total_quantidade;
   }, [itemMesaToPay]);
 
+  const itensParaEntregaImediata = useMemo(() => {
+    return pedido?.itens_pedido.filter(item => item.status === 'pendente' && !item.requer_preparo) || [];
+  }, [pedido]);
+
+  const markAsDeliveredMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from("itens_pedido")
+        .update({ status: 'entregue', updated_at: new Date().toISOString() })
+        .eq("id", itemId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pedidoAberto", mesa?.id] });
+      showSuccess("Item marcado como entregue!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -672,6 +691,34 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           ) : (
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
               <div className="space-y-4 overflow-y-auto pr-2">
+                {itensParaEntregaImediata.length > 0 && (
+                  <div className="p-3 border rounded-lg bg-blue-500/10 border-blue-500/30">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-300 flex items-center">
+                      <AlertTriangle className="w-4 h-4 mr-2" /> Itens para Entrega Imediata
+                    </h4>
+                    <ul className="space-y-2 mt-2">
+                      {itensParaEntregaImediata.map(item => (
+                        <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                          <div>
+                            <p className="font-medium">{item.nome_produto} (x{item.quantidade})</p>
+                            <p className="text-xs text-muted-foreground">
+                              Consumidor: {ocupantes?.find(o => o.id === item.consumido_por_cliente_id)?.nome || 'Mesa (Geral)'}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="bg-green-600 hover:bg-green-700 text-white h-8"
+                            onClick={() => markAsDeliveredMutation.mutate(item.id)}
+                            disabled={markAsDeliveredMutation.isPending}
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" /> Entregue
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <h3 className="font-semibold">Itens do Pedido</h3>
                 {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => {
                   if (cliente.id === 'mesa' && itens.length > 0) {
