@@ -122,6 +122,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const [isResgateOpen, setIsResgateOpen] = useState(false);
   
+  // Pagamento Parcial de Item da Mesa (Geral)
   const [itemMesaToPay, setItemMesaToPay] = useState<GroupedItem | null>(null); // Usando GroupedItem
   const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
   const [clientePagandoMesaId, setClientePagandoMesaId] = useState<string | null>(null);
@@ -532,11 +533,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         showError("Não há clientes ocupando a mesa para atribuir o pagamento.");
         return;
     }
-    // Só permite pagamento parcial se o item agrupado for composto por um único item original
-    if (item.original_ids.length > 1) {
-        showError("Não é possível pagar parcialmente um item agrupado com múltiplos registros originais. Remova e adicione novamente se necessário.");
-        return;
-    }
     
     setItemMesaToPay(item);
     setQuantidadePagarMesa(1);
@@ -552,21 +548,27 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       if (!originalGroupedItem) throw new Error("Item da mesa não encontrado.");
       if (quantidade > originalGroupedItem.total_quantidade) throw new Error("Quantidade a pagar excede a quantidade restante.");
       
-      // Garantir que o item agrupado é composto por um único item original
-      if (originalGroupedItem.original_ids.length > 1) {
-          throw new Error("Erro: Pagamento parcial de item agrupado com múltiplos IDs originais não suportado.");
-      }
-      const originalItemId = originalGroupedItem.original_ids[0];
+      // --- Lógica de Pagamento Parcial de Item da Mesa (Geral) ---
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      // Calcula o subtotal do item da mesa que está sendo pago
+      // 1. Fetch all original items associated with this grouped item, sorted by creation time (pay for oldest first)
+      const { data: originalItems, error: fetchOriginalError } = await supabase
+        .from("itens_pedido")
+        .select("*")
+        .in("id", originalGroupedItem.original_ids)
+        .order("created_at", { ascending: true });
+        
+      if (fetchOriginalError) throw fetchOriginalError;
+      if (!originalItems || originalItems.length === 0) throw new Error("Itens originais não encontrados.");
+
+      // Calculate partial tip based on the quantity being paid
       const precoUnitarioComDesconto = originalGroupedItem.subtotal / originalGroupedItem.total_quantidade;
       const subtotalItem = precoUnitarioComDesconto * quantidade;
       const gorjetaParcial = tipEnabled ? subtotalItem * 0.1 : 0;
 
-      // 1. Cria o novo pedido "recibo"
+      // 2. Create the new paid order (recibo)
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -574,39 +576,49 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         closed_at: new Date().toISOString(), 
         mesa_id: mesa!.id, 
         acompanhantes: pedido.acompanhantes,
-        gorjeta_valor: gorjetaParcial, // Adiciona a gorjeta parcial
-        garcom_id: selectedGarcomId, // Adiciona o garçom
+        gorjeta_valor: gorjetaParcial,
+        garcom_id: selectedGarcomId,
       }).select("id").single();
       if (newPedidoError) throw newPedidoError;
       const newPedidoId = newPedido.id;
 
-      const quantityRemaining = originalGroupedItem.total_quantidade - quantidade;
+      let quantityToPayRemaining = quantidade;
+      
+      // 3. Iterate through original items and move/split them
+      for (const originalItem of originalItems) {
+          if (quantityToPayRemaining <= 0) break;
 
-      // 2. Insere o item pago no novo pedido (recibo)
-      const { error: insertError } = await supabase.from("itens_pedido").insert({
-        ...originalGroupedItem,
-        id: undefined, // Deixa o Supabase gerar um novo ID
-        pedido_id: newPedidoId,
-        quantidade: quantidade,
-        preco: originalGroupedItem.preco, // Preço unitário original
-        consumido_por_cliente_id: clienteId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      if (insertError) throw insertError;
+          const originalQuantity = originalItem.quantidade;
+          const quantityToMove = Math.min(originalQuantity, quantityToPayRemaining);
+          const quantityRemaining = originalQuantity - quantityToMove;
 
-      if (quantityRemaining > 0) {
-        // 3. Atualiza a quantidade restante no item original
-        const { error: updateError } = await supabase.from("itens_pedido")
-          .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
-          .eq("id", originalItemId);
-        if (updateError) throw updateError;
-      } else {
-        // 3. Se a quantidade restante for 0, DELETA o item original
-        const { error: deleteError } = await supabase.from("itens_pedido")
-          .delete()
-          .eq("id", originalItemId);
-        if (deleteError) throw deleteError;
+          // a) Insert the paid portion into the new receipt order
+          const { error: insertError } = await supabase.from("itens_pedido").insert({
+              ...originalItem,
+              id: undefined, // Generate new ID
+              pedido_id: newPedidoId,
+              quantidade: quantityToMove,
+              consumido_por_cliente_id: clienteId, // Assign to the paying client
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+          });
+          if (insertError) throw insertError;
+
+          if (quantityRemaining > 0) {
+              // b) Update the remaining quantity in the original item
+              const { error: updateError } = await supabase.from("itens_pedido")
+                  .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
+                  .eq("id", originalItem.id);
+              if (updateError) throw updateError;
+          } else {
+              // c) If quantity remaining is 0, DELETE the original item
+              const { error: deleteError } = await supabase.from("itens_pedido")
+                  .delete()
+                  .eq("id", originalItem.id);
+              if (deleteError) throw deleteError;
+          }
+
+          quantityToPayRemaining -= quantityToMove;
       }
       
       // 4. Verifica se o cliente que pagou ainda tem itens no pedido principal
@@ -714,7 +726,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                             const precoFinal = item.subtotal;
                             
                             // Verifica se o item agrupado é composto por um único item original
-                            const isSingleOriginalItem = item.original_ids.length === 1;
+                            // REMOVIDO: const isSingleOriginalItem = item.original_ids.length === 1;
                             
                             return (
                               <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
@@ -740,8 +752,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                     variant="outline" 
                                     className="h-8 bg-green-600 hover:bg-green-700 text-white"
                                     onClick={() => handleMesaItemPartialPaymentOpen(item)}
-                                    disabled={!hasActiveOccupants || !isSingleOriginalItem} // Desabilita se for agrupado por múltiplos IDs
-                                    title={!isSingleOriginalItem ? "Pagamento parcial indisponível para itens agrupados de múltiplos registros." : "Pagar item da mesa"}
+                                    disabled={!hasActiveOccupants}
+                                    title={"Pagar item da mesa"}
                                   >
                                     <DollarSign className="w-4 h-4" />
                                   </Button>
