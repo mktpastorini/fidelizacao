@@ -1,9 +1,24 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { hmac } from "https://deno.land/x/hmac@v2.0.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-ifood-signature',
+}
+
+async function validateSignature(req: Request, bodyText: string): Promise<boolean> {
+  const signature = req.headers.get('x-ifood-signature');
+  const secret = Deno.env.get('IFOOD_WEBHOOK_SECRET');
+
+  if (!signature || !secret) {
+    console.error("iFood Webhook: Assinatura ou segredo ausente. Validação falhou.");
+    return false;
+  }
+
+  const expectedSignature = hmac('sha256', secret, bodyText, 'hex');
+  
+  return signature === expectedSignature;
 }
 
 serve(async (req) => {
@@ -17,13 +32,23 @@ serve(async (req) => {
   );
 
   try {
-    // TODO: Implementar a validação de assinatura do webhook do iFood para segurança.
-    const payload = await req.json();
-    console.log("iFood Webhook Received:", payload);
+    const bodyText = await req.text();
+    
+    // 1. Validação de Segurança da Assinatura
+    const isSignatureValid = await validateSignature(req, bodyText);
+    if (!isSignatureValid) {
+      console.warn("iFood Webhook: Tentativa de acesso com assinatura inválida.");
+      return new Response(JSON.stringify({ error: "Assinatura inválida." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    const payload = JSON.parse(bodyText);
+    console.log("iFood Webhook Recebido e Validado:", payload);
 
     const { id: ifoodOrderId, eventType, body } = payload;
 
-    // O user_id do dono do restaurante deve ser passado como parâmetro na URL do webhook
     const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
     if (!userId) {
@@ -31,7 +56,6 @@ serve(async (req) => {
     }
 
     if (eventType === 'PLACED') {
-      // Novo pedido
       const { customer, delivery, items, total } = body;
 
       const { data: newPedido, error: pedidoError } = await supabaseAdmin
@@ -40,7 +64,7 @@ serve(async (req) => {
           user_id: userId,
           order_type: 'IFOOD',
           ifood_order_id: ifoodOrderId,
-          status: 'aberto', // O pedido em si está 'aberto', os itens estarão 'pendentes'
+          status: 'aberto',
           delivery_details: { customer, delivery, total },
         })
         .select('id')
@@ -55,14 +79,13 @@ serve(async (req) => {
         quantidade: item.quantity,
         preco: item.unitPrice,
         status: 'pendente',
-        requer_preparo: true, // Assumimos que todos os itens do iFood requerem preparo
+        requer_preparo: true,
       }));
 
       const { error: itemsError } = await supabaseAdmin.from('itens_pedido').insert(orderItems);
       if (itemsError) throw itemsError;
 
     } else if (eventType === 'CANCELLED') {
-      // Pedido cancelado
       const { data: pedido, error: findError } = await supabaseAdmin
         .from('pedidos')
         .select('id')
@@ -71,13 +94,11 @@ serve(async (req) => {
 
       if (findError) throw findError;
 
-      // Atualiza o status de todos os itens para 'cancelado'
       await supabaseAdmin
         .from('itens_pedido')
         .update({ status: 'cancelado' })
         .eq('pedido_id', pedido.id);
       
-      // Atualiza o status do pedido principal
       await supabaseAdmin
         .from('pedidos')
         .update({ status: 'cancelado', closed_at: new Date().toISOString() })
