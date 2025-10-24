@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog, UtensilsCrossed, DollarSign } from "lucide-react";
+import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog, UtensilsCrossed, DollarSign, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,6 +8,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 const allNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/delivery", icon: Package, label: "Delivery", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
@@ -64,7 +65,6 @@ export function Sidebar() {
         ))}
       </nav>
       <div className="p-2 border-t border-border">
-        {/* Restringindo o acesso a Configurações no Sidebar */}
         {userRole && ['superadmin', 'admin'].includes(userRole) && (
           <NavLink to="/configuracoes" className={({ isActive }) => cn("flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground transition-all duration-200", isActive ? "bg-primary text-primary-foreground shadow-md shadow-primary/30" : "hover:bg-secondary hover:text-foreground hover:border-l-4 hover:border-primary/50")}>
               <div className="flex items-center"><Settings className="w-5 h-5 mr-3" /><span>Configurações</span></div>

@@ -22,8 +22,9 @@ import MenuPublicoPage from "./pages/MenuPublico";
 import UsuariosPage from "./pages/Usuarios";
 import CozinheirosPage from "./pages/Cozinheiros";
 import GorjetasPage from "./pages/Gorjetas";
+import DeliveryPage from "./pages/Delivery"; // Importado
 import { PageActionsProvider } from "./contexts/PageActionsContext";
-import { SplashCursor } from "./components/SplashCursor"; // Importado
+import { SplashCursor } from "./components/SplashCursor";
 
 const queryClient = new QueryClient();
 
@@ -33,7 +34,6 @@ const App = () => (
       <TooltipProvider>
         <Sonner />
         <BrowserRouter>
-          {/* SplashCursor aplicado globalmente */}
           <SplashCursor
             SIM_RESOLUTION={128}
             DYE_RESOLUTION={1440}
@@ -51,17 +51,14 @@ const App = () => (
             TRANSPARENT={true}
           />
           <Routes>
-            {/* Rota Pública para o Menu, agora envolvida por SettingsProvider */}
             <Route path="/menu-publico/:mesaId" element={
               <SettingsProvider>
                 <MenuPublicoPage />
               </SettingsProvider>
             } />
             
-            {/* Rotas de Autenticação */}
             <Route path="/login" element={<Login />} />
             
-            {/* Rotas Protegidas */}
             <Route
               element={
                 <SettingsProvider>
@@ -74,27 +71,18 @@ const App = () => (
                   <Layout />
                 </PageActionsProvider>
               }>
-                {/* Rotas com RoleGuard */}
                 <Route path="/dashboard" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><DashboardPage /></RoleGuard>} />
                 <Route path="/" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SalaoPage /></RoleGuard>} />
                 <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
                 <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
                 <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
-                
-                {/* Cozinha: Acesso exclusivo ou compartilhado */}
                 <Route path="/cozinha" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'cozinha', 'garcom']}><Cozinha /></RoleGuard>} />
-                
-                {/* Gerenciamento de Cozinheiros: Apenas Gerência */}
                 <Route path="/cozinheiros" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><CozinheirosPage /></RoleGuard>} />
-                
-                {/* Restringindo acesso a Gerência */}
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
                 <Route path="/gorjetas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'garcom']}><GorjetasPage /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
-                
-                {/* Configurações: Apenas Superadmin e Admin */}
+                <Route path="/delivery" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><DeliveryPage /></RoleGuard>} />
                 <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin']}><Configuracoes /></RoleGuard>} />
-                
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
             </Route>

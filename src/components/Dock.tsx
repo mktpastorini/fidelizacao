@@ -16,23 +16,25 @@ import {
   LogOut,
   UserCog,
   UtensilsCrossed,
-  DollarSign, // Importado
+  DollarSign,
+  Package, // Importado
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useSettings } from "@/contexts/SettingsContext"; // Importando useSettings
+import { useSettings } from "@/contexts/SettingsContext";
 
 const allNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/delivery", icon: Package, label: "Delivery", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/mesas", icon: TableIcon, label: "Gerenciar Mesas", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/cozinha", icon: ChefHat, label: "Cozinha", roles: ['superadmin', 'admin', 'gerente', 'cozinha', 'garcom'] },
   { to: "/cozinheiros", icon: UtensilsCrossed, label: "Gerenciar Cozinheiros", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/historico", icon: History, label: "Pedidos Fechados", roles: ['superadmin', 'admin', 'gerente'] },
-  { to: "/gorjetas", icon: DollarSign, label: "Gorjetas", roles: ['superadmin', 'admin', 'gerente', 'garcom'] }, // ATUALIZADO
+  { to: "/gorjetas", icon: DollarSign, label: "Gorjetas", roles: ['superadmin', 'admin', 'gerente', 'garcom'] },
   { to: "/mensagens", icon: MessageSquare, label: "Mensagens", roles: ['superadmin', 'admin', 'gerente'] },
   { to: "/configuracoes", icon: Settings, label: "Configurações", roles: ['superadmin', 'admin'] },
   { to: "/usuarios", icon: UserCog, label: "Gerenciar Usuários", roles: ['superadmin'] },
@@ -48,7 +50,6 @@ export function Dock() {
     navigate("/login");
   };
 
-  // Filtra os itens de navegação com base na função do usuário
   const navItems = React.useMemo(() => {
     if (isLoading || !userRole) return [];
     return allNavItems.filter(item => item.roles.includes(userRole));

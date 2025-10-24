@@ -11,24 +11,24 @@ import { Button } from "@/components/ui/button";
 
 type KitchenItem = ItemPedido & {
   pedido: {
+    id: string;
     mesa: { numero: number } | null;
+    order_type?: 'SALAO' | 'IFOOD';
+    delivery_details?: any;
   } | null;
   cliente: { nome: string } | null;
-  cozinheiro: { nome: string } | null; // Adicionado o nome do cozinheiro
+  cozinheiro: { nome: string } | null;
 };
 
 async function fetchKitchenItems(): Promise<KitchenItem[]> {
-  // Itens entregues são mantidos por 30 minutos para visualização
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-
-  // Buscamos todos os itens pendentes/em preparo E itens entregues recentes.
   const orFilter = `status.in.("pendente","preparando"),and(status.eq.entregue,updated_at.gt.${thirtyMinutesAgo.toISOString()})`;
 
   const { data, error } = await supabase
     .from("itens_pedido")
     .select(`
       *,
-      pedido:pedidos!inner(status, mesa:mesas(numero)),
+      pedido:pedidos!inner(id, status, order_type, delivery_details, mesa:mesas(numero)),
       cliente:clientes!consumido_por_cliente_id(nome),
       cozinheiro:cozinheiros!cozinheiro_id(nome)
     `)
@@ -45,7 +45,7 @@ export default function CozinhaPage() {
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
     queryFn: fetchKitchenItems,
-    refetchInterval: 15000, // Atualiza a cada 15 segundos
+    refetchInterval: 15000,
   });
 
   const updateStatusMutation = useMutation({
@@ -55,14 +55,11 @@ export default function CozinhaPage() {
       if (newStatus === 'preparando') {
         updatePayload.cozinheiro_id = cookId;
         updatePayload.hora_inicio_preparo = new Date().toISOString();
-        updatePayload.hora_entrega = null; // Garante que a hora de entrega é resetada
+        updatePayload.hora_entrega = null;
       } else if (newStatus === 'entregue') {
         updatePayload.hora_entrega = new Date().toISOString();
-        
-        // Se o item já tinha um cozinheiro_id (iniciado preparo), mantemos.
-        // Se não tinha (item sem preparo), usamos o cookId passado (que será null).
         if (!items?.find(i => i.id === itemId)?.cozinheiro_id) {
-            updatePayload.cozinheiro_id = cookId; // Pode ser null
+            updatePayload.cozinheiro_id = cookId;
         }
       }
       
@@ -71,13 +68,22 @@ export default function CozinhaPage() {
         .update(updatePayload)
         .eq("id", itemId);
       if (error) throw error;
+
+      // Notifica o iFood se for um pedido de delivery
+      const item = items?.find(i => i.id === itemId);
+      if (item?.pedido?.order_type === 'IFOOD') {
+        const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
+          body: { pedido_id: item.pedido.id, new_status: newStatus },
+        });
+        if (ifoodError) {
+          // Mostra um erro, mas não impede o fluxo principal
+          showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
+        }
+      }
     },
     onSuccess: () => {
-      // Força o refetch para atualizar o Kanban imediatamente
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
-      // Invalida também os pedidos pendentes do sininho
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
-      // Invalida dados do salão para atualizar o status da mesa (se for o último item)
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       showSuccess("Status do item atualizado!");
     },
@@ -88,24 +94,17 @@ export default function CozinhaPage() {
     updateStatusMutation.mutate({ itemId, newStatus, cookId });
   };
 
-  // Filtra itens para o Kanban
   const filteredItems = items?.filter(item => {
     const nome = item.nome_produto.toUpperCase();
-    
-    // 1. Exclui itens de Resgate e Rodízio (pacote ou componente)
     if (nome.startsWith('[RESGATE]') || nome.startsWith('[RODIZIO]')) {
       return false;
     }
-    
-    // 2. Inclui itens que estão pendentes, em preparo ou entregues recentemente
     if (item.status === 'pendente' || item.status === 'preparando' || item.status === 'entregue') {
       return true;
     }
-    
     return false;
   }) || [];
 
-  // Separação em 4 colunas
   const prepPendingItems = filteredItems.filter(item => item.status === 'pendente' && item.requer_preparo);
   const deliveryPendingItems = filteredItems.filter(item => item.status === 'pendente' && !item.requer_preparo);
   const preparingItems = filteredItems.filter(item => item.status === 'preparando');
