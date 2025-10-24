@@ -28,7 +28,7 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
     .from("itens_pedido")
     .select(`
       *,
-      pedido:pedidos!inner(id, status, order_type, delivery_details, mesa:mesas(numero)),
+      pedido:pedidos!inner(id, status, order_type, delivery_status, delivery_details, mesa:mesas(numero)),
       cliente:clientes!consumido_por_cliente_id(nome),
       cozinheiro:cozinheiros!cozinheiro_id(nome)
     `)
@@ -105,7 +105,11 @@ export default function CozinhaPage() {
     return false;
   }) || [];
 
-  const prepPendingItems = filteredItems.filter(item => item.status === 'pendente' && item.requer_preparo);
+  const prepPendingItems = filteredItems.filter(item => 
+    item.status === 'pendente' && 
+    item.requer_preparo &&
+    (item.pedido?.order_type === 'SALAO' || !item.pedido?.order_type) // Apenas itens de salão aparecem aqui
+  );
   const deliveryPendingItems = filteredItems.filter(item => item.status === 'pendente' && !item.requer_preparo);
   const preparingItems = filteredItems.filter(item => item.status === 'preparando');
   const deliveredItems = filteredItems.filter(item => item.status === 'entregue');

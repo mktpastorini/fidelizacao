@@ -19,10 +19,8 @@ async function fetchActiveDeliveryOrders(): Promise<DeliveryOrder[]> {
     .from("pedidos")
     .select("*, itens_pedido(*)")
     .in("order_type", ["IFOOD", "DELIVERY"])
-    .neq("delivery_status", "delivered")
-    .neq("delivery_status", "cancelled")
-    .neq("status", "pago")
-    .neq("status", "cancelado")
+    .not("delivery_status", "in", '("delivered", "cancelled")')
+    .not("status", "in", '("pago", "cancelado")')
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -122,11 +120,23 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      const { error } = await supabase
+      // Atualiza o status do pedido principal
+      const { error: orderError } = await supabase
         .from("pedidos")
         .update({ delivery_status: newStatus })
         .eq("id", orderId);
-      if (error) throw error;
+      if (orderError) throw orderError;
+
+      // Se o pedido está sendo confirmado para preparo, atualiza os itens
+      if (newStatus === 'in_preparation') {
+        const { error: itemsError } = await supabase
+          .from("itens_pedido")
+          .update({ status: 'preparando' })
+          .eq('pedido_id', orderId)
+          .eq('status', 'pendente')
+          .eq('requer_preparo', true);
+        if (itemsError) throw itemsError;
+      }
 
       // Notifica o iFood se necessário
       const order = orders?.find(o => o.id === orderId);
@@ -141,6 +151,7 @@ export default function DeliveryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] }); // Invalida a query da cozinha
       showSuccess("Status do pedido atualizado!");
       setIsDetailsOpen(false);
     },
