@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { RefreshCw } from "lucide-react";
 
-export function Cozinha() {
+export default function Cozinha() {
   const [lastRefreshed, setLastRefreshed] = useState(new Date());
 
   const handleRefresh = () => {
