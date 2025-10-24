@@ -20,7 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
 import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus, User as UserIcon } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
@@ -28,7 +28,7 @@ import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Label } from "../ui/label";
+import { Label } from "@/components/ui/label";
 import { Switch } from "../ui/switch";
 
 type PedidoModalProps = {
@@ -46,6 +46,13 @@ const itemSchema = z.object({
   requer_preparo: z.boolean(),
 });
 
+type ItemToPayWithQuantity = {
+  id: string;
+  quantidade: number;
+  isMesaItem: boolean;
+};
+
+// Novo tipo para itens agrupados
 type GroupedItem = ItemPedido & {
   original_ids: string[];
   total_quantidade: number;
@@ -115,7 +122,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const [isResgateOpen, setIsResgateOpen] = useState(false);
   
-  const [itemMesaToPay, setItemMesaToPay] = useState<GroupedItem | null>(null);
+  const [itemMesaToPay, setItemMesaToPay] = useState<GroupedItem | null>(null); // Usando GroupedItem
   const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
   const [clientePagandoMesaId, setClientePagandoMesaId] = useState<string | null>(null);
   const [isMesaItemPartialPaymentOpen, setIsMesaItemPartialPaymentOpen] = useState(false);
@@ -123,6 +130,11 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   // Gorjeta State
   const [tipEnabled, setTipEnabled] = useState(false);
   const [selectedGarcomId, setSelectedGarcomId] = useState<string | null>(null);
+
+  const form = useForm<z.infer<typeof itemSchema>>({
+    resolver: zodResolver(itemSchema),
+    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
+  });
 
   const { data: pedido, isLoading, isError: isPedidoError, error: pedidoError } = useQuery({
     queryKey: ["pedidoAberto", mesa?.id],
@@ -153,26 +165,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   
   const hasActiveOccupants = ocupantes && ocupantes.length > 0;
 
-  const form = useForm<z.infer<typeof itemSchema>>({
-    resolver: zodResolver(itemSchema),
-    defaultValues: { 
-      nome_produto: "", 
-      quantidade: 1, 
-      preco: 0, 
-      consumido_por_cliente_id: null,
-      status: 'pendente', 
-      requer_preparo: true 
-    },
-  });
-  
-  useEffect(() => {
-    if (isOpen && clientePrincipal) {
-      form.setValue('consumido_por_cliente_id', clientePrincipal.id);
-    } else if (isOpen && !clientePrincipal) {
-      form.setValue('consumido_por_cliente_id', null);
-    }
-  }, [isOpen, clientePrincipal, form]);
-
   const { itensAgrupados, subtotalItens, itensMesaGeral } = useMemo(() => {
     if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), subtotalItens: 0, itensMesaGeral: [] };
     
@@ -185,7 +177,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
     const mesaGeral: GroupedItem[] = [];
 
-    const groupedItemsMap = new Map<string, Map<string, ItemPedido[]>>();
+    // 1. Agrupar itens por consumidor e nome do produto
+    const groupedItemsMap = new Map<string, Map<string, ItemPedido[]>>(); // ConsumidorId -> NomeProduto -> ItemPedido[]
 
     pedido.itens_pedido.forEach(item => {
       const consumerKey = item.consumido_por_cliente_id || 'mesa';
@@ -202,22 +195,24 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       productMap.get(productKey)!.push(item);
     });
 
+    // 2. Consolidar e calcular subtotais
     groupedItemsMap.forEach((productMap, consumerKey) => {
       const clientGroup = agrupados.get(consumerKey);
-      if (!clientGroup) return;
+      if (!clientGroup) return; // Deve sempre existir para 'mesa' ou um ocupante
 
       productMap.forEach((items, nome_produto) => {
         const total_quantidade = items.reduce((sum, item) => sum + item.quantidade, 0);
         const subtotalItem = items.reduce((sum, item) => sum + calcularPrecoComDesconto(item), 0);
         
+        // Usamos o item com o ID mais antigo como base para as propriedades (para manter a referência)
         const baseItem = items.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
         
         const groupedItem: GroupedItem = {
           ...baseItem,
           nome_produto,
-          quantidade: total_quantidade,
+          quantidade: total_quantidade, // A quantidade agora é a soma
           subtotal: subtotalItem,
-          original_ids: items.map(i => i.id),
+          original_ids: items.map(i => i.id), // Guardamos os IDs originais
           total_quantidade,
         };
         
@@ -286,21 +281,14 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess("Item adicionado com sucesso!");
-      
-      form.reset({ 
-        nome_produto: "", 
-        quantidade: 1, 
-        preco: 0, 
-        consumido_por_cliente_id: clientePrincipal?.id || null, 
-        status: 'pendente', 
-        requer_preparo: true 
-      });
+      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
     },
     onError: (error: Error) => showError(error.message),
   });
 
   const deleteItemMutation = useMutation({
     mutationFn: async (item: GroupedItem) => {
+      // Deleta todos os IDs originais que compõem o item agrupado
       const { error } = await supabase.from("itens_pedido").delete().in("id", item.original_ids);
       if (error) throw new Error(error.message);
     },
@@ -315,16 +303,30 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   });
 
   const closePartialOrderMutation = useMutation({
-    mutationFn: async ({ clienteId, allOriginalItemIds }: { clienteId: string, allOriginalItemIds: string[] }) => {
+    mutationFn: async ({ clienteId, itemsToPayWithQuantity }: { clienteId: string, itemsToPayWithQuantity: ItemToPayWithQuantity[] }) => {
       if (!pedido) throw new Error("Pedido não encontrado.");
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
-      const itemsToPay = pedido.itens_pedido.filter(item => allOriginalItemIds.includes(item.id));
-      const subtotalParcial = itemsToPay.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
+      // Calcula o subtotal dos itens que estão sendo pagos parcialmente
+      const subtotalParcial = itemsToPayWithQuantity.reduce((acc, { id, quantidade }) => {
+        // Aqui, 'id' é o ID do item agrupado (que é o ID do primeiro item original)
+        const originalGroupedItem = Array.from(itensAgrupados.values())
+            .flatMap(group => group.itens)
+            .find(item => item.id === id);
+            
+        if (!originalGroupedItem) return acc;
+        
+        // O preço unitário é o preço do item agrupado dividido pela quantidade total original
+        const precoUnitarioComDesconto = originalGroupedItem.subtotal / originalGroupedItem.total_quantidade;
+        return acc + precoUnitarioComDesconto * quantidade;
+      }, 0);
+      
+      // Calcula a gorjeta de 10% sobre o subtotal parcial
       const gorjetaParcial = tipEnabled ? subtotalParcial * 0.1 : 0;
       
+      // Cria o novo pedido "recibo"
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -332,23 +334,81 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         closed_at: new Date().toISOString(), 
         mesa_id: mesa!.id, 
         acompanhantes: pedido.acompanhantes,
-        gorjeta_valor: gorjetaParcial,
-        garcom_id: selectedGarcomId,
+        gorjeta_valor: gorjetaParcial, // Adiciona a gorjeta parcial
+        garcom_id: selectedGarcomId, // Adiciona o garçom
       }).select("id").single();
       if (newPedidoError) throw newPedidoError;
       const newPedidoId = newPedido.id;
 
-      const { error: moveError } = await supabase.from("itens_pedido")
-          .update({ 
-              pedido_id: newPedidoId, 
-              consumido_por_cliente_id: clienteId,
-              updated_at: new Date().toISOString(),
-          })
-          .in("id", allOriginalItemIds);
-      if (moveError) throw moveError;
+      // Processa cada item agrupado que está sendo pago
+      for (const itemToPay of itemsToPayWithQuantity) {
+        const originalGroupedItem = Array.from(itensAgrupados.values())
+            .flatMap(group => group.itens)
+            .find(item => item.id === itemToPay.id);
+            
+        if (!originalGroupedItem) continue;
 
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
+        const quantityToPay = itemToPay.quantidade;
+        const quantityRemaining = originalGroupedItem.total_quantidade - quantityToPay;
+        
+        // Se o item agrupado for composto por múltiplos itens originais, movemos todos
+        // (Isso só deve acontecer para itens individuais, onde o agrupamento é 1:1)
+        if (originalGroupedItem.original_ids.length > 1) {
+            // Move todos os itens originais para o novo pedido (recibo)
+            const { error: updateError } = await supabase.from("itens_pedido")
+                .update({ 
+                    pedido_id: newPedidoId, 
+                    consumido_por_cliente_id: clienteId,
+                    updated_at: new Date().toISOString(),
+                })
+                .in("id", originalGroupedItem.original_ids);
+            if (updateError) throw updateError;
+        } else {
+            // Pagamento parcial de um item agrupado (só pode ser feito se o item agrupado for composto por um único item original)
+            
+            const originalItemId = originalGroupedItem.original_ids[0];
+            
+            // 1. Insere o item pago no novo pedido (recibo)
+            const { error: insertError } = await supabase.from("itens_pedido").insert({
+                ...originalGroupedItem,
+                id: undefined, // Deixa o Supabase gerar um novo ID
+                pedido_id: newPedidoId,
+                quantidade: quantityToPay,
+                preco: originalGroupedItem.preco, // Preço unitário original
+                consumido_por_cliente_id: clienteId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            });
+            if (insertError) throw insertError;
 
+            if (quantityRemaining > 0) {
+                // 2. Atualiza a quantidade restante no item original
+                const { error: updateError } = await supabase.from("itens_pedido")
+                    .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
+                    .eq("id", originalItemId);
+                if (updateError) throw updateError;
+            } else {
+                // 2. Se a quantidade restante for 0, DELETA o item original
+                const { error: deleteError } = await supabase.from("itens_pedido")
+                    .delete()
+                    .eq("id", originalItemId);
+                if (deleteError) throw deleteError;
+            }
+        }
+      }
+
+      // Verifica se o cliente que pagou ainda tem itens no pedido principal
+      const { count: remainingClientItems } = await supabase.from("itens_pedido")
+        .select('*', { count: 'exact', head: true })
+        .eq("pedido_id", pedido.id)
+        .eq("consumido_por_cliente_id", clienteId);
+        
+      // Se o cliente não tiver mais itens, remove-o da mesa
+      if (remainingClientItems === 0) {
+        await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
+      }
+
+      // Verifica se o pedido principal e a mesa devem ser fechados
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
@@ -372,7 +432,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      queryClient.invalidateQueries({ queryKey: ["tipStats"] });
+      queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
       setClientePagandoIndividual(null);
@@ -389,17 +449,20 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
+      // 1. Atualiza o pedido aberto com a gorjeta e o garçom antes de fechar
       const { error: updateError } = await supabase.from("pedidos")
         .update({ gorjeta_valor: gorjetaValor, garcom_id: selectedGarcomId })
         .eq("id", pedido.id);
       if (updateError) throw updateError;
 
+      // 2. Chama a função RPC para fechar o pedido e liberar a mesa
       const { error: rpcError } = await supabase.rpc('finalizar_pagamento_total', {
         p_pedido_id: pedido.id,
         p_mesa_id: mesa.id,
       });
       if (rpcError) throw rpcError;
 
+      // 3. Envia confirmação de pagamento (se houver cliente principal)
       if (pedido.cliente_id) {
         const { error: functionError } = await supabase.functions.invoke('send-payment-confirmation', { 
           body: { pedidoId: pedido.id, userId: user.id } 
@@ -414,7 +477,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["historicoCliente"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
-      queryClient.invalidateQueries({ queryKey: ["tipStats"] });
+      queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       showSuccess("Conta fechada com sucesso!");
       onOpenChange(false);
     },
@@ -469,8 +532,14 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         showError("Não há clientes ocupando a mesa para atribuir o pagamento.");
         return;
     }
+    // Só permite pagamento parcial se o item agrupado for composto por um único item original
+    if (item.original_ids.length > 1) {
+        showError("Não é possível pagar parcialmente um item agrupado com múltiplos registros originais. Remova e adicione novamente se necessário.");
+        return;
+    }
+    
     setItemMesaToPay(item);
-    setQuantidadePagarMesa(item.total_quantidade);
+    setQuantidadePagarMesa(1);
     setClientePagandoMesaId(ocupantes[0].id);
     setIsMesaItemPartialPaymentOpen(true);
   };
@@ -483,15 +552,21 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       if (!originalGroupedItem) throw new Error("Item da mesa não encontrado.");
       if (quantidade > originalGroupedItem.total_quantidade) throw new Error("Quantidade a pagar excede a quantidade restante.");
       
-      const originalItemIds = originalGroupedItem.original_ids;
-
+      // Garantir que o item agrupado é composto por um único item original
+      if (originalGroupedItem.original_ids.length > 1) {
+          throw new Error("Erro: Pagamento parcial de item agrupado com múltiplos IDs originais não suportado.");
+      }
+      const originalItemId = originalGroupedItem.original_ids[0];
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuário não autenticado.");
 
+      // Calcula o subtotal do item da mesa que está sendo pago
       const precoUnitarioComDesconto = originalGroupedItem.subtotal / originalGroupedItem.total_quantidade;
       const subtotalItem = precoUnitarioComDesconto * quantidade;
       const gorjetaParcial = tipEnabled ? subtotalItem * 0.1 : 0;
 
+      // 1. Cria o novo pedido "recibo"
       const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
         user_id: user.id, 
         cliente_id: clienteId, 
@@ -499,80 +574,53 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         closed_at: new Date().toISOString(), 
         mesa_id: mesa!.id, 
         acompanhantes: pedido.acompanhantes,
-        gorjeta_valor: gorjetaParcial,
-        garcom_id: selectedGarcomId,
+        gorjeta_valor: gorjetaParcial, // Adiciona a gorjeta parcial
+        garcom_id: selectedGarcomId, // Adiciona o garçom
       }).select("id").single();
       if (newPedidoError) throw newPedidoError;
       const newPedidoId = newPedido.id;
 
-      if (quantidade === originalGroupedItem.total_quantidade) {
-        // Pagamento total: move todos os IDs originais
-        const { error: moveError } = await supabase.from("itens_pedido")
-          .update({ pedido_id: newPedidoId, consumido_por_cliente_id: clienteId, updated_at: new Date().toISOString() })
-          .in("id", originalItemIds);
-        if (moveError) throw moveError;
+      const quantityRemaining = originalGroupedItem.total_quantidade - quantidade;
+
+      // 2. Insere o item pago no novo pedido (recibo)
+      const { error: insertError } = await supabase.from("itens_pedido").insert({
+        ...originalGroupedItem,
+        id: undefined, // Deixa o Supabase gerar um novo ID
+        pedido_id: newPedidoId,
+        quantidade: quantidade,
+        preco: originalGroupedItem.preco, // Preço unitário original
+        consumido_por_cliente_id: clienteId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      if (insertError) throw insertError;
+
+      if (quantityRemaining > 0) {
+        // 3. Atualiza a quantidade restante no item original
+        const { error: updateError } = await supabase.from("itens_pedido")
+          .update({ quantidade: quantityRemaining, updated_at: new Date().toISOString() })
+          .eq("id", originalItemId);
+        if (updateError) throw updateError;
       } else {
-        // Pagamento parcial: dividir os IDs originais proporcionalmente
-        let quantidadeRestante = quantidade;
-        for (const originalId of originalItemIds) {
-          if (quantidadeRestante <= 0) break;
-
-          // Buscar o item original para saber a quantidade disponível
-          const { data: originalItem, error: originalItemError } = await supabase
-            .from("itens_pedido")
-            .select("*")
-            .eq("id", originalId)
-            .single();
-          if (originalItemError || !originalItem) throw new Error("Erro ao buscar item original para pagamento parcial.");
-
-          const quantidadeParaPagar = Math.min(quantidadeRestante, originalItem.quantidade);
-
-          if (quantidadeParaPagar === originalItem.quantidade) {
-            // Move o item inteiro
-            const { error: moveError } = await supabase.from("itens_pedido")
-              .update({ pedido_id: newPedidoId, consumido_por_cliente_id: clienteId, updated_at: new Date().toISOString() })
-              .eq("id", originalId);
-            if (moveError) throw moveError;
-          } else {
-            // Divide o item: atualiza o original e insere um novo para a quantidade paga
-            const { error: updateError } = await supabase.from("itens_pedido")
-              .update({ quantidade: originalItem.quantidade - quantidadeParaPagar, updated_at: new Date().toISOString() })
-              .eq("id", originalId);
-            if (updateError) throw updateError;
-
-            const { error: insertError } = await supabase.from("itens_pedido").insert({
-              pedido_id: newPedidoId,
-              user_id: user.id,
-              nome_produto: originalItem.nome_produto,
-              quantidade: quantidadeParaPagar,
-              preco: originalItem.preco,
-              consumido_por_cliente_id: clienteId,
-              desconto_percentual: originalItem.desconto_percentual,
-              desconto_motivo: originalItem.desconto_motivo,
-              status: originalItem.status,
-              requer_preparo: originalItem.requer_preparo,
-              cozinheiro_id: originalItem.cozinheiro_id,
-              hora_inicio_preparo: originalItem.hora_inicio_preparo,
-              hora_entrega: originalItem.hora_entrega,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-            if (insertError) throw insertError;
-          }
-
-          quantidadeRestante -= quantidadeParaPagar;
-        }
+        // 3. Se a quantidade restante for 0, DELETA o item original
+        const { error: deleteError } = await supabase.from("itens_pedido")
+          .delete()
+          .eq("id", originalItemId);
+        if (deleteError) throw deleteError;
       }
-
+      
+      // 4. Verifica se o cliente que pagou ainda tem itens no pedido principal
       const { count: remainingClientItems } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id)
         .eq("consumido_por_cliente_id", clienteId);
         
+      // Se o cliente não tiver mais itens, remove-o da mesa
       if (remainingClientItems === 0) {
         await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesa!.id).eq("cliente_id", clienteId);
       }
 
+      // 5. Verifica se o pedido principal e a mesa devem ser fechados
       const { count: remainingItemsCount } = await supabase.from("itens_pedido")
         .select('*', { count: 'exact', head: true })
         .eq("pedido_id", pedido.id);
@@ -596,7 +644,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["salaoData"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
-      queryClient.invalidateQueries({ queryKey: ["tipStats"] });
+      queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       const cliente = ocupantes?.find(o => o.id === clienteId);
       showSuccess(`Pagamento parcial de item da mesa atribuído a ${cliente?.nome || 'cliente'}!`);
       setIsMesaItemPartialPaymentOpen(false);
@@ -614,6 +662,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     }
   };
   
+  // Variável calculada para o modal de pagamento parcial de item da mesa
   const precoUnitarioComDescontoMesa = useMemo(() => {
     if (!itemMesaToPay) return 0;
     return itemMesaToPay.subtotal / itemMesaToPay.total_quantidade;
@@ -621,7 +670,389 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
 
   return (
     <>
-      {/* ... restante do componente permanece igual ... */}
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Pedido da Mesa {mesa?.numero}</DialogTitle>
+            {/* Substituído DialogDescription por um div para evitar o erro de aninhamento JSX */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Users className="w-4 h-4" />
+              <span>{ocupantes?.map(o => o.nome).join(', ') || "N/A"}</span>
+              {clientePrincipal && (
+                <Badge variant="secondary" className="ml-4 flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-yellow-500 text-yellow-500" />
+                  {clientePrincipal.pontos} pontos (Principal)
+                </Badge>
+              )}
+            </div>
+          </DialogHeader>
+          {isPedidoError ? (
+            <div className="flex flex-col items-center justify-center p-8 text-destructive">
+              <AlertTriangle className="w-12 h-12 mb-4" />
+              <p className="text-lg font-semibold">Erro ao carregar o pedido!</p>
+              <p className="text-sm text-center">
+                {pedidoError?.message || "Houve um problema ao buscar os detalhes do pedido. Por favor, tente novamente."}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Se o problema persistir, pode haver múltiplos pedidos abertos para esta mesa.
+              </p>
+            </div>
+          ) : isLoading ? (
+            <p>Carregando...</p>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh]">
+              <div className="space-y-4 overflow-y-auto pr-2">
+                <h3 className="font-semibold">Itens do Pedido</h3>
+                {Array.from(itensAgrupados.values()).map(({ cliente, itens, subtotal }) => {
+                  if (cliente.id === 'mesa' && itens.length > 0) {
+                    return (
+                      <div key={cliente.id} className="p-3 border rounded-lg bg-warning/10">
+                        <h4 className="font-semibold text-warning-foreground">Mesa (Geral) - Itens Pendentes</h4>
+                        <ul className="space-y-2 mt-2">
+                          {itens.map((item) => {
+                            const precoOriginal = (item.preco || 0) * item.total_quantidade;
+                            const precoFinal = item.subtotal;
+                            
+                            // Verifica se o item agrupado é composto por um único item original
+                            const isSingleOriginalItem = item.original_ids.length === 1;
+                            
+                            return (
+                              <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                                <div>
+                                  <p className="font-medium">{item.nome_produto} (x{item.total_quantidade})</p>
+                                  {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                    <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="text-right">
+                                    {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                      <>
+                                        <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                        <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                      </>
+                                    ) : (
+                                      <p>R$ {precoFinal.toFixed(2)}</p>
+                                    )}
+                                  </div>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => handleMesaItemPartialPaymentOpen(item)}
+                                    disabled={!hasActiveOccupants || !isSingleOriginalItem} // Desabilita se for agrupado por múltiplos IDs
+                                    title={!isSingleOriginalItem ? "Pagamento parcial indisponível para itens agrupados de múltiplos registros." : "Pagar item da mesa"}
+                                  >
+                                    <DollarSign className="w-4 h-4" />
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                        <Tag className="h-4 w-4 mr-2" />
+                                        <span>Aplicar Desconto</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item)}>
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        <span>Remover Item</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotal.toFixed(2)}</p>
+                      </div>
+                    );
+                  }
+                  
+                  if (cliente.id !== 'mesa' && itens.length > 0) {
+                    const isPrincipal = cliente.id === clientePrincipal?.id;
+                    const subtotalIndividual = itens.reduce((acc, item) => acc + item.subtotal, 0);
+
+                    return (
+                      <div key={cliente.id} className="p-3 border rounded-lg">
+                        <div className="flex justify-between items-center mb-2">
+                          <h4 className="font-semibold">{cliente.nome} {isPrincipal && "(Principal)"}</h4>
+                          <Button size="sm" variant="outline" onClick={() => handlePartialPaymentOpen(cliente as Cliente)}>
+                            <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
+                          </Button>
+                        </div>
+                        <ul className="space-y-2">
+                          {itens.map((item) => {
+                            const precoOriginal = (item.preco || 0) * item.total_quantidade;
+                            const precoFinal = item.subtotal;
+                            
+                            return (
+                              <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
+                                <div>
+                                  <p className="font-medium">{item.nome_produto} (x{item.total_quantidade})</p>
+                                  {item.desconto_percentual && item.desconto_percentual > 0 && (
+                                    <Badge variant="secondary" className="mt-1">{item.desconto_percentual}% off - {item.desconto_motivo}</Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <div className="text-right">
+                                    {item.desconto_percentual && item.desconto_percentual > 0 ? (
+                                      <>
+                                        <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
+                                        <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
+                                      </>
+                                    ) : (
+                                      <p>R$ {precoFinal.toFixed(2)}</p>
+                                    )}
+                                  </div>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
+                                        <Tag className="h-4 w-4 mr-2" />
+                                        <span>Aplicar Desconto</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="text-destructive" onClick={() => deleteItemMutation.mutate(item)}>
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        <span>Remover Item</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                        <p className="text-right font-semibold mt-2">Subtotal: R$ {subtotalIndividual.toFixed(2)}</p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+
+              <div className="p-4 border rounded-lg">
+                <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField control={form.control} name="nome_produto" render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Produto</FormLabel>
+                        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between", !field.value && "text-muted-foreground")}>
+                                {field.value ? produtos?.find(p => p.nome === field.value)?.nome : "Selecione um produto"}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0"><Command><CommandInput placeholder="Buscar produto..." /><CommandList><CommandEmpty>Nenhum produto encontrado.</CommandEmpty><CommandGroup>
+                            {produtos?.map((produto) => (<CommandItem value={produto.nome} key={produto.id} onSelect={() => {
+                              const preco = produto.tipo === 'componente_rodizio' ? 0 : produto.preco;
+                              form.setValue("nome_produto", produto.nome);
+                              form.setValue("preco", preco);
+                              form.setValue("requer_preparo", produto.requer_preparo);
+                              setPopoverOpen(false);
+                            }}>
+                              <Check className={cn("mr-2 h-4 w-4", produto.nome === field.value ? "opacity-100" : "opacity-0")} />{produto.nome}</CommandItem>))}
+                          </CommandGroup></CommandList></Command></PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                    <FormField control={form.control} name="quantidade" render={({ field }) => (<FormItem><FormLabel>Quantidade</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>)}/>
+                    <FormField control={form.control} name="consumido_por_cliente_id" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Consumido por</FormLabel>
+                        <Select onValueChange={(value) => field.onChange(value === 'null' ? null : value)} value={field.value ?? 'null'}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Selecione quem consumiu" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="null">Mesa (Geral)</SelectItem>
+                            {ocupantes?.map(ocupante => (<SelectItem key={ocupante.id} value={ocupante.id}>{ocupante.nome}</SelectItem>))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}/>
+                    <Button type="submit" className="w-full" disabled={addItemMutation.isPending}><PlusCircle className="w-4 h-4 mr-2" />Adicionar ao Pedido</Button>
+                    
+                    {ocupantes && ocupantes.length > 0 && produtosResgatáveis.length > 0 && (
+                      <Button type="button" variant="secondary" className="w-full mt-2" onClick={() => setIsResgateOpen(true)}>
+                        <Star className="w-4 h-4 mr-2 fill-yellow-500 text-yellow-500" />
+                        Resgatar Prêmios
+                      </Button>
+                    )}
+                  </form>
+                </Form>
+              </div>
+            </div>
+          )}
+          <div className="mt-6 pt-4 border-t space-y-4">
+            {/* Seção de Gorjeta */}
+            <div className="space-y-3 p-3 border rounded-lg bg-secondary">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                        <Switch id="tip-toggle" checked={tipEnabled} onCheckedChange={setTipEnabled} disabled={closeOrderMutation.isPending} />
+                        <Label htmlFor="tip-toggle" className="text-base font-semibold">Adicionar Gorjeta (10%)</Label>
+                    </div>
+                    <span className="text-lg font-bold text-primary">R$ {gorjetaValor.toFixed(2).replace('.', ',')}</span>
+                </div>
+                {tipEnabled && (
+                    <div>
+                        <Label htmlFor="garcom-select">Garçom Responsável</Label>
+                        <Select 
+                            value={selectedGarcomId || ''} 
+                            onValueChange={setSelectedGarcomId}
+                            disabled={closeOrderMutation.isPending}
+                        >
+                            <SelectTrigger id="garcom-select" className="mt-1">
+                                <SelectValue placeholder="Selecione o garçom" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {waiters?.map(waiter => (
+                                    <SelectItem key={waiter.id} value={waiter.id}>
+                                        {waiter.first_name} {waiter.last_name} ({waiter.role})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+            </div>
+            
+            <div className="flex justify-between items-center text-lg font-bold">
+              <span>Subtotal dos Itens:</span>
+              <span>R$ {subtotalItens.toFixed(2).replace('.', ',')}</span>
+            </div>
+            <div className="flex justify-between items-center text-2xl font-extrabold text-primary">
+              <span>Total Final:</span>
+              <span>R$ {totalPedido.toFixed(2).replace('.', ',')}</span>
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button 
+                onClick={() => closeOrderMutation.mutate()} 
+                disabled={!pedido || subtotalItens === 0 || closeOrderMutation.isPending || (tipEnabled && !selectedGarcomId)}
+            >
+              <CreditCard className="w-4 h-4 mr-2" />
+              {closeOrderMutation.isPending ? "Finalizando..." : "Finalizar Conta Total"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <FinalizarContaParcialDialog
+        isOpen={!!clientePagandoIndividual}
+        onOpenChange={() => setClientePagandoIndividual(null)}
+        cliente={clientePagandoIndividual}
+        itensIndividuais={getItemsToPayIndividual(clientePagandoIndividual?.id || '')}
+        clientePrincipalId={clientePrincipal?.id || null}
+        onConfirm={(itemsToPayWithQuantity) => clientePagandoIndividual && closePartialOrderMutation.mutate({ clienteId: clientePagandoIndividual.id, itemsToPayWithQuantity })}
+        isSubmitting={closePartialOrderMutation.isPending}
+      />
+      
+      <AlertDialog open={isMesaItemPartialPaymentOpen} onOpenChange={setIsMesaItemPartialPaymentOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Pagar Item da Mesa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Selecione a quantidade e o cliente que está pagando o item: <span className="font-semibold">{itemMesaToPay?.nome_produto}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {itemMesaToPay && ocupantes && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="cliente-pagando-mesa">Cliente Pagando</Label>
+                <Select 
+                  value={clientePagandoMesaId || ''} 
+                  onValueChange={setClientePagandoMesaId}
+                  disabled={ocupantes.length === 0 || payMesaItemPartialMutation.isPending}
+                >
+                  <SelectTrigger id="cliente-pagando-mesa" className="mt-1">
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ocupantes.map(cliente => (
+                      <SelectItem key={cliente.id} value={cliente.id}>
+                        {cliente.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="quantidade-pagar">Quantidade a Pagar (Máx: {itemMesaToPay.total_quantidade})</Label>
+                <div className="flex items-center space-x-2 mt-1">
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={() => setQuantidadePagarMesa(prev => Math.max(1, prev - 1))} 
+                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialMutation.isPending}
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    max={itemMesaToPay.total_quantidade}
+                    value={quantidadePagarMesa} 
+                    onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.total_quantidade, parseInt(e.target.value) || 1)))} 
+                    className="w-16 text-center"
+                    disabled={payMesaItemPartialMutation.isPending}
+                  />
+                  <Button 
+                    size="icon" 
+                    onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
+                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || payMesaItemPartialPaymentOpen.isSubmitting}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
+                <span>Total a Pagar:</span>
+                <span>{(precoUnitarioComDescontoMesa * quantidadePagarMesa).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+              </div>
+            </div>
+          )}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={payMesaItemPartialMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmMesaItemPayment} 
+              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialMutation.isPending}
+            >
+              {payMesaItemPartialMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AplicarDescontoDialog
+        isOpen={!!itemParaDesconto}
+        onOpenChange={() => setItemParaDesconto(null)}
+        item={itemParaDesconto}
+        onDiscountRequested={handleDiscountRequested}
+      />
+      <ResgatePontosDialog
+        isOpen={isResgateOpen}
+        onOpenChange={setIsResgateOpen}
+        ocupantes={ocupantes || []}
+        mesaId={mesa?.id || null}
+        produtosResgatáveis={produtosResgatáveis}
+      />
     </>
   );
 }

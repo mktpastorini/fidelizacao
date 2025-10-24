@@ -41,6 +41,9 @@ function getBrazilTime() {
 }
 
 async function fetchSalaoData(superadminId: string | null): Promise<SalaoData> {
+  // Não precisamos do user logado aqui, pois o RLS já garante a visibilidade dos dados
+  // mas mantemos a estrutura para consistência.
+  
   const { data: mesas, error: mesasError } = await supabase
     .from("mesas")
     .select("*, cliente:clientes(id, nome), ocupantes:mesa_ocupantes(cliente:clientes(id, nome))")
@@ -58,6 +61,7 @@ async function fetchSalaoData(superadminId: string | null): Promise<SalaoData> {
 
   let settings: UserSettings | null = null;
   if (superadminId) {
+    // Busca as configurações do Superadmin para obter o status de fechamento e webhook
     const { data: settingsData, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", superadminId).single();
     if (settingsError && settingsError.code !== 'PGRST116') {
       console.error("Erro ao buscar configurações do Superadmin:", settingsError);
@@ -77,7 +81,7 @@ export default function SalaoPage() {
   const queryClient = useQueryClient();
   const { requestApproval, isRequesting } = useApprovalRequest();
   const { userRole } = useSettings();
-  const { superadminId, isLoadingSuperadminId } = useSuperadminId();
+  const { superadminId, isLoadingSuperadminId } = useSuperadminId(); // Usando o novo hook
   
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
@@ -91,8 +95,15 @@ export default function SalaoPage() {
     { client: Cliente; timestamp: number }[]
   >([]);
 
+  // Determina se o usuário logado é um dos roles que precisa do ID do Superadmin para o botão de fechar
   const needsSuperadminId = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
+  
+  // Se o usuário precisar do ID do Superadmin, esperamos que ele carregue. Caso contrário, passamos null.
   const idForFetch = needsSuperadminId ? superadminId : null;
+  
+  // A condição de habilitação agora é:
+  // 1. Se não precisa do ID do Superadmin (garcom/balcao), sempre habilitado (idForFetch é null).
+  // 2. Se precisa do ID do Superadmin (gerente/admin/superadmin), habilitado APENAS se o ID já foi resolvido (não está mais carregando).
   const isSuperadminIdResolved = !needsSuperadminId || !isLoadingSuperadminId;
 
   const { data, isLoading } = useQuery({
@@ -104,6 +115,8 @@ export default function SalaoPage() {
 
   const isClosed = data?.settings?.establishment_is_closed || false;
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
+  
+  // Permite fechar o dia para Superadmin, Admin e Gerente
   const canCloseDay = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
   const allocatedClientIds = data?.mesas
@@ -113,8 +126,12 @@ export default function SalaoPage() {
   const closeDayMutation = useMutation({
     mutationFn: async () => {
       if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+      
+      // 1. Executa a função Edge (que calcula stats e envia webhook)
       const { error } = await supabase.functions.invoke('close-day');
       if (error) throw new Error(error.message);
+      
+      // 2. Atualiza o status de fechamento no perfil do Superadmin
       const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: true }).eq("id", superadminId);
       if (updateError) throw updateError;
     },
@@ -128,8 +145,12 @@ export default function SalaoPage() {
   const openDayMutation = useMutation({
     mutationFn: async () => {
       if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+      
+      // 1. Atualiza o status de fechamento no perfil do Superadmin
       const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", superadminId);
       if (updateError) throw updateError;
+
+      // 2. Envia a notificação de abertura
       const { error: functionError } = await supabase.functions.invoke('open-day');
       if (functionError) {
         showError(`Dia aberto, mas falha ao enviar notificação: ${functionError.message}`);
@@ -477,7 +498,7 @@ export default function SalaoPage() {
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={34} minSize={20}>
             <div className="h-full overflow-y-auto p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {mesasComPedidos?.map(mesa => (
                   <MesaCard 
                     key={mesa.id} 
