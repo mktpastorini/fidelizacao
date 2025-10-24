@@ -132,13 +132,23 @@ export default function DeliveryPage() {
       if (orderError) throw orderError;
 
       if (newStatus === 'in_preparation') {
-        const { error: itemsError } = await supabase
+        // Update prep items to 'preparando'
+        const { error: prepItemsError } = await supabase
           .from("itens_pedido")
           .update({ status: 'preparando' })
           .eq('pedido_id', orderId)
           .eq('status', 'pendente')
           .eq('requer_preparo', true);
-        if (itemsError) throw itemsError;
+        if (prepItemsError) throw prepItemsError;
+
+        // Update non-prep items to 'entregue'
+        const { error: nonPrepItemsError } = await supabase
+          .from("itens_pedido")
+          .update({ status: 'entregue' })
+          .eq('pedido_id', orderId)
+          .eq('status', 'pendente')
+          .eq('requer_preparo', false);
+        if (nonPrepItemsError) throw nonPrepItemsError;
       }
 
       const order = orders?.find(o => o.id === orderId);
