@@ -24,11 +24,18 @@ type ItemToPayWithQuantity = {
   isMesaItem: boolean;
 };
 
+// Define o tipo esperado para os itens agrupados
+type GroupedItemForPayment = ItemPedido & {
+  total_quantidade: number;
+  subtotal: number;
+  original_ids: string[];
+};
+
 type FinalizarContaParcialDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   cliente: Cliente | null;
-  itensIndividuais: ItemPedido[];
+  itensIndividuais: GroupedItemForPayment[]; // Usando o tipo específico
   clientePrincipalId: string | null;
   onConfirm: (itemIdsToPay: ItemToPayWithQuantity[]) => void;
   isSubmitting: boolean;
@@ -66,6 +73,7 @@ export function FinalizarContaParcialDialog({
       const originalItem = itensIndividuais.find(item => item.id === id);
       if (!originalItem) return acc;
       
+      // Calcula o preço unitário com desconto
       const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
       return acc + precoUnitarioComDesconto * quantidade;
     }, 0);

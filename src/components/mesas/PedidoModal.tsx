@@ -20,7 +20,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
 import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus, User as UserIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
@@ -28,7 +28,7 @@ import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
+import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 
 type PedidoModalProps = {
@@ -131,11 +131,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [tipEnabled, setTipEnabled] = useState(false);
   const [selectedGarcomId, setSelectedGarcomId] = useState<string | null>(null);
 
-  const form = useForm<z.infer<typeof itemSchema>>({
-    resolver: zodResolver(itemSchema),
-    defaultValues: { nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true },
-  });
-
   const { data: pedido, isLoading, isError: isPedidoError, error: pedidoError } = useQuery({
     queryKey: ["pedidoAberto", mesa?.id],
     queryFn: () => fetchPedidoAberto(mesa!.id),
@@ -164,6 +159,28 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const produtosResgatáveis = produtos?.filter(p => p.pontos_resgate && p.pontos_resgate > 0) || [];
   
   const hasActiveOccupants = ocupantes && ocupantes.length > 0;
+
+  const form = useForm<z.infer<typeof itemSchema>>({
+    resolver: zodResolver(itemSchema),
+    defaultValues: { 
+      nome_produto: "", 
+      quantidade: 1, 
+      preco: 0, 
+      consumido_por_cliente_id: null, // Initial default
+      status: 'pendente', 
+      requer_preparo: true 
+    },
+  });
+  
+  // Efeito para definir o consumidor padrão como o cliente principal da mesa
+  useEffect(() => {
+    if (isOpen && clientePrincipal) {
+      form.setValue('consumido_por_cliente_id', clientePrincipal.id);
+    } else if (isOpen && !clientePrincipal) {
+      form.setValue('consumido_por_cliente_id', null);
+    }
+  }, [isOpen, clientePrincipal, form]);
+
 
   const { itensAgrupados, subtotalItens, itensMesaGeral } = useMemo(() => {
     if (!pedido?.itens_pedido || !ocupantes) return { itensAgrupados: new Map(), subtotalItens: 0, itensMesaGeral: [] };
@@ -281,7 +298,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["mesas"] });
       queryClient.invalidateQueries({ queryKey: ["pendingOrderItems"] });
       showSuccess("Item adicionado com sucesso!");
-      form.reset({ nome_produto: "", quantidade: 1, preco: 0, consumido_por_cliente_id: null, status: 'pendente', requer_preparo: true });
+      
+      // Reset the form, setting the default consumer back to the main client if available
+      form.reset({ 
+        nome_produto: "", 
+        quantidade: 1, 
+        preco: 0, 
+        consumido_por_cliente_id: clientePrincipal?.id || null, 
+        status: 'pendente', 
+        requer_preparo: true 
+      });
     },
     onError: (error: Error) => showError(error.message),
   });
@@ -725,16 +751,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1">
-                                  <div className="text-right">
-                                    {item.desconto_percentual && item.desconto_percentual > 0 ? (
-                                      <>
-                                        <p className="text-muted-foreground line-through text-xs">R$ {precoOriginal.toFixed(2)}</p>
-                                        <p className="font-semibold">R$ {precoFinal.toFixed(2)}</p>
-                                      </>
-                                    ) : (
-                                      <p>R$ {precoFinal.toFixed(2)}</p>
-                                    )}
-                                  </div>
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
@@ -954,7 +970,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         isOpen={!!clientePagandoIndividual}
         onOpenChange={() => setClientePagandoIndividual(null)}
         cliente={clientePagandoIndividual}
-        itensIndividuais={getItemsToPayIndividual(clientePagandoIndividual?.id || '')}
+        itensIndividuais={getItemsToPayIndividual(clientePagandoIndividual?.id || '') as any} // Casting to GroupedItemForPayment[]
         clientePrincipalId={clientePrincipal?.id || null}
         onConfirm={(itemsToPayWithQuantity) => clientePagandoIndividual && closePartialOrderMutation.mutate({ clienteId: clientePagandoIndividual.id, itemsToPayWithQuantity })}
         isSubmitting={closePartialOrderMutation.isPending}
