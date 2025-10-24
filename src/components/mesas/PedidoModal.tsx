@@ -265,7 +265,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       let status: ItemPedido['status'] = 'pendente';
 
       // Campos a serem inseridos, garantindo que apenas colunas válidas sejam enviadas
-      const itemToInsert = {
+      const itemToInsert: Partial<ItemPedido> = {
         pedido_id: pedidoId,
         user_id: user.id,
         nome_produto: nomeProdutoFinal,
@@ -363,11 +363,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       let subtotalParcial = 0;
       for (const itemToPay of itemsToPayWithQuantity) {
         const originalItem = pedido.itens_pedido.find(i => i.id === itemToPay.id);
-        if (originalItem) {
-          // Usamos o preço unitário do item original para calcular o subtotal
-          const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
-          subtotalParcial += precoUnitarioComDesconto * itemToPay.quantidade;
-        }
+        if (!originalItem) continue;
+
+        const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
+        subtotalParcial += precoUnitarioComDesconto * itemToPay.quantidade;
       }
       const gorjetaParcial = tipEnabled ? subtotalParcial * 0.1 : 0;
 
@@ -926,7 +925,16 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         cliente={clientePagandoIndividual}
         itensIndividuais={getItemsToPayIndividual(clientePagandoIndividual?.id || '')}
         clientePrincipalId={clientePrincipal?.id || null}
-        onConfirm={(itemsToPayWithQuantity) => clientePagandoIndividual && closePartialOrderMutation.mutate({ clienteId: clientePagandoIndividual.id, itemsToPayWithQuantity })}
+        onConfirm={(itemsToPayWithQuantity) => {
+          if (clientePagandoIndividual) {
+            const itemsToPayWithQuantityCleaned = itemsToPayWithQuantity.map(item => ({
+              id: item.id,
+              quantidade: item.quantidade,
+              isMesaItem: item.isMesaItem,
+            }));
+            closePartialOrderMutation.mutate({ clienteId: clientePagandoIndividual.id, itemsToPayWithQuantity: itemsToPayWithQuantityCleaned });
+          }
+        }}
         isSubmitting={closePartialOrderMutation.isPending}
       />
       
@@ -980,7 +988,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.total_quantidade, parseInt(e.target.value) || 1)))} 
                     className="w-16 text-center"
                     disabled={payMesaItemPartialMutation.isPending}
-                  />
+                  >
+                  </Input>
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
