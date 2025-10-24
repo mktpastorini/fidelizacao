@@ -24,6 +24,7 @@ import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { FinalizarContaTotalDialog } from "./FinalizarContaTotalDialog";
 import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
+import { Badge } from "@/components/ui/badge"; // <-- IMPORTAÇÃO ADICIONADA
 
 type MesaComPedido = Mesa & {
   pedido?: (Pedido & { itens_pedido: ItemPedido[] }) | null;
