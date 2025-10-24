@@ -7,6 +7,47 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-ifood-signature',
 }
 
+const IFOOD_API_URL = 'https://merchant-api.ifood.com.br';
+
+// Helper function to get iFood API token
+async function getIfoodApiToken(clientId: string, clientSecret: string): Promise<string> {
+  console.log("iFood Webhook: Obtendo token de autenticação...");
+  const params = new URLSearchParams();
+  params.append('grantType', 'client_credentials');
+  params.append('clientId', clientId);
+  params.append('clientSecret', clientSecret);
+
+  const response = await fetch(`${IFOOD_API_URL}/authentication/v1.0/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => response.text());
+    throw new Error(`Falha ao obter token do iFood. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
+  }
+
+  const data = await response.json();
+  console.log("iFood Webhook: Token obtido com sucesso.");
+  return data.accessToken;
+}
+
+// Helper function to confirm an order on iFood API
+async function confirmIfoodOrder(ifoodOrderId: string, token: string) {
+  console.log(`Confirmando pedido ${ifoodOrderId} no iFood...`);
+  const response = await fetch(`${IFOOD_API_URL}/order/v1.0/orders/${ifoodOrderId}/confirm`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Falha ao confirmar pedido no iFood. Status: ${response.status}. Detalhes: ${errorBody}`);
+  }
+  console.log(`Pedido ${ifoodOrderId} confirmado no iFood.`);
+}
+
+
 async function validateSignature(req: Request, bodyText: string): Promise<boolean> {
   const signature = req.headers.get('x-ifood-signature');
   const secret = Deno.env.get('IFOOD_WEBHOOK_SECRET');
@@ -58,13 +99,24 @@ serve(async (req) => {
       case 'PLACED': {
         const { customer, delivery, items, total } = body;
 
+        // 1. Confirmar o pedido na API do iFood imediatamente
+        const ifoodClientId = Deno.env.get('IFOOD_CLIENT_ID');
+        const ifoodClientSecret = Deno.env.get('IFOOD_CLIENT_SECRET');
+        if (!ifoodClientId || !ifoodClientSecret) {
+          throw new Error("Credenciais do iFood (IFOOD_CLIENT_ID, IFOOD_CLIENT_SECRET) não configuradas.");
+        }
+        const token = await getIfoodApiToken(ifoodClientId, ifoodClientSecret);
+        await confirmIfoodOrder(ifoodOrderId, token);
+
+        // 2. Criar o pedido no banco de dados já com o status de preparo
         const { data: newPedido, error: pedidoError } = await supabaseAdmin
           .from('pedidos')
           .insert({
             user_id: userId,
             order_type: 'IFOOD',
             ifood_order_id: ifoodOrderId,
-            status: 'aberto',
+            status: 'aberto', // Mantém o status geral como 'aberto'
+            delivery_status: 'in_preparation', // Define o status de delivery para 'em preparo'
             delivery_details: { customer, delivery, total },
           })
           .select('id')
@@ -72,14 +124,15 @@ serve(async (req) => {
 
         if (pedidoError) throw pedidoError;
 
+        // 3. Criar os itens do pedido já com o status 'preparando'
         const orderItems = items.map((item: any) => ({
           pedido_id: newPedido.id,
           user_id: userId,
           nome_produto: item.name,
           quantidade: item.quantity,
           preco: item.unitPrice,
-          status: 'pendente',
-          requer_preparo: true,
+          status: 'preparando', // Item já entra em preparo
+          requer_preparo: true, // Assume que todos os itens do iFood requerem preparo
         }));
 
         const { error: itemsError } = await supabaseAdmin.from('itens_pedido').insert(orderItems);
@@ -118,6 +171,7 @@ serve(async (req) => {
       }
     }
 
+    // Enviar acknowledgment para o iFood no final
     try {
       await supabaseAdmin.functions.invoke('ifood-acknowledgment', {
         body: { events: [{ id: ifoodEventId }] },
