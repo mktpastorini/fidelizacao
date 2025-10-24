@@ -121,16 +121,14 @@ export default function CozinhaPage() {
       </div>
 
       <Tabs defaultValue="kanban" className="flex-1 flex flex-col min-h-0">
-        <div className="flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
-          <TabsList className="grid grid-cols-2">
-            <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
-            <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList className="grid w-full grid-cols-2 max-w-md shrink-0">
+          <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
+          <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
+        </TabsList>
         
-        <TabsContent value="kanban" className="mt-0 flex-1 flex flex-col min-h-0">
-          <div className="flex justify-end items-center mb-4 shrink-0">
+        <TabsContent value="kanban" className="mt-6 flex-1 flex flex-col min-h-0">
+          <div className="flex justify-between items-center mb-4 shrink-0">
+            <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
             <Button 
               variant="outline" 
               size="sm" 
