@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Pedido, ItemPedido, Cliente, Produto } from "@/types/supabase";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Package, PlusCircle } from "lucide-react";
-import { DeliveryOrderCard } from "@/components/delivery/DeliveryOrderCard";
+import { DeliveryKanbanColumn } from "@/components/delivery/DeliveryKanbanColumn";
 import { Button } from "@/components/ui/button";
 import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
 import { DeliveryOrderDetailsModal } from "@/components/delivery/DeliveryOrderDetailsModal";
@@ -48,7 +48,7 @@ export default function DeliveryPage() {
   const { data: orders, isLoading: isLoadingOrders, isError: isOrdersError } = useQuery({
     queryKey: ["activeDeliveryOrders"],
     queryFn: fetchActiveDeliveryOrders,
-    refetchInterval: 30000,
+    refetchInterval: 15000,
   });
 
   const { data: clientes, isLoading: isLoadingClientes } = useQuery({
@@ -154,40 +154,65 @@ export default function DeliveryPage() {
 
   const isLoading = isLoadingOrders || isLoadingClientes || isLoadingProdutos;
 
+  const { awaiting, inPreparation, ready, outForDelivery } = useMemo(() => {
+    const awaiting: DeliveryOrder[] = [];
+    const inPreparation: DeliveryOrder[] = [];
+    const ready: DeliveryOrder[] = [];
+    const outForDelivery: DeliveryOrder[] = [];
+
+    orders?.forEach(order => {
+      const status = order.delivery_status || order.status;
+      switch (status) {
+        case 'awaiting_confirmation':
+        case 'aberto': // Mapeia status antigo do iFood
+          awaiting.push(order);
+          break;
+        case 'in_preparation':
+          inPreparation.push(order);
+          break;
+        case 'ready_for_delivery':
+          ready.push(order);
+          break;
+        case 'out_for_delivery':
+          outForDelivery.push(order);
+          break;
+        default:
+          break;
+      }
+    });
+
+    return { awaiting, inPreparation, ready, outForDelivery };
+  }, [orders]);
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-6 shrink-0">
         <div>
           <h1 className="text-3xl font-bold">Painel de Delivery</h1>
-          <p className="text-muted-foreground mt-2">Gerencie todos os pedidos para entrega, sejam eles do iFood ou manuais.</p>
+          <p className="text-muted-foreground mt-2">Gerencie todos os pedidos para entrega em tempo real.</p>
         </div>
         <Button onClick={() => setIsNewOrderOpen(true)} disabled={isLoading}>
             <PlusCircle className="w-4 h-4 mr-2" /> Novo Pedido Delivery
         </Button>
       </div>
 
-      <div className="bg-card p-6 rounded-lg border">
+      <div className="flex-1 flex gap-4 min-h-0">
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-64 w-full" />
-          </div>
+          <>
+            <Skeleton className="flex-1" />
+            <Skeleton className="flex-1" />
+            <Skeleton className="flex-1" />
+            <Skeleton className="flex-1" />
+          </>
         ) : isOrdersError ? (
           <p className="text-destructive">Erro ao carregar pedidos de delivery.</p>
-        ) : orders && orders.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {orders.map((order) => (
-              <div key={order.id} onClick={() => handleViewDetails(order)}>
-                <DeliveryOrderCard order={order} />
-              </div>
-            ))}
-          </div>
         ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            <Package className="w-12 h-12 mx-auto mb-4" />
-            <p>Nenhum pedido de delivery ativo no momento.</p>
-          </div>
+          <>
+            <DeliveryKanbanColumn title="Aguardando Confirmação" orders={awaiting} onViewDetails={handleViewDetails} borderColor="border-yellow-500" />
+            <DeliveryKanbanColumn title="Em Preparo" orders={inPreparation} onViewDetails={handleViewDetails} borderColor="border-blue-500" />
+            <DeliveryKanbanColumn title="Pronto para Entrega" orders={ready} onViewDetails={handleViewDetails} borderColor="border-purple-500" />
+            <DeliveryKanbanColumn title="Saiu para Entrega" orders={outForDelivery} onViewDetails={handleViewDetails} borderColor="border-orange-500" />
+          </>
         )}
       </div>
 

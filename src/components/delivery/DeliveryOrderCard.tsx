@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Package, Clock, User, Hash, DollarSign, ArrowRight } from "lucide-react";
-import { Button } from "../ui/button";
 
 type DeliveryOrder = Pedido & {
   itens_pedido: ItemPedido[];
@@ -36,7 +35,7 @@ export function DeliveryOrderCard({ order }: DeliveryOrderCardProps) {
   const statusInfo = statusMap[order.delivery_status || order.status] || { label: "Desconhecido", color: "bg-gray-500" };
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all">
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
@@ -68,9 +67,9 @@ export function DeliveryOrderCard({ order }: DeliveryOrderCardProps) {
           <DollarSign className="w-4 h-4" />
           {formatCurrency(total)}
         </div>
-        <Button variant="outline" size="sm">
-          Ver Detalhes <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        <div className="text-xs text-muted-foreground flex items-center">
+          Ver Detalhes <ArrowRight className="w-4 h-4 ml-1" />
+        </div>
       </CardFooter>
     </Card>
   );
