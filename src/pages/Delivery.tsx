@@ -8,6 +8,7 @@ import { DeliveryKanbanColumn } from "@/components/delivery/DeliveryKanbanColumn
 import { Button } from "@/components/ui/button";
 import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
 import { DeliveryOrderDetailsModal } from "@/components/delivery/DeliveryOrderDetailsModal";
+import { DeliveryChecklistModal } from "@/components/delivery/DeliveryChecklistModal";
 import { showError, showSuccess } from "@/utils/toast";
 
 type DeliveryOrder = Pedido & {
@@ -44,6 +45,8 @@ export default function DeliveryPage() {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [orderForChecklist, setOrderForChecklist] = useState<DeliveryOrder | null>(null);
 
   const { data: orders, isLoading: isLoadingOrders, isError: isOrdersError } = useQuery({
     queryKey: ["activeDeliveryOrders"],
@@ -103,7 +106,7 @@ export default function DeliveryPage() {
         preco: item.preco,
         status: 'pendente',
         requer_preparo: item.requer_preparo,
-        consumido_por_cliente_id: values.clienteId, // Associando o cliente ao item
+        consumido_por_cliente_id: values.clienteId,
       }));
 
       const { error: itemsError } = await supabase.from('itens_pedido').insert(orderItems);
@@ -111,7 +114,7 @@ export default function DeliveryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] }); // Invalida a cozinha
+      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       showSuccess("Novo pedido de delivery criado com sucesso!");
       setIsNewOrderOpen(false);
     },
@@ -122,14 +125,12 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      // Atualiza o status do pedido principal
       const { error: orderError } = await supabase
         .from("pedidos")
         .update({ delivery_status: newStatus })
         .eq("id", orderId);
       if (orderError) throw orderError;
 
-      // Se o pedido está sendo confirmado para preparo, atualiza os itens
       if (newStatus === 'in_preparation') {
         const { error: itemsError } = await supabase
           .from("itens_pedido")
@@ -140,7 +141,6 @@ export default function DeliveryPage() {
         if (itemsError) throw itemsError;
       }
 
-      // Notifica o iFood se necessário
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
@@ -153,9 +153,10 @@ export default function DeliveryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] }); // Invalida a query da cozinha
+      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       showSuccess("Status do pedido atualizado!");
       setIsDetailsOpen(false);
+      setIsChecklistOpen(false);
     },
     onError: (error: Error) => {
       showError(`Falha ao atualizar status: ${error.message}`);
@@ -165,6 +166,16 @@ export default function DeliveryPage() {
   const handleViewDetails = (order: DeliveryOrder) => {
     setSelectedOrder(order);
     setIsDetailsOpen(true);
+  };
+
+  const handleOpenChecklist = (order: DeliveryOrder) => {
+    setIsDetailsOpen(false);
+    setOrderForChecklist(order);
+    setIsChecklistOpen(true);
+  };
+
+  const handleConfirmDispatch = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, newStatus: 'out_for_delivery' });
   };
 
   const isLoading = isLoadingOrders || isLoadingClientes || isLoadingProdutos;
@@ -179,7 +190,7 @@ export default function DeliveryPage() {
       const status = order.delivery_status || order.status;
       switch (status) {
         case 'awaiting_confirmation':
-        case 'aberto': // Mapeia status antigo do iFood
+        case 'aberto':
           awaiting.push(order);
           break;
         case 'in_preparation':
@@ -246,6 +257,15 @@ export default function DeliveryPage() {
         order={selectedOrder}
         onStatusChange={updateStatusMutation.mutate}
         isUpdatingStatus={updateStatusMutation.isPending}
+        onOpenChecklist={handleOpenChecklist}
+      />
+
+      <DeliveryChecklistModal
+        isOpen={isChecklistOpen}
+        onOpenChange={setIsChecklistOpen}
+        order={orderForChecklist}
+        onConfirmDispatch={handleConfirmDispatch}
+        isDispatching={updateStatusMutation.isPending}
       />
     </div>
   );

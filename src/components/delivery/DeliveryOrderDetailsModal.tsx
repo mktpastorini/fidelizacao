@@ -17,6 +17,7 @@ type DeliveryOrderDetailsModalProps = {
   order: DeliveryOrder | null;
   onStatusChange: (orderId: string, newStatus: string) => void;
   isUpdatingStatus: boolean;
+  onOpenChecklist: (order: DeliveryOrder) => void;
 };
 
 const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -39,7 +40,7 @@ const statusFlow: { [key: string]: { next: string; label: string; icon: React.El
   out_for_delivery: { next: "delivered", label: "Marcar como Entregue", icon: CheckCircle },
 };
 
-export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatusChange, isUpdatingStatus }: DeliveryOrderDetailsModalProps) {
+export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatusChange, isUpdatingStatus, onOpenChecklist }: DeliveryOrderDetailsModalProps) {
   if (!order) return null;
 
   const total = order.delivery_details?.total?.orderAmount || order.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
@@ -49,6 +50,16 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
   const currentStatus = order.delivery_status || order.status;
   const statusInfo = statusMap[currentStatus] || { label: "Desconhecido", color: "bg-gray-500", icon: Package };
   const nextAction = statusFlow[currentStatus];
+
+  const handleNextAction = () => {
+    if (nextAction) {
+      if (currentStatus === 'ready_for_delivery') {
+        onOpenChecklist(order);
+      } else {
+        onStatusChange(order.id, nextAction.next);
+      }
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -101,7 +112,7 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
             <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
             {nextAction && (
               <Button 
-                onClick={() => onStatusChange(order.id, nextAction.next)}
+                onClick={handleNextAction}
                 disabled={isUpdatingStatus}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
