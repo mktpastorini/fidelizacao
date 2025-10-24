@@ -18,12 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Minus, Plus } from "lucide-react";
 
-type ItemToPayWithQuantity = {
-  id: string;
-  quantidade: number;
-  isMesaItem: boolean;
-};
-
 // Define o tipo esperado para os itens agrupados
 type GroupedItemForPayment = ItemPedido & {
   total_quantidade: number;
@@ -37,7 +31,7 @@ type FinalizarContaParcialDialogProps = {
   cliente: Cliente | null;
   itensIndividuais: GroupedItemForPayment[]; // Usando o tipo específico
   clientePrincipalId: string | null;
-  onConfirm: (itemIdsToPay: ItemToPayWithQuantity[]) => void;
+  onConfirm: (itemIdsToPay: string[]) => void; // Agora recebe apenas os IDs originais
   isSubmitting: boolean;
 };
 
@@ -59,31 +53,20 @@ export function FinalizarContaParcialDialog({
   isSubmitting,
 }: FinalizarContaParcialDialogProps) {
   
-  // Os itens a serem pagos são apenas os individuais do cliente
-  const itemsToPayWithQuantity: ItemToPayWithQuantity[] = useMemo(() => {
-    return itensIndividuais.map(item => ({
-      id: item.id,
-      quantidade: item.quantidade,
-      isMesaItem: false,
-    }));
+  // Coleta todos os IDs originais de todos os itens agrupados
+  const allOriginalItemIds: string[] = useMemo(() => {
+    return itensIndividuais.flatMap(item => item.original_ids);
   }, [itensIndividuais]);
 
   const total = useMemo(() => {
-    return itemsToPayWithQuantity.reduce((acc, { id, quantidade }) => {
-      const originalItem = itensIndividuais.find(item => item.id === id);
-      if (!originalItem) return acc;
-      
-      // Calcula o preço unitário com desconto
-      const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
-      return acc + precoUnitarioComDesconto * quantidade;
-    }, 0);
-  }, [itemsToPayWithQuantity, itensIndividuais]);
+    return itensIndividuais.reduce((acc, item) => acc + item.subtotal, 0);
+  }, [itensIndividuais]);
 
   if (!cliente) return null;
 
   const handleConfirm = () => {
-    if (itemsToPayWithQuantity.length > 0) {
-      onConfirm(itemsToPayWithQuantity); 
+    if (allOriginalItemIds.length > 0) {
+      onConfirm(allOriginalItemIds); 
     }
   };
 
@@ -97,15 +80,14 @@ export function FinalizarContaParcialDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         
-        {/* Usando div em vez de aninhar diretamente em AlertDialogDescription */}
         <div className="max-h-60 my-4 pr-2">
           <ScrollArea className="h-full">
             <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
             <ul className="space-y-1 text-sm mb-4 p-2 border rounded-md bg-secondary">
               {itensIndividuais.map(item => (
                 <li key={item.id} className="flex justify-between">
-                  <span>{item.nome_produto} (x{item.quantidade})</span>
-                  <span>{formatCurrency(calcularPrecoComDesconto(item))}</span>
+                  <span>{item.nome_produto} (x{item.total_quantidade})</span>
+                  <span>{formatCurrency(item.subtotal)}</span>
                 </li>
               ))}
             </ul>
@@ -125,7 +107,7 @@ export function FinalizarContaParcialDialog({
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleConfirm} 
-            disabled={isSubmitting || itemsToPayWithQuantity.length === 0}
+            disabled={isSubmitting || allOriginalItemIds.length === 0}
           >
             {isSubmitting ? "Processando..." : `Confirmar Pagamento (${formatCurrency(total)})`}
           </AlertDialogAction>
