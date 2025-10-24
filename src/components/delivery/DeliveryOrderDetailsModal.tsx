@@ -1,5 +1,5 @@
 import { Pedido, ItemPedido } from "@/types/supabase";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -58,10 +58,10 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
             {order.order_type === 'IFOOD' ? <img src="/ifood-icon.png" alt="iFood" className="w-6 h-6" /> : <Package className="w-6 h-6" />}
             Detalhes do Pedido
           </DialogTitle>
-          <DialogDescription className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground flex items-center justify-between">
             <span>{orderId} - {format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</span>
             <Badge className={`${statusInfo.color} text-white`}>{statusInfo.label}</Badge>
-          </DialogDescription>
+          </div>
         </DialogHeader>
         
         <ScrollArea className="flex-1 min-h-0 pr-4">

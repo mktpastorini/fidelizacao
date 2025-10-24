@@ -107,8 +107,7 @@ export default function CozinhaPage() {
 
   const prepPendingItems = filteredItems.filter(item => 
     item.status === 'pendente' && 
-    item.requer_preparo &&
-    (item.pedido?.order_type === 'SALAO' || !item.pedido?.order_type) // Apenas itens de salão aparecem aqui
+    item.requer_preparo
   );
   const deliveryPendingItems = filteredItems.filter(item => item.status === 'pendente' && !item.requer_preparo);
   const preparingItems = filteredItems.filter(item => item.status === 'preparando');
