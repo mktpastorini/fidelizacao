@@ -121,25 +121,23 @@ export default function CozinhaPage() {
       </div>
 
       <Tabs defaultValue="kanban" className="flex-1 flex flex-col min-h-0">
+        {/* Novo contêiner para TabsList e Botão Atualizar */}
         <div className="flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
           <TabsList className="grid grid-cols-2">
             <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
           </TabsList>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["kitchenItems"] })}
+            disabled={updateStatusMutation.isPending}
+          >
+            <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
+          </Button>
         </div>
         
         <TabsContent value="kanban" className="mt-0 flex-1 flex flex-col min-h-0">
-          <div className="flex justify-end items-center mb-4 shrink-0">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => queryClient.invalidateQueries({ queryKey: ["kitchenItems"] })}
-              disabled={updateStatusMutation.isPending}
-            >
-              <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
-            </Button>
-          </div>
           {isLoading ? (
             <div className="flex-1 flex gap-4 h-full">
               <Skeleton className="flex-1" />
