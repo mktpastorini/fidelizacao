@@ -9,27 +9,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Cliente, ItemPedido, StaffProfile } from "@/types/supabase";
+import { ItemPedido, StaffProfile } from "@/types/supabase";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { DollarSign } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { showError } from "@/utils/toast";
 
-type ItemToPayWithQuantity = {
-  id: string;
-  quantidade: number;
-  isMesaItem: boolean;
-};
-
-type FinalizarContaParcialDialogProps = {
+type FinalizarContaTotalDialogProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  cliente: Cliente | null;
-  itensIndividuais: ItemPedido[];
-  staffProfiles: StaffProfile[]; // Novo: Lista de garçons/staff
-  onConfirm: (itemIdsToPay: ItemToPayWithQuantity[], gorjetaValor: number, garcomId: string) => void;
+  itensRestantes: ItemPedido[];
+  staffProfiles: StaffProfile[];
+  onConfirm: (gorjetaValor: number, garcomId: string) => void;
   isSubmitting: boolean;
 };
 
@@ -41,52 +34,39 @@ const calcularPrecoComDesconto = (item: ItemPedido) => {
   return precoTotal - desconto;
 };
 
-export function FinalizarContaParcialDialog({
+export function FinalizarContaTotalDialog({
   isOpen,
   onOpenChange,
-  cliente,
-  itensIndividuais,
+  itensRestantes,
   staffProfiles,
   onConfirm,
   isSubmitting,
-}: FinalizarContaParcialDialogProps) {
+}: FinalizarContaTotalDialogProps) {
   const [selectedGarcomId, setSelectedGarcomId] = useState<string | null>(null);
   const [tipEnabled, setTipEnabled] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
-      // Tenta selecionar o primeiro garçom como padrão
       if (staffProfiles.length > 0) {
         setSelectedGarcomId(staffProfiles[0].id);
       }
     }
   }, [isOpen, staffProfiles]);
 
-  // Itens a serem pagos (todos os itens individuais do cliente)
-  const itemsToPayWithQuantity: ItemToPayWithQuantity[] = useMemo(() => {
-    return itensIndividuais.map(item => ({
-      id: item.id,
-      quantidade: item.quantidade,
-      isMesaItem: false,
-    }));
-  }, [itensIndividuais]);
-
-  // Subtotal dos itens do cliente
+  // Subtotal de TODOS os itens restantes
   const subtotalItens = useMemo(() => {
-    return itensIndividuais.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
-  }, [itensIndividuais]);
+    return itensRestantes.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
+  }, [itensRestantes]);
 
-  // Gorjeta (10% do subtotal)
+  // Gorjeta (10% do subtotal total)
   const gorjetaValor = tipEnabled ? subtotalItens * 0.1 : 0;
   
   // Total final
   const totalAPagar = subtotalItens + gorjetaValor;
 
-  if (!cliente) return null;
-
   const handleConfirm = () => {
-    if (itemsToPayWithQuantity.length === 0) {
-      showError("Nenhum item para pagar.");
+    if (itensRestantes.length === 0) {
+      showError("Nenhum item restante para pagar.");
       return;
     }
     if (tipEnabled && !selectedGarcomId) {
@@ -94,24 +74,24 @@ export function FinalizarContaParcialDialog({
       return;
     }
     
-    onConfirm(itemsToPayWithQuantity, gorjetaValor, selectedGarcomId!); 
+    onConfirm(gorjetaValor, selectedGarcomId!); 
   };
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Finalizar Conta de {cliente.nome}</AlertDialogTitle>
+          <AlertDialogTitle>Finalizar Conta Total</AlertDialogTitle>
           <AlertDialogDescription>
-            Você está finalizando o pagamento dos itens individuais de {cliente.nome}.
+            O cliente principal está finalizando o pagamento de todos os itens restantes da mesa.
           </AlertDialogDescription>
         </AlertDialogHeader>
         
         <div className="max-h-60 my-4 pr-2">
           <ScrollArea className="h-full">
-            <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
+            <h4 className="font-semibold mb-2">Itens Restantes ({itensRestantes.length})</h4>
             <ul className="space-y-1 text-sm mb-4 p-2 border rounded-md bg-secondary">
-              {itensIndividuais.map(item => (
+              {itensRestantes.map(item => (
                 <li key={item.id} className="flex justify-between">
                   <span>{item.nome_produto} (x{item.quantidade})</span>
                   <span>{formatCurrency(calcularPrecoComDesconto(item))}</span>
@@ -119,8 +99,8 @@ export function FinalizarContaParcialDialog({
               ))}
             </ul>
             
-            {itensIndividuais.length === 0 && (
-              <p className="text-center text-muted-foreground py-4">Nenhum item individual para pagar.</p>
+            {itensRestantes.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">Nenhum item restante para pagar.</p>
             )}
           </ScrollArea>
         </div>
@@ -147,6 +127,12 @@ export function FinalizarContaParcialDialog({
                 </Select>
             </div>
             
+            {/* Toggle Gorjeta */}
+            <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <Label htmlFor="tip-toggle">Incluir Gorjeta (10%)</Label>
+                <Switch id="tip-toggle" checked={tipEnabled} onCheckedChange={setTipEnabled} disabled={isSubmitting} />
+            </div>
+
             {/* Resumo Financeiro */}
             <div className="space-y-1">
                 <div className="flex justify-between text-sm">
@@ -154,7 +140,7 @@ export function FinalizarContaParcialDialog({
                     <span className="font-medium">{formatCurrency(subtotalItens)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                    <span>Gorjeta (10%):</span>
+                    <span>Gorjeta ({tipEnabled ? '10%' : '0%'}):</span>
                     <span className={cn("font-medium", tipEnabled ? "text-green-600" : "text-muted-foreground")}>{formatCurrency(gorjetaValor)}</span>
                 </div>
                 <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
@@ -168,9 +154,9 @@ export function FinalizarContaParcialDialog({
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleConfirm} 
-            disabled={isSubmitting || itemsToPayWithQuantity.length === 0 || (tipEnabled && !selectedGarcomId)}
+            disabled={isSubmitting || itensRestantes.length === 0 || (tipEnabled && !selectedGarcomId)}
           >
-            {isSubmitting ? "Processando..." : `Confirmar Pagamento (${formatCurrency(totalAPagar)})`}
+            {isSubmitting ? "Processando..." : `Confirmar Pagamento Total (${formatCurrency(totalAPagar)})`}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

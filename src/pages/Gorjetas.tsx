@@ -62,6 +62,8 @@ async function fetchTipDetails(garcomId: string, dateRange: DateRange): Promise<
       closed_at
     `)
     .eq('garcom_id', garcomId)
+    .not('gorjeta_valor', 'is', null) // Apenas pedidos com gorjeta registrada
+    .gt('gorjeta_valor', 0) // Apenas gorjetas maiores que zero
     .gte('closed_at', startOfDay(dateRange.from).toISOString())
     .lte('closed_at', endOfDay(dateRange.to).toISOString())
     .order('closed_at', { ascending: false });
@@ -126,7 +128,7 @@ export default function GorjetasPage() {
     } catch (error: any) {
       setTipDetails([]);
       setIsTipDetailsOpen(false);
-      alert(`Erro ao carregar detalhes das gorjetas: ${error.message}`);
+      showError(`Erro ao carregar detalhes das gorjetas: ${error.message}`);
     }
   };
 
@@ -205,12 +207,13 @@ export default function GorjetasPage() {
                 {tipStats.map((stat) => (
                   <TableRow key={stat.garcom_id}>
                     <TableCell className="font-medium flex items-center">
-                      <button 
-                        className="text-blue-600 hover:underline"
+                      <Button 
+                        variant="link"
+                        className="p-0 h-auto text-blue-600 hover:text-blue-700"
                         onClick={() => openTipDetails(stat.garcom_id, stat.garcom_nome)}
                       >
                         {stat.garcom_nome || `ID: ${stat.garcom_id.substring(0, 8)}...`}
-                      </button>
+                      </Button>
                     </TableCell>
                     <TableCell className="text-right font-bold text-green-600">
                       {formatCurrency(stat.total_gorjetas)}
