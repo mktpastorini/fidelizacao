@@ -102,9 +102,9 @@ serve(async (req) => {
 
     const token = await getIfoodApiToken(ifoodClientId, ifoodClientSecret);
 
-    if (new_status === 'preparando') {
+    if (new_status === 'in_preparation') {
       await confirmIfoodOrder(pedido.ifood_order_id, token);
-    } else if (new_status === 'entregue') {
+    } else if (new_status === 'out_for_delivery') { // CORRIGIDO: de 'entregue' para 'out_for_delivery'
       await dispatchIfoodOrder(pedido.ifood_order_id, token);
     }
 

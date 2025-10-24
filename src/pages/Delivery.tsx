@@ -7,6 +7,7 @@ import { Package, PlusCircle } from "lucide-react";
 import { DeliveryOrderCard } from "@/components/delivery/DeliveryOrderCard";
 import { Button } from "@/components/ui/button";
 import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
+import { DeliveryOrderDetailsModal } from "@/components/delivery/DeliveryOrderDetailsModal";
 import { showError, showSuccess } from "@/utils/toast";
 
 type DeliveryOrder = Pedido & {
@@ -18,6 +19,7 @@ async function fetchActiveDeliveryOrders(): Promise<DeliveryOrder[]> {
     .from("pedidos")
     .select("*, itens_pedido(*)")
     .in("order_type", ["IFOOD", "DELIVERY"])
+    .not("delivery_status", "in", "('delivered', 'cancelled')")
     .not("status", "in", "('pago', 'cancelado')")
     .order("created_at", { ascending: true });
 
@@ -40,6 +42,8 @@ async function fetchProdutos(): Promise<Produto[]> {
 export default function DeliveryPage() {
   const queryClient = useQueryClient();
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
 
   const { data: orders, isLoading: isLoadingOrders, isError: isOrdersError } = useQuery({
     queryKey: ["activeDeliveryOrders"],
@@ -83,7 +87,7 @@ export default function DeliveryPage() {
           cliente_id: values.clienteId,
           order_type: 'DELIVERY',
           delivery_status: 'awaiting_confirmation',
-          status: 'aberto', // Mantém o status 'aberto' para consistência
+          status: 'aberto',
           delivery_details: deliveryDetails,
         })
         .select('id')
@@ -114,6 +118,40 @@ export default function DeliveryPage() {
     },
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
+      const { error } = await supabase
+        .from("pedidos")
+        .update({ delivery_status: newStatus })
+        .eq("id", orderId);
+      if (error) throw error;
+
+      // Notifica o iFood se necessário
+      const order = orders?.find(o => o.id === orderId);
+      if (order?.order_type === 'IFOOD') {
+        const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
+          body: { pedido_id: orderId, new_status: newStatus },
+        });
+        if (ifoodError) {
+          showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
+      showSuccess("Status do pedido atualizado!");
+      setIsDetailsOpen(false);
+    },
+    onError: (error: Error) => {
+      showError(`Falha ao atualizar status: ${error.message}`);
+    },
+  });
+
+  const handleViewDetails = (order: DeliveryOrder) => {
+    setSelectedOrder(order);
+    setIsDetailsOpen(true);
+  };
+
   const isLoading = isLoadingOrders || isLoadingClientes || isLoadingProdutos;
 
   return (
@@ -140,7 +178,9 @@ export default function DeliveryPage() {
         ) : orders && orders.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {orders.map((order) => (
-              <DeliveryOrderCard key={order.id} order={order} />
+              <div key={order.id} onClick={() => handleViewDetails(order)}>
+                <DeliveryOrderCard order={order} />
+              </div>
             ))}
           </div>
         ) : (
@@ -158,6 +198,14 @@ export default function DeliveryPage() {
         produtos={produtos}
         onSubmit={createDeliveryOrderMutation.mutate}
         isSubmitting={createDeliveryOrderMutation.isPending}
+      />
+
+      <DeliveryOrderDetailsModal
+        isOpen={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        order={selectedOrder}
+        onStatusChange={updateStatusMutation.mutate}
+        isUpdatingStatus={updateStatusMutation.isPending}
       />
     </div>
   );
