@@ -1,3 +1,4 @@
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -363,11 +364,10 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       let subtotalParcial = 0;
       for (const itemToPay of itemsToPayWithQuantity) {
         const originalItem = pedido.itens_pedido.find(i => i.id === itemToPay.id);
-        if (originalItem) {
-          // Usamos o preço unitário do item original para calcular o subtotal
-          const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
-          subtotalParcial += precoUnitarioComDesconto * itemToPay.quantidade;
-        }
+        if (!originalItem) continue;
+
+        const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
+        subtotalParcial += precoUnitarioComDesconto * itemToPay.quantidade;
       }
       const gorjetaParcial = tipEnabled ? subtotalParcial * 0.1 : 0;
 
@@ -397,7 +397,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
             user_id: originalItem.user_id,
             nome_produto: originalItem.nome_produto,
             preco: originalItem.preco,
-            consumido_por_cliente_id: originalItem.consumido_por_cliente_id,
+            consumido_por_cliente_id: originalItem.consumido_por_cliente_id || clienteId, // Atribui ao cliente se for Mesa Geral
             desconto_percentual: originalItem.desconto_percentual,
             desconto_motivo: originalItem.desconto_motivo,
             status: originalItem.status,
@@ -412,6 +412,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           ...itemFieldsToCopy,
           pedido_id: newPedidoId,
           quantidade: itemToPay.quantidade,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
         if (insertError) throw insertError;
 
@@ -558,6 +560,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         ...itemFieldsToCopy,
         pedido_id: newPedidoId,
         quantidade: quantidade,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
       if (insertError) throw insertError;
 
@@ -807,7 +811,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               <div className="p-4 border rounded-lg">
                 <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <form onSubmit={form.handleSubmit(addItemMutation.mutate)} className="space-y-4">
                     <FormField control={form.control} name="nome_produto" render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>Produto</FormLabel>
@@ -985,7 +989,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.total_quantidade, parseInt(e.target.value) || 1)))} 
                     className="w-16 text-center"
                     disabled={payMesaItemPartialMutation.isPending}
-                  />
+                  >
+                  </Input>
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
