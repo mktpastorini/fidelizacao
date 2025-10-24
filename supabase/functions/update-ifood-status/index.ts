@@ -6,29 +6,55 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Mock da API do iFood - substitua pelas URLs e lógica de autenticação reais
-async function getIfoodApiToken(clientId: string, clientSecret: string) {
-  // Lógica para obter o token de autenticação da API do iFood
-  console.log("Obtendo token do iFood...");
-  return "mock_ifood_api_token";
+const IFOOD_API_URL = 'https://merchant-api.ifood.com.br';
+
+async function getIfoodApiToken(clientId: string, clientSecret: string): Promise<string> {
+  console.log("iFood Status Update: Obtendo token de autenticação...");
+  const params = new URLSearchParams();
+  params.append('grantType', 'client_credentials');
+  params.append('clientId', clientId);
+  params.append('clientSecret', clientSecret);
+
+  const response = await fetch(`${IFOOD_API_URL}/authentication/v1.0/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => response.text());
+    throw new Error(`Falha ao obter token do iFood. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
+  }
+
+  const data = await response.json();
+  console.log("iFood Status Update: Token obtido com sucesso.");
+  return data.accessToken;
 }
 
 async function confirmIfoodOrder(ifoodOrderId: string, token: string) {
   console.log(`Confirmando pedido ${ifoodOrderId} no iFood...`);
-  // const response = await fetch(`https://api.ifood.com.br/v1/orders/${ifoodOrderId}/confirm`, {
-  //   method: 'POST',
-  //   headers: { 'Authorization': `Bearer ${token}` }
-  // });
-  // if (!response.ok) throw new Error("Falha ao confirmar pedido no iFood.");
+  const response = await fetch(`${IFOOD_API_URL}/order/v1.0/orders/${ifoodOrderId}/confirm`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Falha ao confirmar pedido no iFood. Status: ${response.status}. Detalhes: ${errorBody}`);
+  }
+  console.log(`Pedido ${ifoodOrderId} confirmado no iFood.`);
 }
 
 async function dispatchIfoodOrder(ifoodOrderId: string, token: string) {
   console.log(`Despachando pedido ${ifoodOrderId} no iFood...`);
-  // const response = await fetch(`https://api.ifood.com.br/v1/orders/${ifoodOrderId}/dispatch`, {
-  //   method: 'POST',
-  //   headers: { 'Authorization': `Bearer ${token}` }
-  // });
-  // if (!response.ok) throw new Error("Falha ao despachar pedido no iFood.");
+  const response = await fetch(`${IFOOD_API_URL}/order/v1.0/orders/${ifoodOrderId}/dispatch`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Falha ao despachar pedido no iFood. Status: ${response.status}. Detalhes: ${errorBody}`);
+  }
+  console.log(`Pedido ${ifoodOrderId} despachado no iFood.`);
 }
 
 serve(async (req) => {
@@ -62,7 +88,7 @@ serve(async (req) => {
 
     if (pedidoError) throw pedidoError;
     if (pedido.order_type !== 'IFOOD' || !pedido.ifood_order_id) {
-      return new Response(JSON.stringify({ success: true, message: "Não é um pedido do iFood." }), {
+      return new Response(JSON.stringify({ success: true, message: "Não é um pedido do iFood, nenhuma ação necessária." }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
