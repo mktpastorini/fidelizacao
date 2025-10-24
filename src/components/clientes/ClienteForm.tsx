@@ -37,6 +37,13 @@ const formSchema = z.object({
       idade: z.coerce.number().positive().int().optional().nullable(),
     })
   ).optional(),
+  // Campos de endereço
+  address_street: z.string().optional(),
+  address_number: z.string().optional(),
+  address_neighborhood: z.string().optional(),
+  address_city: z.string().optional(),
+  address_zip: z.string().optional(),
+  address_complement: z.string().optional(),
 });
 
 type ClienteFormProps = {
@@ -63,6 +70,12 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
         apos_comer: defaultValues?.gostos?.apos_comer || "",
       },
       filhos: defaultValues?.filhos || [],
+      address_street: defaultValues?.address_street || "",
+      address_number: defaultValues?.address_number || "",
+      address_neighborhood: defaultValues?.address_neighborhood || "",
+      address_city: defaultValues?.address_city || "",
+      address_zip: defaultValues?.address_zip || "",
+      address_complement: defaultValues?.address_complement || "",
     },
   });
 
@@ -204,6 +217,20 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
                 ))}
               </div>
               <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => appendFilho({ nome: "", idade: null })}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Filho</Button>
+            </AccordionContent>
+          </AccordionItem>
+          <AccordionItem value="item-3" className="border rounded-md px-4">
+            <AccordionTrigger>Endereço</AccordionTrigger>
+            <AccordionContent className="pt-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <FormField control={form.control} name="address_street" render={({ field }) => (<FormItem className="col-span-2"><FormLabel className="text-sm">Rua</FormLabel><FormControl><Input placeholder="Rua das Flores" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="address_number" render={({ field }) => (<FormItem><FormLabel className="text-sm">Número</FormLabel><FormControl><Input placeholder="123" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField control={form.control} name="address_neighborhood" render={({ field }) => (<FormItem><FormLabel className="text-sm">Bairro</FormLabel><FormControl><Input placeholder="Centro" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="address_city" render={({ field }) => (<FormItem><FormLabel className="text-sm">Cidade</FormLabel><FormControl><Input placeholder="São Paulo" {...field} /></FormControl><FormMessage /></FormItem>)} />
+              </div>
+              <FormField control={form.control} name="address_complement" render={({ field }) => (<FormItem><FormLabel className="text-sm">Complemento</FormLabel><FormControl><Input placeholder="Apto 42, Bloco B" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </AccordionContent>
           </AccordionItem>
         </Accordion>
