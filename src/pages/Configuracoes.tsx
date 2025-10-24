@@ -5,7 +5,7 @@ import { WebhookForm } from "@/components/configuracoes/WebhookForm";
 import { TemplateSettingsForm } from "@/components/configuracoes/TemplateSettingsForm";
 import { ApiDocumentation } from "@/components/configuracoes/ApiDocumentation";
 import { CameraSettings } from "@/components/configuracoes/CameraSettings";
-import { SystemOverview } from "@/components/configuracoes/SystemOverview"; // Importado
+import { SystemOverview } from "@/components/configuracoes/SystemOverview";
 import { showError, showSuccess } from "@/utils/toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +18,8 @@ import { Copy, RefreshCw, Send, ShieldAlert, UserCog } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useState, useEffect } from "react"; // Importado
+import { useState, useEffect } from "react";
+import { IFoodSettings } from "@/components/configuracoes/iFoodSettings";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -204,6 +205,7 @@ export default function ConfiguracoesPage() {
   };
 
   const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
+  const gridColsClass = userRole === 'superadmin' ? 'grid-cols-8' : 'grid-cols-7';
 
   return (
     <div>
@@ -215,9 +217,10 @@ export default function ConfiguracoesPage() {
       </div>
 
       <Tabs defaultValue="acesso" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className={`grid w-full ${gridColsClass}`}>
           <TabsTrigger value="acesso">Acesso & Segurança</TabsTrigger>
-          <TabsTrigger value="mensagens">Integrações de Mensagens</TabsTrigger>
+          <TabsTrigger value="mensagens">Mensagens</TabsTrigger>
+          <TabsTrigger value="ifood">iFood</TabsTrigger>
           <TabsTrigger value="reconhecimento">Reconhecimento Facial</TabsTrigger>
           <TabsTrigger value="operacao">Operação do Salão</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
@@ -297,7 +300,22 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        {/* 3. Reconhecimento Facial */}
+        {/* 3. iFood */}
+        <TabsContent value="ifood" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Integração com iFood</CardTitle>
+              <CardDescription>
+                Configure e valide suas credenciais para receber pedidos do iFood diretamente no sistema.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <IFoodSettings />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* 4. Reconhecimento Facial */}
         <TabsContent value="reconhecimento" className="mt-6">
           <div className="space-y-6">
             <Card>
@@ -311,7 +329,7 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        {/* 4. Operação do Salão */}
+        {/* 5. Operação do Salão */}
         <TabsContent value="operacao" className="mt-6">
           <div className="space-y-6">
             <Card>
@@ -325,7 +343,7 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        {/* 5. Aparência */}
+        {/* 6. Aparência */}
         <TabsContent value="aparencia" className="mt-6">
           <div className="space-y-6">
             <Card>
@@ -352,12 +370,12 @@ export default function ConfiguracoesPage() {
           </div>
         </TabsContent>
 
-        {/* 6. Documentação API */}
+        {/* 7. Documentação API */}
         <TabsContent value="api" className="mt-6">
           <ApiDocumentation />
         </TabsContent>
         
-        {/* 7. Visão Geral do Sistema (Apenas Superadmin) */}
+        {/* 8. Visão Geral do Sistema (Apenas Superadmin) */}
         {userRole === 'superadmin' && (
           <TabsContent value="visao-geral" className="mt-6">
             <SystemOverview />
