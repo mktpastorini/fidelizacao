@@ -28,7 +28,7 @@ import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
+import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 
 type PedidoModalProps = {
@@ -875,7 +875,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                 <Select 
                   value={clientePagandoMesaId || ''} 
                   onValueChange={setClientePagandoMesaId}
-                  disabled={ocupantes.length === 0 || payMesaItemPartialMutation.isPending}
+                  disabled={ocupantes.length === 0 || closePartialOrderMutation.isPending}
                 >
                   <SelectTrigger id="cliente-pagando-mesa" className="mt-1">
                     <SelectValue placeholder="Selecione o cliente" />
@@ -897,7 +897,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     variant="outline" 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.max(1, prev - 1))} 
-                    disabled={quantidadePagarMesa <= 1 || payMesaItemPartialMutation.isPending}
+                    disabled={quantidadePagarMesa <= 1 || closePartialOrderMutation.isPending}
                   >
                     <Minus className="w-4 h-4" />
                   </Button>
@@ -908,12 +908,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     value={quantidadePagarMesa} 
                     onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.total_quantidade, parseInt(e.target.value) || 1)))} 
                     className="w-16 text-center"
-                    disabled={payMesaItemPartialMutation.isPending}
+                    disabled={closePartialOrderMutation.isPending}
                   />
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
-                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || payMesaItemPartialPaymentOpen.isPending}
+                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || closePartialOrderMutation.isPending}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -928,12 +928,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={payMesaItemPartialMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={closePartialOrderMutation.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmMesaItemPayment} 
-              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || payMesaItemPartialMutation.isPending}
+              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || closePartialOrderMutation.isPending}
             >
-              {payMesaItemPartialMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+              {closePartialOrderMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
