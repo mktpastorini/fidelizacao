@@ -47,7 +47,7 @@ serve(async (req) => {
     const payload = JSON.parse(bodyText);
     console.log("iFood Webhook Recebido e Validado:", payload);
 
-    const { id: ifoodOrderId, eventType, body } = payload;
+    const { id: ifoodEventId, correlationId: ifoodOrderId, code: eventType } = payload;
 
     const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
@@ -56,7 +56,8 @@ serve(async (req) => {
     }
 
     if (eventType === 'PLACED') {
-      const { customer, delivery, items, total } = body;
+      // O corpo do evento PLACED está dentro do próprio payload
+      const { customer, delivery, items, total } = payload;
 
       const { data: newPedido, error: pedidoError } = await supabaseAdmin
         .from('pedidos')
@@ -103,6 +104,18 @@ serve(async (req) => {
         .from('pedidos')
         .update({ status: 'cancelado', closed_at: new Date().toISOString() })
         .eq('id', pedido.id);
+    }
+
+    // Após processar o evento, enviar o acknowledgment
+    try {
+      await supabaseAdmin.functions.invoke('ifood-acknowledgment', {
+        body: { events: [{ id: ifoodEventId }] },
+      });
+      console.log(`iFood Webhook: Acknowledgment enviado para o evento ${ifoodEventId}`);
+    } catch (ackError) {
+      // Loga o erro mas não impede a resposta 200, pois o evento já foi processado.
+      // O iFood pode reenviar, mas teremos que lidar com a duplicidade.
+      console.error(`iFood Webhook: Falha ao enviar acknowledgment para o evento ${ifoodEventId}:`, ackError.message);
     }
 
     return new Response(JSON.stringify({ success: true }), {
