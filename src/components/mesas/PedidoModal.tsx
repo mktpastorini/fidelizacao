@@ -435,8 +435,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
       queryClient.invalidateQueries({ queryKey: ["clientes"] });
       queryClient.invalidateQueries({ queryKey: ["tipStats"] }); // Invalida as estatísticas de gorjeta
       const cliente = ocupantes?.find(o => o.id === clienteId);
-      showSuccess(`Conta de ${cliente?.nome || 'cliente'} finalizada!`);
-      setClientePagandoIndividual(null);
+      showSuccess(`Pagamento parcial de item da mesa atribuído a ${cliente?.nome || 'cliente'}!`);
       setIsMesaItemPartialPaymentOpen(false);
     },
     onError: (error: Error) => showError(error.message),
@@ -598,6 +597,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               id: undefined, // Generate new ID
               pedido_id: newPedidoId,
               quantidade: quantityToMove,
+              preco: originalItem.preco, // Preço unitário original
               consumido_por_cliente_id: clienteId, // Assign to the paying client
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
@@ -1026,7 +1026,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
-                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || payMesaItemPartialPaymentOpen.isSubmitting}
+                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || payMesaItemPartialMutation.isPending}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
