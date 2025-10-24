@@ -15,8 +15,9 @@ import { Badge } from "@/components/ui/badge";
 type KanbanCardProps = {
   item: ItemPedido & {
     pedido: {
+      id: string;
       mesa: { numero: number } | null;
-      order_type?: 'SALAO' | 'IFOOD';
+      order_type?: 'SALAO' | 'IFOOD' | 'DELIVERY';
       delivery_details?: any;
     } | null;
     cliente: { nome: string } | null;
@@ -44,6 +45,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
   const isOverdue = minutesSinceCreation > 5 && item.status === 'pendente';
   const isNonPrepItem = !item.requer_preparo;
   const isIfoodOrder = item.pedido?.order_type === 'IFOOD';
+  const isDeliveryOrder = item.pedido?.order_type === 'DELIVERY';
 
   const canManagePreparation = userRole && ['cozinha', 'superadmin', 'admin', 'gerente'].includes(userRole);
   const canDeliverNonPrep = userRole && ['garcom', 'balcao', 'superadmin', 'admin', 'gerente'].includes(userRole);
@@ -91,7 +93,11 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
           <div>
             {isIfoodOrder ? (
               <Badge variant="destructive" className="mb-1 flex items-center w-fit">
-                <Package className="w-3 h-3 mr-1" /> iFood Delivery
+                <img src="/ifood-icon.png" alt="iFood" className="w-3 h-3 mr-1" /> iFood Delivery
+              </Badge>
+            ) : isDeliveryOrder ? (
+              <Badge variant="secondary" className="mb-1 flex items-center w-fit">
+                <Package className="w-3 h-3 mr-1" /> Delivery
               </Badge>
             ) : (
               <p className="text-sm font-semibold text-muted-foreground">MESA {item.pedido?.mesa?.numero || '?'}</p>
@@ -101,7 +107,7 @@ export function KanbanCard({ item, onStatusChange }: KanbanCardProps) {
           <div className="text-sm text-muted-foreground space-y-1 border-t pt-3">
             <div className="flex items-center">
               <User className="w-4 h-4 mr-2" />
-              <span>{isIfoodOrder ? item.pedido?.delivery_details?.customer?.name : (item.cliente?.nome || "Mesa (Geral)")}</span>
+              <span>{item.cliente?.nome || "Cliente não identificado"}</span>
             </div>
             <div className="flex items-center">
               <Clock className="w-4 h-4 mr-2" />

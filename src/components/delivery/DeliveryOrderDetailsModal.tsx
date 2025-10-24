@@ -69,7 +69,7 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
             <div className="p-4 border rounded-lg bg-secondary">
               <h3 className="font-semibold mb-2 flex items-center gap-2"><User className="w-4 h-4" /> Cliente</h3>
               <p>{customer?.name || "Cliente Balcão"}</p>
-              {customer?.phone && <p className="text-sm text-muted-foreground flex items-center gap-2"><Phone className="w-3 h-3" /> {customer.phone}</p>}
+              {customer?.phone && <div className="text-sm text-muted-foreground flex items-center gap-2"><Phone className="w-3 h-3" /> {customer.phone}</div>}
             </div>
             {address && (
               <div className="p-4 border rounded-lg bg-secondary">

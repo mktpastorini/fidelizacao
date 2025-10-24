@@ -19,8 +19,8 @@ async function fetchActiveDeliveryOrders(): Promise<DeliveryOrder[]> {
     .from("pedidos")
     .select("*, itens_pedido(*)")
     .in("order_type", ["IFOOD", "DELIVERY"])
-    .not("delivery_status", "in", "(delivered,cancelled)")
-    .not("status", "in", "(pago,cancelado)")
+    .not("delivery_status", "in", "(\"delivered\",\"cancelled\")")
+    .not("status", "in", "(\"pago\",\"cancelado\")")
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
@@ -103,6 +103,7 @@ export default function DeliveryPage() {
         preco: item.preco,
         status: 'pendente',
         requer_preparo: item.requer_preparo,
+        consumido_por_cliente_id: values.clienteId, // Associando o cliente ao item
       }));
 
       const { error: itemsError } = await supabase.from('itens_pedido').insert(orderItems);
@@ -110,6 +111,7 @@ export default function DeliveryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] }); // Invalida a cozinha
       showSuccess("Novo pedido de delivery criado com sucesso!");
       setIsNewOrderOpen(false);
     },
