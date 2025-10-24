@@ -513,8 +513,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         if (moveError) throw moveError;
       } else {
         // Pagamento parcial: dividir os IDs originais proporcionalmente
-        // Para simplificar, vamos iterar pelos itens originais e mover quantidades até atingir a quantidade a pagar
-
         let quantidadeRestante = quantidade;
         for (const originalId of originalItemIds) {
           if (quantidadeRestante <= 0) break;
