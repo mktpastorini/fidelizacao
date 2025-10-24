@@ -3,13 +3,23 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Pedido, ItemPedido, Cliente, Produto } from "@/types/supabase";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Package, PlusCircle } from "lucide-react";
+import { Package, PlusCircle, Trash2 } from "lucide-react";
 import { DeliveryKanbanColumn } from "@/components/delivery/DeliveryKanbanColumn";
 import { Button } from "@/components/ui/button";
 import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
 import { DeliveryOrderDetailsModal } from "@/components/delivery/DeliveryOrderDetailsModal";
 import { DeliveryChecklistModal } from "@/components/delivery/DeliveryChecklistModal";
 import { showError, showSuccess } from "@/utils/toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type DeliveryOrder = Pedido & {
   itens_pedido: ItemPedido[];
@@ -47,6 +57,7 @@ export default function DeliveryPage() {
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [orderForChecklist, setOrderForChecklist] = useState<DeliveryOrder | null>(null);
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
   const { data: orders, isLoading: isLoadingOrders, isError: isOrdersError } = useQuery({
     queryKey: ["activeDeliveryOrders"],
@@ -125,36 +136,44 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      const { error: orderError } = await supabase
-        .from("pedidos")
-        .update({ delivery_status: newStatus })
-        .eq("id", orderId);
-      if (orderError) throw orderError;
+      let finalStatus = newStatus;
 
       if (newStatus === 'in_preparation') {
-        // Update prep items to 'preparando'
-        const { error: prepItemsError } = await supabase
+        await supabase
           .from("itens_pedido")
           .update({ status: 'preparando' })
           .eq('pedido_id', orderId)
           .eq('status', 'pendente')
           .eq('requer_preparo', true);
-        if (prepItemsError) throw prepItemsError;
 
-        // Update non-prep items to 'entregue'
-        const { error: nonPrepItemsError } = await supabase
+        await supabase
           .from("itens_pedido")
           .update({ status: 'entregue' })
           .eq('pedido_id', orderId)
           .eq('status', 'pendente')
           .eq('requer_preparo', false);
-        if (nonPrepItemsError) throw nonPrepItemsError;
+        
+        const { count: remainingPrepItems } = await supabase
+            .from('itens_pedido')
+            .select('*', { count: 'exact', head: true })
+            .eq('pedido_id', orderId)
+            .eq('status', 'preparando');
+
+        if (remainingPrepItems === 0) {
+            finalStatus = 'ready_for_delivery';
+        }
       }
+
+      const { error: orderError } = await supabase
+        .from("pedidos")
+        .update({ delivery_status: finalStatus })
+        .eq("id", orderId);
+      if (orderError) throw orderError;
 
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
-          body: { pedido_id: orderId, new_status: newStatus },
+          body: { pedido_id: orderId, new_status: finalStatus },
         });
         if (ifoodError) {
           showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
@@ -171,6 +190,24 @@ export default function DeliveryPage() {
     },
     onError: (error: Error) => {
       showError(`Falha ao atualizar status: ${error.message}`);
+    },
+  });
+
+  const clearAwaitingOrdersMutation = useMutation({
+    mutationFn: async (orderIds: string[]) => {
+        const { error } = await supabase
+            .from("pedidos")
+            .update({ delivery_status: 'cancelled', status: 'cancelado', closed_at: new Date().toISOString() })
+            .in('id', orderIds);
+        if (error) throw error;
+    },
+    onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
+        showSuccess("Pedidos em 'Aguardando Confirmação' foram cancelados.");
+        setIsClearConfirmOpen(false);
+    },
+    onError: (error: Error) => {
+        showError(`Falha ao limpar pedidos: ${error.message}`);
     },
   });
 
@@ -221,6 +258,27 @@ export default function DeliveryPage() {
     return { awaiting, inPreparation, ready, outForDelivery };
   }, [orders]);
 
+  const handleClearAwaiting = () => {
+    const orderIds = awaiting.map(order => order.id);
+    if (orderIds.length > 0) {
+        clearAwaitingOrdersMutation.mutate(orderIds);
+    } else {
+        setIsClearConfirmOpen(false);
+    }
+  };
+
+  const clearButton = awaiting.length > 0 ? (
+    <Button
+        variant="ghost"
+        size="sm"
+        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+        onClick={() => setIsClearConfirmOpen(true)}
+    >
+        <Trash2 className="w-4 h-4 mr-1" />
+        Limpar
+    </Button>
+  ) : null;
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-6 shrink-0">
@@ -245,7 +303,7 @@ export default function DeliveryPage() {
           <p className="text-destructive">Erro ao carregar pedidos de delivery.</p>
         ) : (
           <>
-            <DeliveryKanbanColumn title="Aguardando Confirmação" orders={awaiting} onViewDetails={handleViewDetails} borderColor="border-yellow-500" />
+            <DeliveryKanbanColumn title="Aguardando Confirmação" orders={awaiting} onViewDetails={handleViewDetails} borderColor="border-yellow-500" actionButton={clearButton} />
             <DeliveryKanbanColumn title="Em Preparo" orders={inPreparation} onViewDetails={handleViewDetails} borderColor="border-blue-500" />
             <DeliveryKanbanColumn title="Pronto para Entrega" orders={ready} onViewDetails={handleViewDetails} borderColor="border-purple-500" />
             <DeliveryKanbanColumn title="Saiu para Entrega" orders={outForDelivery} onViewDetails={handleViewDetails} borderColor="border-orange-500" />
@@ -278,6 +336,27 @@ export default function DeliveryPage() {
         onConfirmDispatch={handleConfirmDispatch}
         isDispatching={updateStatusMutation.isPending}
       />
+
+      <AlertDialog open={isClearConfirmOpen} onOpenChange={setIsClearConfirmOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar Limpeza?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Você tem certeza que deseja cancelar todos os {awaiting.length} pedidos na coluna "Aguardando Confirmação"? Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleClearAwaiting}
+                    disabled={clearAwaitingOrdersMutation.isPending}
+                    className="bg-destructive hover:bg-destructive/90"
+                >
+                    {clearAwaitingOrdersMutation.isPending ? "Cancelando..." : "Sim, Cancelar Todos"}
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
