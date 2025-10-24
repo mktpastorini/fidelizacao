@@ -9,13 +9,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Cliente, ItemPedido, StaffProfile } from "@/types/supabase";
+import { Cliente, ItemPedido } from "@/types/supabase";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Minus, Plus } from "lucide-react";
 
 type ItemToPayWithQuantity = {
   id: string;
@@ -28,8 +29,8 @@ type FinalizarContaParcialDialogProps = {
   onOpenChange: (isOpen: boolean) => void;
   cliente: Cliente | null;
   itensIndividuais: ItemPedido[];
-  staffProfiles: StaffProfile[]; // Novo: Lista de garçons/staff
-  onConfirm: (itemIdsToPay: ItemToPayWithQuantity[], gorjetaValor: number, garcomId: string) => void;
+  clientePrincipalId: string | null;
+  onConfirm: (itemIdsToPay: ItemToPayWithQuantity[]) => void;
   isSubmitting: boolean;
 };
 
@@ -46,23 +47,12 @@ export function FinalizarContaParcialDialog({
   onOpenChange,
   cliente,
   itensIndividuais,
-  staffProfiles,
+  clientePrincipalId,
   onConfirm,
   isSubmitting,
 }: FinalizarContaParcialDialogProps) {
-  const [selectedGarcomId, setSelectedGarcomId] = useState<string | null>(null);
-  const [tipEnabled, setTipEnabled] = useState(true);
-
-  useEffect(() => {
-    if (isOpen) {
-      // Tenta selecionar o primeiro garçom como padrão
-      if (staffProfiles.length > 0) {
-        setSelectedGarcomId(staffProfiles[0].id);
-      }
-    }
-  }, [isOpen, staffProfiles]);
-
-  // Itens a serem pagos (todos os itens individuais do cliente)
+  
+  // Os itens a serem pagos são apenas os individuais do cliente
   const itemsToPayWithQuantity: ItemToPayWithQuantity[] = useMemo(() => {
     return itensIndividuais.map(item => ({
       id: item.id,
@@ -71,30 +61,22 @@ export function FinalizarContaParcialDialog({
     }));
   }, [itensIndividuais]);
 
-  // Subtotal dos itens do cliente
-  const subtotalItens = useMemo(() => {
-    return itensIndividuais.reduce((acc, item) => acc + calcularPrecoComDesconto(item), 0);
-  }, [itensIndividuais]);
-
-  // Gorjeta (10% do subtotal)
-  const gorjetaValor = tipEnabled ? subtotalItens * 0.1 : 0;
-  
-  // Total final
-  const totalAPagar = subtotalItens + gorjetaValor;
+  const total = useMemo(() => {
+    return itemsToPayWithQuantity.reduce((acc, { id, quantidade }) => {
+      const originalItem = itensIndividuais.find(item => item.id === id);
+      if (!originalItem) return acc;
+      
+      const precoUnitarioComDesconto = calcularPrecoComDesconto({ ...originalItem, quantidade: 1 });
+      return acc + precoUnitarioComDesconto * quantidade;
+    }, 0);
+  }, [itemsToPayWithQuantity, itensIndividuais]);
 
   if (!cliente) return null;
 
   const handleConfirm = () => {
-    if (itemsToPayWithQuantity.length === 0) {
-      showError("Nenhum item para pagar.");
-      return;
+    if (itemsToPayWithQuantity.length > 0) {
+      onConfirm(itemsToPayWithQuantity); 
     }
-    if (tipEnabled && !selectedGarcomId) {
-      showError("Selecione o garçom para aplicar a gorjeta.");
-      return;
-    }
-    
-    onConfirm(itemsToPayWithQuantity, gorjetaValor, selectedGarcomId!); 
   };
 
   return (
@@ -107,6 +89,7 @@ export function FinalizarContaParcialDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         
+        {/* Usando div em vez de aninhar diretamente em AlertDialogDescription */}
         <div className="max-h-60 my-4 pr-2">
           <ScrollArea className="h-full">
             <h4 className="font-semibold mb-2">Itens Individuais ({itensIndividuais.length})</h4>
@@ -125,52 +108,18 @@ export function FinalizarContaParcialDialog({
           </ScrollArea>
         </div>
         
-        <div className="space-y-3 pt-4 border-t">
-            {/* Seletor de Garçom */}
-            <div>
-                <Label htmlFor="garcom-select" className="text-sm font-medium">Garçom (para gorjeta)</Label>
-                <Select 
-                    value={selectedGarcomId || ''} 
-                    onValueChange={setSelectedGarcomId}
-                    disabled={staffProfiles.length === 0 || isSubmitting}
-                >
-                    <SelectTrigger id="garcom-select" className="mt-1">
-                        <SelectValue placeholder="Selecione o garçom" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {staffProfiles.map(staff => (
-                            <SelectItem key={staff.id} value={staff.id}>
-                                {staff.first_name} {staff.last_name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            
-            {/* Resumo Financeiro */}
-            <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span className="font-medium">{formatCurrency(subtotalItens)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                    <span>Gorjeta (10%):</span>
-                    <span className={cn("font-medium", tipEnabled ? "text-green-600" : "text-muted-foreground")}>{formatCurrency(gorjetaValor)}</span>
-                </div>
-                <div className="flex justify-between items-center text-lg font-bold pt-2 border-t">
-                    <span>Total a Pagar:</span>
-                    <span>{formatCurrency(totalAPagar)}</span>
-                </div>
-            </div>
+        <div className="flex justify-between items-center text-lg font-bold pt-4 border-t">
+            <span>Total a Pagar:</span>
+            <span>{formatCurrency(total)}</span>
         </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
           <AlertDialogAction 
             onClick={handleConfirm} 
-            disabled={isSubmitting || itemsToPayWithQuantity.length === 0 || (tipEnabled && !selectedGarcomId)}
+            disabled={isSubmitting || itemsToPayWithQuantity.length === 0}
           >
-            {isSubmitting ? "Processando..." : `Confirmar Pagamento (${formatCurrency(totalAPagar)})`}
+            {isSubmitting ? "Processando..." : `Confirmar Pagamento (${formatCurrency(total)})`}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

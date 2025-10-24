@@ -13,22 +13,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useSuperadminId } from "@/hooks/useSuperadminId";
 import { useSettings } from "@/contexts/SettingsContext";
 import { StatCard } from "@/components/dashboard/StatCard";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { TipDetailsModal } from "@/components/gorjetas/TipDetailsModal";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"; // Importado Alert
 
 type TipStat = {
   garcom_id: string;
   garcom_nome: string;
   total_gorjetas: number;
   total_pedidos: number;
-};
-
-type TipDetail = {
-  id: string;
-  cliente_nome: string;
-  valor: number;
-  data: string;
 };
 
 // Função para obter data/hora no horário de Brasília
@@ -48,35 +39,6 @@ async function fetchTipStats(userId: string, dateRange: DateRange): Promise<TipS
   });
   if (error) throw new Error(error.message);
   return data || [];
-}
-
-async function fetchTipDetails(garcomId: string, dateRange: DateRange): Promise<TipDetail[]> {
-  if (!dateRange.from || !dateRange.to) return [];
-  
-  const { data, error } = await supabase
-    .from('pedidos')
-    .select(`
-      id,
-      cliente:clientes(nome),
-      gorjeta_valor,
-      closed_at
-    `)
-    .eq('garcom_id', garcomId)
-    .not('gorjeta_valor', 'is', null) // Apenas pedidos com gorjeta registrada
-    .gt('gorjeta_valor', 0) // Apenas gorjetas maiores que zero
-    .gte('closed_at', startOfDay(dateRange.from).toISOString())
-    .lte('closed_at', endOfDay(dateRange.to).toISOString())
-    .order('closed_at', { ascending: false });
-  
-  if (error) throw new Error(error.message);
-  if (!data) return [];
-  
-  return data.map(p => ({
-    id: p.id,
-    cliente_nome: p.cliente?.nome || 'N/A',
-    valor: p.gorjeta_valor || 0,
-    data: p.closed_at,
-  }));
 }
 
 const formatCurrency = (value: number | undefined) => {
@@ -109,28 +71,9 @@ export default function GorjetasPage() {
     enabled: isQueryEnabled,
   });
 
-  const [selectedGarcomId, setSelectedGarcomId] = useState<string | null>(null);
-  const [isTipDetailsOpen, setIsTipDetailsOpen] = useState(false);
-  const [tipDetails, setTipDetails] = useState<TipDetail[]>([]);
-  const [selectedGarcomNome, setSelectedGarcomNome] = useState<string>("");
-
   const totalTips = useMemo(() => {
     return tipStats?.reduce((sum, stat) => sum + stat.total_gorjetas, 0) || 0;
   }, [tipStats]);
-
-  const openTipDetails = async (garcomId: string, garcomNome: string) => {
-    setSelectedGarcomId(garcomId);
-    setSelectedGarcomNome(garcomNome);
-    try {
-      const details = await fetchTipDetails(garcomId, dateRange!);
-      setTipDetails(details);
-      setIsTipDetailsOpen(true);
-    } catch (error: any) {
-      setTipDetails([]);
-      setIsTipDetailsOpen(false);
-      showError(`Erro ao carregar detalhes das gorjetas: ${error.message}`);
-    }
-  };
 
   if (isLoadingSuperadminId || isLoading) {
     return <Skeleton className="h-96 w-full" />;
@@ -147,6 +90,8 @@ export default function GorjetasPage() {
     );
   }
 
+  // Se o RoleGuard permitiu o acesso, mas o userIdToFetch ainda é null (o que só deve acontecer se o SuperadminId for null, mas sem erro),
+  // exibimos uma mensagem de erro de configuração.
   if (!userIdToFetch) {
     return (
       <Alert variant="destructive" className="mt-8">
@@ -207,13 +152,8 @@ export default function GorjetasPage() {
                 {tipStats.map((stat) => (
                   <TableRow key={stat.garcom_id}>
                     <TableCell className="font-medium flex items-center">
-                      <Button 
-                        variant="link"
-                        className="p-0 h-auto text-blue-600 hover:text-blue-700"
-                        onClick={() => openTipDetails(stat.garcom_id, stat.garcom_nome)}
-                      >
-                        {stat.garcom_nome || `ID: ${stat.garcom_id.substring(0, 8)}...`}
-                      </Button>
+                      <UserIcon className="w-4 h-4 mr-2 text-muted-foreground" />
+                      {stat.garcom_nome || `ID: ${stat.garcom_id.substring(0, 8)}...`}
                     </TableCell>
                     <TableCell className="text-right font-bold text-green-600">
                       {formatCurrency(stat.total_gorjetas)}
@@ -230,13 +170,6 @@ export default function GorjetasPage() {
           )}
         </CardContent>
       </Card>
-
-      <TipDetailsModal 
-        isOpen={isTipDetailsOpen} 
-        onOpenChange={setIsTipDetailsOpen} 
-        garcomNome={selectedGarcomNome} 
-        tipDetails={tipDetails} 
-      />
     </div>
   );
 }
