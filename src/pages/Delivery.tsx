@@ -19,8 +19,8 @@ async function fetchActiveDeliveryOrders(): Promise<DeliveryOrder[]> {
     .from("pedidos")
     .select("*, itens_pedido(*)")
     .in("order_type", ["IFOOD", "DELIVERY"])
-    .not("delivery_status", "in", ['delivered', 'cancelled'])
-    .not("status", "in", ['pago', 'cancelado'])
+    .not("delivery_status", "in", '("delivered", "cancelled")')
+    .not("status", "in", '("pago", "cancelado")')
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);
