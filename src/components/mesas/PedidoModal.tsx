@@ -22,7 +22,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
-import { AplicarDescontoDialog } from "./MesaCard";
+import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
 import { ResgatePontosDialog } from "./ResgatePontosDialog";
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -810,7 +810,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
               <div className="p-4 border rounded-lg">
                 <h3 className="font-semibold mb-4">Adicionar Novo Item</h3>
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <form onSubmit={form.handleSubmit(addItemMutation.mutate)} className="space-y-4">
                     <FormField control={form.control} name="nome_produto" render={({ field }) => (
                       <FormItem className="flex flex-col">
                         <FormLabel>Produto</FormLabel>
