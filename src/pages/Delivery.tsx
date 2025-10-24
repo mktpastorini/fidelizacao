@@ -125,12 +125,14 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
+      // 1. Atualiza o status principal do pedido de delivery
       const { error: orderError } = await supabase
         .from("pedidos")
         .update({ delivery_status: newStatus })
         .eq("id", orderId);
       if (orderError) throw orderError;
 
+      // 2. Se o pedido está indo para "preparo", atualiza todos os itens pendentes para "preparando"
       if (newStatus === 'in_preparation') {
         const { error: itemsError } = await supabase
           .from("itens_pedido")
@@ -141,18 +143,21 @@ export default function DeliveryPage() {
         if (itemsError) throw itemsError;
       }
 
+      // 3. Se for um pedido do iFood, notifica a API do iFood
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
           body: { pedido_id: orderId, new_status: newStatus },
         });
         if (ifoodError) {
+          // Mostra um aviso, mas não impede o fluxo, pois o status local já foi atualizado
           showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["deliveryKitchenItems"] });
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       showSuccess("Status do pedido atualizado!");
       setIsDetailsOpen(false);
