@@ -38,7 +38,7 @@ type PedidoModalProps = {
 };
 
 const itemSchema = z.object({
-  nome_produto: z.string().min(2, "O nome do produto é obrigatório."),
+  nome_produto: z.string().min(2, { message: "O nome do produto é obrigatório." }),
   quantidade: z.coerce.number().min(1, "A quantidade deve ser pelo menos 1."),
   preco: z.coerce.number(),
   consumido_por_cliente_id: z.string().uuid().nullable().optional(),
@@ -123,7 +123,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [isResgateOpen, setIsResgateOpen] = useState(false);
   
   // Pagamento Parcial de Item da Mesa (Geral)
-  const [itemMesaToPay, setItemMesaToPay] = useState<GroupedItem | null>(null); // Usando GroupedItem
+  const [itemMesaToPay, setItemMesaToPay] = useState<GroupedItem | null>(null);
   const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
   const [clientePagandoMesaId, setClientePagandoMesaId] = useState<string | null>(null);
   const [isMesaItemPartialPaymentOpen, setIsMesaItemPartialPaymentOpen] = useState(false);
@@ -651,6 +651,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                       </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+
                                       <DropdownMenuItem onClick={() => setItemParaDesconto(item)}>
                                         <Tag className="h-4 w-4 mr-2" />
                                         <span>Aplicar Desconto</span>
