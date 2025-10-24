@@ -34,7 +34,6 @@ serve(async (req) => {
   try {
     const bodyText = await req.text();
     
-    // 1. Validação de Segurança da Assinatura
     const isSignatureValid = await validateSignature(req, bodyText);
     if (!isSignatureValid) {
       console.warn("iFood Webhook: Tentativa de acesso com assinatura inválida.");
@@ -47,7 +46,7 @@ serve(async (req) => {
     const payload = JSON.parse(bodyText);
     console.log("iFood Webhook Recebido e Validado:", payload);
 
-    const { id: ifoodEventId, correlationId: ifoodOrderId, code: eventType } = payload;
+    const { id: ifoodEventId, correlationId: ifoodOrderId, code: eventType, body } = payload;
 
     const url = new URL(req.url);
     const userId = url.searchParams.get('user_id');
@@ -55,66 +54,76 @@ serve(async (req) => {
       throw new Error("user_id é obrigatório na URL do webhook.");
     }
 
-    if (eventType === 'PLACED') {
-      // O corpo do evento PLACED está dentro do próprio payload
-      const { customer, delivery, items, total } = payload;
+    switch (eventType) {
+      case 'PLACED': {
+        const { customer, delivery, items, total } = body;
 
-      const { data: newPedido, error: pedidoError } = await supabaseAdmin
-        .from('pedidos')
-        .insert({
+        const { data: newPedido, error: pedidoError } = await supabaseAdmin
+          .from('pedidos')
+          .insert({
+            user_id: userId,
+            order_type: 'IFOOD',
+            ifood_order_id: ifoodOrderId,
+            status: 'aberto',
+            delivery_details: { customer, delivery, total },
+          })
+          .select('id')
+          .single();
+
+        if (pedidoError) throw pedidoError;
+
+        const orderItems = items.map((item: any) => ({
+          pedido_id: newPedido.id,
           user_id: userId,
-          order_type: 'IFOOD',
-          ifood_order_id: ifoodOrderId,
-          status: 'aberto',
-          delivery_details: { customer, delivery, total },
-        })
-        .select('id')
-        .single();
+          nome_produto: item.name,
+          quantidade: item.quantity,
+          preco: item.unitPrice,
+          status: 'pendente',
+          requer_preparo: true,
+        }));
 
-      if (pedidoError) throw pedidoError;
-
-      const orderItems = items.map((item: any) => ({
-        pedido_id: newPedido.id,
-        user_id: userId,
-        nome_produto: item.name,
-        quantidade: item.quantity,
-        preco: item.unitPrice,
-        status: 'pendente',
-        requer_preparo: true,
-      }));
-
-      const { error: itemsError } = await supabaseAdmin.from('itens_pedido').insert(orderItems);
-      if (itemsError) throw itemsError;
-
-    } else if (eventType === 'CANCELLED') {
-      const { data: pedido, error: findError } = await supabaseAdmin
-        .from('pedidos')
-        .select('id')
-        .eq('ifood_order_id', ifoodOrderId)
-        .single();
-
-      if (findError) throw findError;
-
-      await supabaseAdmin
-        .from('itens_pedido')
-        .update({ status: 'cancelado' })
-        .eq('pedido_id', pedido.id);
+        const { error: itemsError } = await supabaseAdmin.from('itens_pedido').insert(orderItems);
+        if (itemsError) throw itemsError;
+        break;
+      }
       
-      await supabaseAdmin
-        .from('pedidos')
-        .update({ status: 'cancelado', closed_at: new Date().toISOString() })
-        .eq('id', pedido.id);
+      case 'CANCELLED': {
+        const { data: pedido, error: findError } = await supabaseAdmin
+          .from('pedidos')
+          .select('id')
+          .eq('ifood_order_id', ifoodOrderId)
+          .single();
+
+        if (findError) throw findError;
+
+        await supabaseAdmin
+          .from('itens_pedido')
+          .update({ status: 'cancelado' })
+          .eq('pedido_id', pedido.id);
+        
+        await supabaseAdmin
+          .from('pedidos')
+          .update({ status: 'cancelado', closed_at: new Date().toISOString() })
+          .eq('id', pedido.id);
+        break;
+      }
+
+      case 'DELIVERED':
+      case 'CONCLUDED': {
+        await supabaseAdmin
+          .from('pedidos')
+          .update({ status: 'pago', closed_at: new Date().toISOString() })
+          .eq('ifood_order_id', ifoodOrderId);
+        break;
+      }
     }
 
-    // Após processar o evento, enviar o acknowledgment
     try {
       await supabaseAdmin.functions.invoke('ifood-acknowledgment', {
         body: { events: [{ id: ifoodEventId }] },
       });
       console.log(`iFood Webhook: Acknowledgment enviado para o evento ${ifoodEventId}`);
     } catch (ackError) {
-      // Loga o erro mas não impede a resposta 200, pois o evento já foi processado.
-      // O iFood pode reenviar, mas teremos que lidar com a duplicidade.
       console.error(`iFood Webhook: Falha ao enviar acknowledgment para o evento ${ifoodEventId}:`, ackError.message);
     }
 
