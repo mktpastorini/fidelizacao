@@ -18,6 +18,7 @@ import { Copy, RefreshCw, Send, ShieldAlert, UserCog } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useState, useEffect } from "react"; // Importado
 
 type UserData = {
   templates: MessageTemplate[];
@@ -122,6 +123,15 @@ function CompreFaceSettingsForm() {
 export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    };
+    fetchUserId();
+  }, []);
 
   const { data, isLoading: isLoadingPage, isError } = useQuery({
     queryKey: ["configPageData"],
@@ -189,7 +199,7 @@ export default function ConfiguracoesPage() {
   const handleCopy = (text: string | null | undefined) => {
     if (text) {
       navigator.clipboard.writeText(text);
-      showSuccess("Chave de API copiada!");
+      showSuccess("Copiado para a área de transferência!");
     }
   };
 
@@ -221,6 +231,10 @@ export default function ConfiguracoesPage() {
             <Card>
               <CardHeader><CardTitle>Chave de API</CardTitle><CardDescription>Use esta chave para autenticar requisições à API do Fidelize.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-20 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div className="flex items-center gap-2"><Input readOnly value={settings?.api_key || "Nenhuma chave gerada"} /><Button variant="outline" size="icon" onClick={() => handleCopy(settings?.api_key)}><Copy className="w-4 h-4" /></Button></div><Button variant="secondary" onClick={() => regenerateApiKeyMutation.mutate()} disabled={regenerateApiKeyMutation.isPending}><RefreshCw className="w-4 h-4 mr-2" />{regenerateApiKeyMutation.isPending ? "Gerando..." : "Gerar Nova Chave"}</Button></div>)}</CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Seu ID de Usuário</CardTitle><CardDescription>Use este ID para configurar webhooks externos, como o do iFood.</CardDescription></CardHeader>
+              <CardContent>{isLoading ? <Skeleton className="h-10 w-full" /> : (<div className="flex items-center gap-2"><Input readOnly value={userId || "Carregando..."} /><Button variant="outline" size="icon" onClick={() => handleCopy(userId)}><Copy className="w-4 h-4" /></Button></div>)}</CardContent>
             </Card>
           </div>
         </TabsContent>
