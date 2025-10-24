@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemPedido } from "@/types/supabase";
@@ -41,6 +42,7 @@ async function fetchKitchenItems(): Promise<KitchenItem[]> {
 
 export default function CozinhaPage() {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState("kanban");
 
   const { data: items, isLoading, isError } = useQuery({
     queryKey: ["kitchenItems"],
@@ -120,15 +122,13 @@ export default function CozinhaPage() {
         <p className="text-muted-foreground mt-1">Acompanhe o preparo dos pedidos em tempo real.</p>
       </div>
 
-      <Tabs defaultValue="kanban" className="flex-1 flex flex-col min-h-0">
-        <TabsList className="grid w-full grid-cols-2 max-w-md shrink-0">
-          <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
-          <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="kanban" className="mt-6 flex-1 flex flex-col min-h-0">
-          <div className="flex justify-between items-center mb-4 shrink-0">
-            <h2 className="text-xl font-semibold">Kanban de Pedidos</h2>
+      <Tabs defaultValue="kanban" onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <div className="flex items-center justify-between mb-4 shrink-0">
+          <TabsList className="grid grid-cols-2">
+            <TabsTrigger value="kanban">Kanban de Pedidos</TabsTrigger>
+            <TabsTrigger value="relatorio">Relatório de Desempenho</TabsTrigger>
+          </TabsList>
+          {activeTab === 'kanban' && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -137,7 +137,10 @@ export default function CozinhaPage() {
             >
               <RefreshCw className="w-4 h-4 mr-2" /> Atualizar
             </Button>
-          </div>
+          )}
+        </div>
+        
+        <TabsContent value="kanban" className="mt-0 flex-1 flex flex-col min-h-0">
           {isLoading ? (
             <div className="flex-1 flex gap-4 h-full">
               <Skeleton className="flex-1" />
