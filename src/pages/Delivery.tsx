@@ -16,19 +16,13 @@ type DeliveryOrder = Pedido & {
 };
 
 async function fetchActiveDeliveryOrders(): Promise<DeliveryOrder[]> {
-  const activeStatuses = [
-    'awaiting_confirmation', 
-    'in_preparation', 
-    'ready_for_delivery', 
-    'out_for_delivery',
-    'aberto' // Fallback for older iFood orders
-  ];
-
   const { data, error } = await supabase
     .from("pedidos")
     .select("*, itens_pedido(*)")
     .in("order_type", ["IFOOD", "DELIVERY"])
-    .in("delivery_status", activeStatuses)
+    .or(
+      `delivery_status.in.("awaiting_confirmation","in_preparation","ready_for_delivery","out_for_delivery"),and(delivery_status.is.null,status.eq.aberto)`
+    )
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);

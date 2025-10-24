@@ -44,7 +44,16 @@ export function DeliveryOrderForm({ clientes, produtos, onSubmit, isSubmitting }
 
   const form = useForm<z.infer<typeof deliveryFormSchema>>({
     resolver: zodResolver(deliveryFormSchema),
-    defaultValues: { items: [] },
+    defaultValues: {
+      items: [],
+      clienteId: undefined,
+      address_street: "",
+      address_number: "",
+      address_neighborhood: "",
+      address_city: "",
+      address_zip: "",
+      address_complement: "",
+    },
   });
 
   const { fields, append, remove } = useFieldArray({
