@@ -65,6 +65,26 @@ export function ApiDocumentation() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Webhook: Integração com iFood</CardTitle>
+          <CardDescription>
+            Para receber pedidos do iFood, configure a seguinte URL no seu painel de desenvolvedor do iFood.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm">
+            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/ifood-webhook-handler?user_id=SEU_USER_ID`
+          </div>
+          <h4 className="font-semibold">Instruções:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+            <li>Copie a URL acima.</li>
+            <li>Substitua <code className="bg-muted p-1 rounded text-foreground">SEU_USER_ID</code> pelo seu ID de usuário, que você pode encontrar na aba "Acesso & Segurança".</li>
+            <li>Cole a URL completa no campo de webhook no seu painel do iFood.</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>API: Atualizar Status de Entrega</CardTitle>
           <CardDescription>
             Após seu sistema tentar enviar a mensagem, ele **deve** chamar este endpoint para nos informar o resultado.
