@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Mesa, Pedido, ItemPedido, UserSettings } from "@/types/supabase";
@@ -8,7 +8,7 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { UserPlus, Lock, Unlock, ScanFace, Users } from "lucide-react";
+import { UserPlus, Lock, Unlock, ScanFace, Users, PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
@@ -21,7 +21,9 @@ import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPane
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useSuperadminId } from "@/hooks/useSuperadminId"; // Importado
+import { useSuperadminId } from "@/hooks/useSuperadminId";
+import { usePageActions } from "@/contexts/PageActionsContext";
+import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -31,7 +33,7 @@ type SalaoData = {
   mesas: MesaComOcupantes[];
   pedidosAbertos: PedidoAberto[];
   clientes: Cliente[];
-  settings: UserSettings | null; // Configurações do Superadmin
+  settings: UserSettings | null;
 };
 
 function getBrazilTime() {
@@ -41,9 +43,6 @@ function getBrazilTime() {
 }
 
 async function fetchSalaoData(superadminId: string | null): Promise<SalaoData> {
-  // Não precisamos do user logado aqui, pois o RLS já garante a visibilidade dos dados
-  // mas mantemos a estrutura para consistência.
-  
   const { data: mesas, error: mesasError } = await supabase
     .from("mesas")
     .select("*, cliente:clientes(id, nome), ocupantes:mesa_ocupantes(cliente:clientes(id, nome))")
@@ -61,7 +60,6 @@ async function fetchSalaoData(superadminId: string | null): Promise<SalaoData> {
 
   let settings: UserSettings | null = null;
   if (superadminId) {
-    // Busca as configurações do Superadmin para obter o status de fechamento e webhook
     const { data: settingsData, error: settingsError } = await supabase.from("user_settings").select("*").eq("id", superadminId).single();
     if (settingsError && settingsError.code !== 'PGRST116') {
       console.error("Erro ao buscar configurações do Superadmin:", settingsError);
@@ -81,7 +79,8 @@ export default function SalaoPage() {
   const queryClient = useQueryClient();
   const { requestApproval, isRequesting } = useApprovalRequest();
   const { userRole } = useSettings();
-  const { superadminId, isLoadingSuperadminId } = useSuperadminId(); // Usando o novo hook
+  const { superadminId, isLoadingSuperadminId } = useSuperadminId();
+  const { setPageActions } = usePageActions();
   
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
@@ -94,16 +93,25 @@ export default function SalaoPage() {
   const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
     { client: Cliente; timestamp: number }[]
   >([]);
+  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
 
-  // Determina se o usuário logado é um dos roles que precisa do ID do Superadmin para o botão de fechar
+  useEffect(() => {
+    const pageSpecificActions = (
+      <Button onClick={() => setIsDeliveryDialogOpen(true)}>
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Novo pedido Delivery
+      </Button>
+    );
+
+    setPageActions(pageSpecificActions);
+
+    return () => {
+      setPageActions(null);
+    };
+  }, [setPageActions]);
+
   const needsSuperadminId = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
-  
-  // Se o usuário precisar do ID do Superadmin, esperamos que ele carregue. Caso contrário, passamos null.
   const idForFetch = needsSuperadminId ? superadminId : null;
-  
-  // A condição de habilitação agora é:
-  // 1. Se não precisa do ID do Superadmin (garcom/balcao), sempre habilitado (idForFetch é null).
-  // 2. Se precisa do ID do Superadmin (gerente/admin/superadmin), habilitado APENAS se o ID já foi resolvido (não está mais carregando).
   const isSuperadminIdResolved = !needsSuperadminId || !isLoadingSuperadminId;
 
   const { data, isLoading } = useQuery({
@@ -115,8 +123,6 @@ export default function SalaoPage() {
 
   const isClosed = data?.settings?.establishment_is_closed || false;
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
-  
-  // Permite fechar o dia para Superadmin, Admin e Gerente
   const canCloseDay = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
   const allocatedClientIds = data?.mesas
@@ -126,12 +132,8 @@ export default function SalaoPage() {
   const closeDayMutation = useMutation({
     mutationFn: async () => {
       if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
-      
-      // 1. Executa a função Edge (que calcula stats e envia webhook)
       const { error } = await supabase.functions.invoke('close-day');
       if (error) throw new Error(error.message);
-      
-      // 2. Atualiza o status de fechamento no perfil do Superadmin
       const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: true }).eq("id", superadminId);
       if (updateError) throw updateError;
     },
@@ -145,12 +147,8 @@ export default function SalaoPage() {
   const openDayMutation = useMutation({
     mutationFn: async () => {
       if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
-      
-      // 1. Atualiza o status de fechamento no perfil do Superadmin
       const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", superadminId);
       if (updateError) throw updateError;
-
-      // 2. Envia a notificação de abertura
       const { error: functionError } = await supabase.functions.invoke('open-day');
       if (functionError) {
         showError(`Dia aberto, mas falha ao enviar notificação: ${functionError.message}`);
@@ -558,6 +556,7 @@ export default function SalaoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <NewDeliveryOrderDialog isOpen={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen} />
     </div>
   );
 }
