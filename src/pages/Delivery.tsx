@@ -340,7 +340,9 @@ export default function DeliveryPage() {
         isOpen={isDetailsOpen}
         onOpenChange={setIsDetailsOpen}
         order={selectedOrder}
-        onStatusChange={updateStatusMutation.mutate}
+        onStatusChange={(orderId, newStatus) => {
+          updateStatusMutation.mutate({ orderId, newStatus });
+        }}
         isUpdatingStatus={updateStatusMutation.isPending}
         onOpenChecklist={handleOpenChecklist}
       />
