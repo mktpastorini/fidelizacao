@@ -136,46 +136,30 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      console.log(`[DEBUG] Iniciando mutação para atualizar status. Pedido ID: ${orderId}, Novo Status: ${newStatus}`);
-      
       const { error: orderError } = await supabase
         .from("pedidos")
         .update({ delivery_status: newStatus })
         .eq("id", orderId);
-      if (orderError) {
-        console.error("[DEBUG] Erro ao atualizar 'pedidos.delivery_status':", orderError);
-        throw orderError;
-      }
-      console.log(`[DEBUG] 'pedidos.delivery_status' atualizado com sucesso.`);
+      if (orderError) throw orderError;
 
       const order = orders?.find(o => o.id === orderId);
-      if (order?.order_type === 'IFOOD' && newStatus === 'CONFIRMED') {
-        console.log(`[DEBUG] Pedido do iFood detectado. Chamando função 'update-ifood-status' para confirmar.`);
-        const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
-          body: { pedido_id: orderId, new_status: 'in_preparation' }, // iFood usa 'in_preparation' para confirmar
-        });
-        if (ifoodError) {
-          console.error("[DEBUG] Erro na função 'update-ifood-status':", ifoodError);
-          showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
-        } else {
-          console.log(`[DEBUG] Função 'update-ifood-status' executada com sucesso.`);
+      if (order?.order_type === 'IFOOD') {
+        let ifoodStatus = null;
+        if (newStatus === 'CONFIRMED') ifoodStatus = 'in_preparation';
+        if (newStatus === 'out_for_delivery') ifoodStatus = 'out_for_delivery';
+
+        if (ifoodStatus) {
+          const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
+            body: { pedido_id: orderId, new_status: ifoodStatus },
+          });
+          if (ifoodError) {
+            showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
+          }
         }
       }
       return { orderId, newStatus };
     },
     onSuccess: ({ orderId, newStatus }) => {
-      console.log(`[DEBUG] onSuccess da mutação. Pedido ID: ${orderId}, Novo Status: ${newStatus}`);
-      
-      queryClient.setQueryData(['activeDeliveryOrders'], (oldData: DeliveryOrder[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.map(order =>
-          order.id === orderId
-            ? { ...order, delivery_status: newStatus as any }
-            : order
-        );
-      });
-
-      console.log("[DEBUG] Invalidando queries: activeDeliveryOrders, deliveryKitchenItems, kitchenItems");
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
       queryClient.invalidateQueries({ queryKey: ["deliveryKitchenItems"] });
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
@@ -184,7 +168,6 @@ export default function DeliveryPage() {
       setIsChecklistOpen(false);
     },
     onError: (error: Error) => {
-      console.error("[DEBUG] onError da mutação:", error);
       showError(`Falha ao atualizar status: ${error.message}`);
     },
   });

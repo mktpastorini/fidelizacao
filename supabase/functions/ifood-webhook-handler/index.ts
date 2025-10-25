@@ -108,15 +108,15 @@ serve(async (req) => {
         const token = await getIfoodApiToken(ifoodClientId, ifoodClientSecret);
         await confirmIfoodOrder(ifoodOrderId, token);
 
-        // 2. Criar o pedido no banco de dados já com o status de preparo
+        // 2. Criar o pedido no banco de dados com o status 'CONFIRMED'
         const { data: newPedido, error: pedidoError } = await supabaseAdmin
           .from('pedidos')
           .insert({
             user_id: userId,
             order_type: 'IFOOD',
             ifood_order_id: ifoodOrderId,
-            status: 'aberto', // Mantém o status geral como 'aberto'
-            delivery_status: 'in_preparation', // Define o status de delivery para 'em preparo'
+            status: 'aberto',
+            delivery_status: 'CONFIRMED', // Alterado para CONFIRMED
             delivery_details: { customer, delivery, total },
           })
           .select('id')
@@ -124,15 +124,15 @@ serve(async (req) => {
 
         if (pedidoError) throw pedidoError;
 
-        // 3. Criar os itens do pedido já com o status 'preparando'
+        // 3. Criar os itens do pedido com o status 'pendente'
         const orderItems = items.map((item: any) => ({
           pedido_id: newPedido.id,
           user_id: userId,
           nome_produto: item.name,
           quantidade: item.quantity,
           preco: item.unitPrice,
-          status: 'preparando', // Item já entra em preparo
-          requer_preparo: true, // Assume que todos os itens do iFood requerem preparo
+          status: 'pendente', // Alterado para pendente
+          requer_preparo: true,
         }));
 
         const { error: itemsError } = await supabaseAdmin.from('itens_pedido').insert(orderItems);

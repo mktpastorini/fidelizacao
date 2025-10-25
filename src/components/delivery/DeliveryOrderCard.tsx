@@ -17,6 +17,7 @@ const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style:
 
 const statusMap: { [key: string]: { label: string; color: string } } = {
   awaiting_confirmation: { label: "Aguardando Confirmação", color: "bg-yellow-500" },
+  CONFIRMED: { label: "Confirmado", color: "bg-cyan-500" },
   in_preparation: { label: "Em Preparo", color: "bg-blue-500" },
   ready_for_delivery: { label: "Pronto para Entrega", color: "bg-purple-500" },
   out_for_delivery: { label: "Saiu para Entrega", color: "bg-orange-500" },
