@@ -42,7 +42,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
-  return { settings, error: null, superadminId };
+  return { settings, error: null };
 }
 
 serve(async (req) => {
@@ -82,7 +82,7 @@ serve(async (req) => {
 
 
     // 3. Buscando configurações do CompreFace do Superadmin
-    const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -121,18 +121,18 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      // 7. Buscar dados do cliente usando o ID do Superadmin
+      // 7. Buscar dados do cliente usando o ID do usuário LOGADO
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', superadminId) // <--- USANDO O ID DO SUPERADMIN AQUI
+        .eq('user_id', userIdForClients) // <-- CORREÇÃO APLICADA AQUI
         .single();
 
       if (clientError) {
         // Se o cliente não for encontrado (ex: foi deletado do banco mas não do CompreFace)
         if (clientError.code === 'PGRST116') {
-            console.warn(`[recognize-face] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
+            console.warn(`[recognize-face] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados para este usuário.`);
             return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);

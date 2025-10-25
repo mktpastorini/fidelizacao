@@ -42,7 +42,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
   }
 
-  return { settings, error: null, superadminId };
+  return { settings, error: null };
 }
 
 serve(async (req) => {
@@ -80,7 +80,7 @@ serve(async (req) => {
     console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userIdForClients}`);
     
     // 3. Buscando configurações do CompreFace do Superadmin
-    const { settings, error: settingsError, superadminId } = await getComprefaceSettings(supabaseAdmin);
+    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -122,12 +122,12 @@ serve(async (req) => {
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
           console.log(`[recognize-multiple-faces] Match encontrado - Subject: ${bestSubject.subject}, Similaridade: ${bestSubject.similarity}`);
 
-          // Buscar dados do cliente usando o ID do Superadmin
+          // Buscar dados do cliente usando o ID do usuário LOGADO
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
             .select('*, filhos(*)')
             .eq('id', bestSubject.subject)
-            .eq('user_id', superadminId) // <--- USANDO O ID DO SUPERADMIN AQUI
+            .eq('user_id', userIdForClients) // <-- CORREÇÃO APLICADA AQUI
             .single();
 
           if (clientError) {
