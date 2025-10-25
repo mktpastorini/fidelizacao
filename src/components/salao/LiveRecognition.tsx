@@ -6,7 +6,7 @@ import { Cliente } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, User, Video, VideoOff } from 'lucide-react';
+import { Loader2, User, Video, VideoOff, Camera, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type LiveRecognitionProps = {
@@ -26,16 +26,16 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const videoConstraints = {
     width: 400,
     height: 400,
-    deviceId: settings?.preferred_camera_device_id ? { exact: settings.preferred_camera_device_id } : undefined,
+    deviceId: settings?.preferred_camera_device_id || undefined,
   };
 
-  const handleRecognition = useCallback(async () => {
+  const handleRecognition = useCallback(async (manualTrigger = false) => {
     if (isScanning || !isCameraOn || !webcamRef.current) return;
 
     const now = Date.now();
-    if (now - lastRecognitionTime < 5000) return; // Scan every 5 seconds
+    if (!manualTrigger && (now - lastRecognitionTime < 5000)) return; // Scan every 5 seconds automatically
 
-    console.log("[LiveRecognition] Iniciando varredura...");
+    console.log(`[LiveRecognition] Iniciando varredura... (Manual: ${manualTrigger})`);
     setLastRecognitionTime(now);
     const imageSrc = webcamRef.current.getScreenshot();
     if (!imageSrc) {
@@ -54,9 +54,10 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     }
   }, [isScanning, isCameraOn, lastRecognitionTime, recognize, onClientRecognized]);
 
+  // Efeito para o scan automático
   useEffect(() => {
     if (isCameraOn && isReady) {
-      recognitionIntervalRef.current = setInterval(handleRecognition, 2000); // Check every 2 seconds
+      recognitionIntervalRef.current = setInterval(() => handleRecognition(false), 2000); // Check every 2 seconds
     } else {
       if (recognitionIntervalRef.current) {
         clearInterval(recognitionIntervalRef.current);
@@ -105,6 +106,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
             </Avatar>
             <p className="text-xl font-bold">{recognitionResult.match.nome}</p>
           </div>
+          <p className="text-xs text-muted-foreground">Similaridade: {(recognitionResult.similarity! * 100).toFixed(1)}%</p>
         </div>
       );
     }
@@ -152,6 +154,15 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         <div className="w-full h-24 flex items-center justify-center">
           {renderStatus()}
         </div>
+        
+        <Button 
+          onClick={() => handleRecognition(true)} 
+          disabled={!isCameraOn || isScanning || !!displayError}
+          className="w-full"
+        >
+          {isScanning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+          {isScanning ? "Analisando..." : "Tirar Foto e Testar"}
+        </Button>
       </CardContent>
     </Card>
   );
