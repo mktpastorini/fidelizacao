@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 // Função auxiliar para buscar as configurações do Superadmin
-async function getComprefaceSettings(supabaseAdmin: any) {
+async function getComprefaceSettingsAndSuperadminId(supabaseAdmin: any) {
   console.log(`[RF-SINGLE] Buscando configurações do CompreFace do Superadmin principal...`);
 
   // 1. Buscar o ID do Superadmin
@@ -20,7 +20,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 
   if (profileError || !superadminProfile) {
     console.error("[RF-SINGLE] Erro ao buscar Superadmin:", profileError?.message || "Perfil não encontrado.");
-    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal."), superadminId: null };
   }
   
   const superadminId = superadminProfile.id;
@@ -35,14 +35,14 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 
   if (settingsError) {
     console.error(`[RF-SINGLE] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError.message);
-    return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
+    return { settings: null, error: new Error("Falha ao carregar configurações do sistema."), superadminId };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'."), superadminId };
   }
 
-  return { settings, error: null };
+  return { settings, error: null, superadminId };
 }
 
 serve(async (req) => {
@@ -58,17 +58,17 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[RF-SINGLE] 1/8: Parsing body da requisição...");
-    const { image_url, mesa_id } = await req.json();
+    console.log("[RF-SINGLE] 1/7: Parsing body da requisição...");
+    const { image_url } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
-    console.log(`[RF-SINGLE] 1/8: Body recebido. Mesa ID: ${mesa_id}`);
+    console.log("[RF-SINGLE] 1/7: Body recebido.");
 
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
     }
 
-    console.log("[RF-SINGLE] 2/8: Autenticando usuário logado...");
+    console.log("[RF-SINGLE] 2/7: Autenticando usuário logado...");
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error("Usuário não autenticado. O reconhecimento facial requer autenticação.");
@@ -76,21 +76,10 @@ serve(async (req) => {
     
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    console.log(`[RF-SINGLE] 2/8: Usuário autenticado: ${user.id}`);
+    console.log(`[RF-SINGLE] 2/7: Usuário autenticado: ${user.id}`);
 
-    console.log("[RF-SINGLE] 3/8: Buscando ID do Super Admin para consulta de clientes...");
-    const { data: superadminProfile, error: superadminError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'superadmin')
-      .limit(1)
-      .single();
-    if (superadminError) throw new Error("Falha ao encontrar o usuário Super Admin do estabelecimento.");
-    const userIdForClients = superadminProfile.id;
-    console.log(`[RF-SINGLE] 3/8: ID do Super Admin para clientes: ${userIdForClients}`);
-
-    console.log("[RF-SINGLE] 4/8: Buscando configurações do CompreFace...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    console.log("[RF-SINGLE] 3/7: Buscando configurações do CompreFace e ID do Super Admin...");
+    const { settings, error: settingsError, superadminId } = await getComprefaceSettingsAndSuperadminId(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -98,10 +87,11 @@ serve(async (req) => {
         status: 400,
       });
     }
-    console.log("[RF-SINGLE] 4/8: Configurações carregadas.");
+    if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+    console.log("[RF-SINGLE] 3/7: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[RF-SINGLE] 5/8: Enviando para CompreFace para reconhecimento...");
+    console.log("[RF-SINGLE] 4/7: Enviando para CompreFace para reconhecimento...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
@@ -111,9 +101,9 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[RF-SINGLE] 6/8: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[RF-SINGLE] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
     const responseBody = await response.json().catch(() => response.text());
-    console.log(`[RF-SINGLE] 6/8: Corpo da resposta do CompreFace:`, responseBody);
+    console.log(`[RF-SINGLE] 5/7: Corpo da resposta do CompreFace:`, responseBody);
 
     if (!response.ok) {
       if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
@@ -126,14 +116,14 @@ serve(async (req) => {
     const bestMatch = responseBody.result?.[0]?.subjects?.[0];
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
-      console.log(`[RF-SINGLE] 7/8: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      console.log(`[RF-SINGLE] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      console.log(`[RF-SINGLE] 8/8: Buscando cliente no DB com ID: ${bestMatch.subject} e user_id: ${userIdForClients}`);
+      console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject} e user_id: ${superadminId}`);
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', userIdForClients)
+        .eq('user_id', superadminId) // Usa o ID do Superadmin
         .single();
 
       if (clientError) {
@@ -143,11 +133,11 @@ serve(async (req) => {
         }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
-      console.log("[RF-SINGLE] 8/8: Cliente encontrado no DB. Retornando sucesso.");
+      console.log("[RF-SINGLE] 7/7: Cliente encontrado no DB. Retornando sucesso.");
       return new Response(JSON.stringify({ match: client, distance: 1 - bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    console.log("[RF-SINGLE] 7/8: Nenhum match encontrado com similaridade suficiente. Retornando nulo.");
+    console.log("[RF-SINGLE] 6/7: Nenhum match encontrado com similaridade suficiente. Retornando nulo.");
     return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {

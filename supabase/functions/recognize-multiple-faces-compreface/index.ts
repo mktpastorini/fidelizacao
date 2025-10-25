@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 // Função auxiliar para buscar as configurações do Superadmin
-async function getComprefaceSettings(supabaseAdmin: any) {
+async function getComprefaceSettingsAndSuperadminId(supabaseAdmin: any) {
   console.log("[RF-MULTI] Buscando configurações do CompreFace do Superadmin principal...");
 
   // 1. Buscar o ID do Superadmin
@@ -20,7 +20,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 
   if (profileError || !superadminProfile) {
     console.error("[RF-MULTI] Erro ao buscar Superadmin:", profileError);
-    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
+    return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal."), superadminId: null };
   }
   
   const superadminId = superadminProfile.id;
@@ -35,14 +35,14 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 
   if (settingsError) {
     console.error(`[RF-MULTI] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError);
-    return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
+    return { settings: null, error: new Error("Falha ao carregar configurações do sistema."), superadminId };
   }
 
   if (!settings?.compreface_url || !settings?.compreface_api_key) {
-    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'.") };
+    return { settings: null, error: new Error("URL ou Chave de API do CompreFace não configuradas no perfil do Superadmin. Por favor, configure em 'Configurações' > 'Reconhecimento Facial'."), superadminId };
   }
 
-  return { settings, error: null };
+  return { settings, error: null, superadminId };
 }
 
 serve(async (req) => {
@@ -78,19 +78,8 @@ serve(async (req) => {
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
     console.log(`[RF-MULTI] 2/7: Usuário autenticado: ${user.id}`);
     
-    console.log("[RF-MULTI] 3/7: Buscando ID do Super Admin para consulta de clientes...");
-    const { data: superadminProfile, error: superadminError } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('role', 'superadmin')
-      .limit(1)
-      .single();
-    if (superadminError) throw new Error("Falha ao encontrar o usuário Super Admin do estabelecimento.");
-    const userIdForClients = superadminProfile.id;
-    console.log(`[RF-MULTI] 3/7: ID do Super Admin para clientes: ${userIdForClients}`);
-
-    console.log("[RF-MULTI] 4/7: Buscando configurações do CompreFace...");
-    const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
+    console.log("[RF-MULTI] 3/7: Buscando configurações do CompreFace e ID do Super Admin...");
+    const { settings, error: settingsError, superadminId } = await getComprefaceSettingsAndSuperadminId(supabaseAdmin);
 
     if (settingsError) {
       return new Response(JSON.stringify({ error: settingsError.message }), {
@@ -98,10 +87,11 @@ serve(async (req) => {
         status: 400,
       });
     }
-    console.log("[RF-MULTI] 4/7: Configurações carregadas.");
+    if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+    console.log(`[RF-MULTI] 3/7: Configurações carregadas. ID do Super Admin para clientes: ${superadminId}`);
 
     const payload = { file: imageData };
-    console.log("[RF-MULTI] 5/7: Enviando para CompreFace para reconhecimento de múltiplas faces...");
+    console.log("[RF-MULTI] 4/7: Enviando para CompreFace para reconhecimento de múltiplas faces...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=0`, {
       method: 'POST',
       headers: {
@@ -111,9 +101,9 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[RF-MULTI] 6/7: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[RF-MULTI] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
     const responseBody = await response.json().catch(() => response.text());
-    console.log(`[RF-MULTI] 6/7: Corpo da resposta do CompreFace:`, responseBody);
+    console.log(`[RF-MULTI] 5/7: Corpo da resposta do CompreFace:`, responseBody);
 
     if (!response.ok) {
       if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
@@ -127,7 +117,7 @@ serve(async (req) => {
     const minSimilarity = 0.85;
 
     if (responseBody.result && Array.isArray(responseBody.result)) {
-      console.log(`[RF-MULTI] 7/7: Processando ${responseBody.result.length} rosto(s) detectado(s)...`);
+      console.log(`[RF-MULTI] 6/7: Processando ${responseBody.result.length} rosto(s) detectado(s)...`);
       for (const faceResult of responseBody.result) {
         const bestSubject = faceResult.subjects?.[0];
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
@@ -137,7 +127,7 @@ serve(async (req) => {
             .from('clientes')
             .select('*, filhos(*)')
             .eq('id', bestSubject.subject)
-            .eq('user_id', userIdForClients)
+            .eq('user_id', superadminId) // Usa o ID do Superadmin
             .single();
 
           if (clientError) {
