@@ -58,9 +58,11 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         }
       } catch (err: any) {
         console.error("Erro ao listar dispositivos de câmera:", err);
-        // Se falhar, garante que pelo menos uma instância exista para exibir o erro
-        if (cameraInstances.length === 0) {
-          setCameraInstances([{
+        setCameraInstances(prev => {
+          if (prev.length > 0) {
+            return prev.map((inst, idx) => idx === 0 ? { ...inst, mediaError: err.message } : inst);
+          }
+          return [{
             id: 'cam-1',
             deviceId: null,
             isCameraOn: false,
@@ -70,8 +72,8 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             recognizedFaces: [],
             lastRecognitionTime: 0,
             isCameraReady: false,
-          }]);
-        }
+          }];
+        });
       }
     };
     getDevices();
@@ -103,7 +105,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
   }, []);
 
-  // --- Lógica de Varredura Automática por Câmera ---
+  // --- Lógica de Varredura Automática por Câmera (Recursão) ---
   useEffect(() => {
     const timeouts: number[] = [];
     const allocatedSet = new Set(allocatedClientIds);
@@ -121,9 +123,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         return;
       }
 
-      // Atualiza o estado de loading para o hook de reconhecimento
-      // NOTA: O hook `useMultiFaceRecognition` já gerencia o estado global `isRecognitionLoading`.
-
+      // Inicia o reconhecimento
       const results = await recognizeMultiple(imageSrc);
       
       // Atualiza a instância da câmera com os resultados
@@ -166,10 +166,21 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     allocatedClientIds
   ]);
 
-  // --- Sincronização com o Painel Lateral ---
+  // --- Sincronização e Limpeza de Clientes Persistentes ---
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);
-  }, [persistentRecognizedClients, onRecognizedFacesUpdate]);
+    
+    // Limpeza de clientes expirados (mantida separada para estabilidade)
+    const cleanupInterval = setInterval(() => {
+      setPersistentRecognizedClients(prevClients => {
+        const now = Date.now();
+        const allocatedSet = new Set(allocatedClientIds);
+        return prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+      });
+    }, 5000);
+
+    return () => clearInterval(cleanupInterval);
+  }, [persistentRecognizedClients, onRecognizedFacesUpdate, allocatedClientIds]);
 
   const getAvailableDevices = useCallback((currentDeviceId: string | null) => {
     const usedDeviceIds = new Set(cameraInstances.map(c => c.deviceId).filter(Boolean));

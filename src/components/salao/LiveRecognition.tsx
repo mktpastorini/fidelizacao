@@ -29,7 +29,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   };
 
   const handleRecognition = useCallback(async (manualTrigger = false) => {
-    if (!isCameraOn || !webcamRef.current) return;
+    if (!isCameraOn || !webcamRef.current || isScanning) return;
 
     console.log(`[LiveRecognition] Iniciando varredura... (Manual: ${manualTrigger})`);
     const imageSrc = webcamRef.current.getScreenshot();
@@ -47,7 +47,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     } else {
       console.log(`[LiveRecognition] Nenhum match. Status: ${result?.status}, Mensagem: ${result?.message}`);
     }
-  }, [isCameraOn, recognize, onClientRecognized]);
+  }, [isCameraOn, isScanning, recognize, onClientRecognized]); // Adicionado isScanning à dependência
 
   // Efeito para o scan automático usando recursão com setTimeout
   useEffect(() => {
@@ -68,6 +68,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
       }
 
       try {
+        // Chama a função de reconhecimento (que gerencia o estado isScanning internamente)
         await handleRecognition(false);
       } catch (e) {
         console.error("Erro durante o scan automático:", e);
@@ -83,7 +84,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, recognitionResult]);
+  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, recognitionResult]); // Dependências ajustadas
 
   const handleMediaError = (err: any) => {
     console.error("[LiveRecognition] Erro ao acessar a câmera:", err);
@@ -172,6 +173,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         </div>
         
         <Button 
+            // O botão manual chama handleRecognition(true)
           onClick={() => handleRecognition(true)} 
           disabled={!isCameraOn || isScanning || !!displayError || !isCameraReady}
           className="w-full"
