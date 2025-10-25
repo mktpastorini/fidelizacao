@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Trash2 } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "../ui/skeleton";
+import { useSuperadminId } from "@/hooks/useSuperadminId";
 
 async function fetchCategorias(): Promise<Categoria[]> {
   const { data, error } = await supabase.from("categorias").select("*").order("nome");
@@ -16,6 +17,7 @@ async function fetchCategorias(): Promise<Categoria[]> {
 
 export function CategoriaManager() {
   const queryClient = useQueryClient();
+  const { superadminId } = useSuperadminId();
   const [newCategoryName, setNewCategoryName] = useState("");
 
   const { data: categorias, isLoading } = useQuery({
@@ -25,8 +27,8 @@ export function CategoriaManager() {
 
   const addMutation = useMutation({
     mutationFn: async (nome: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("categorias").insert({ nome, user_id: user?.id });
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
+      const { error } = await supabase.from("categorias").insert({ nome, user_id: superadminId });
       if (error) throw error;
     },
     onSuccess: () => {

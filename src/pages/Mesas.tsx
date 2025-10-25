@@ -23,6 +23,7 @@ import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { useApprovalRequest } from "@/hooks/useApprovalRequest"; // Importado
 import { usePageActions } from "@/contexts/PageActionsContext";
+import { useSuperadminId } from "@/hooks/useSuperadminId";
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -49,6 +50,7 @@ export default function MesasPage() {
   const queryClient = useQueryClient();
   const { setPageActions } = usePageActions();
   const { requestApproval, isRequesting } = useApprovalRequest(); // Usando o hook
+  const { superadminId } = useSuperadminId();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
   const [isPedidoOpen, setIsPedidoOpen] = useState(false);
@@ -105,8 +107,8 @@ export default function MesasPage() {
 
   const addMesaMutation = useMutation({
     mutationFn: async (newMesa: { numero: number; capacidade: number }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("mesas").insert([{ ...newMesa, user_id: user?.id }]);
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
+      const { error } = await supabase.from("mesas").insert([{ ...newMesa, user_id: superadminId }]);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -147,8 +149,7 @@ export default function MesasPage() {
   const ocuparMesaMutation = useMutation({
     mutationFn: async ({ clientePrincipalId, acompanhanteIds, currentOccupantIds }: { clientePrincipalId: string, acompanhanteIds: string[], currentOccupantIds: string[] }) => {
       if (!selectedMesa) throw new Error("Nenhuma mesa selecionada");
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
   
       const todosNovosOcupantesIds = [clientePrincipalId, ...acompanhanteIds];
       const todosOcupantes = clientes?.filter(c => todosNovosOcupantesIds.includes(c.id)) || [];
@@ -179,7 +180,7 @@ export default function MesasPage() {
         const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
           mesa_id: selectedMesa.id,
           cliente_id: clientePrincipalId,
-          user_id: user.id,
+          user_id: superadminId,
           status: "aberto",
           acompanhantes: acompanhantesJson,
         }).select("id").single();
@@ -205,7 +206,7 @@ export default function MesasPage() {
         const ocupantesDataToInsert = occupantsToAdd.map(clienteId => ({
           mesa_id: selectedMesa.id,
           cliente_id: clienteId,
-          user_id: user.id,
+          user_id: superadminId,
         }));
         await supabase.from("mesa_ocupantes").insert(ocupantesDataToInsert);
       }

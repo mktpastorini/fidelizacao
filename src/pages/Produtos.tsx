@@ -13,6 +13,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePageActions } from "@/contexts/PageActionsContext";
 import { useEffect } from "react";
+import { useSuperadminId } from "@/hooks/useSuperadminId";
 
 async function fetchProdutos(): Promise<Produto[]> {
   const { data, error } = await supabase.from("produtos").select("*").order("created_at", { ascending: false });
@@ -29,6 +30,7 @@ async function fetchCategorias(): Promise<Categoria[]> {
 export default function ProdutosPage() {
   const queryClient = useQueryClient();
   const { setPageActions } = usePageActions();
+  const { superadminId } = useSuperadminId();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [editingProduto, setEditingProduto] = useState<Produto | null>(null);
@@ -49,8 +51,8 @@ export default function ProdutosPage() {
 
   const addProdutoMutation = useMutation({
     mutationFn: async (newProduto: Omit<Produto, 'id' | 'created_at'>) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("produtos").insert([{ ...newProduto, user_id: user?.id }]);
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
+      const { error } = await supabase.from("produtos").insert([{ ...newProduto, user_id: superadminId }]);
       if (error) throw error;
     },
     onSuccess: () => {

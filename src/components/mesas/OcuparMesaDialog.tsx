@@ -32,6 +32,7 @@ import { Check, ChevronsUpDown, X, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClienteForm } from "../clientes/ClienteForm";
 import { showError, showSuccess } from "@/utils/toast";
+import { useSuperadminId } from "@/hooks/useSuperadminId";
 
 type OcuparMesaDialogProps = {
   isOpen: boolean;
@@ -60,6 +61,7 @@ export function OcuparMesaDialog({
   isSubmitting,
 }: OcuparMesaDialogProps) {
   const queryClient = useQueryClient();
+  const { superadminId } = useSuperadminId();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [isNewCompanionOpen, setIsNewCompanionOpen] = useState(false);
   const [clientePrincipalId, setClientePrincipalId] = useState<string | null>(null);
@@ -89,11 +91,10 @@ export function OcuparMesaDialog({
 
   const addCompanionMutation = useMutation({
     mutationFn: async (newCliente: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
 
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
-        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: null,
+        p_user_id: superadminId, p_nome: newCliente.nome, p_casado_com: null,
         p_whatsapp: newCliente.whatsapp, p_gostos: null, p_avatar_url: newCliente.avatar_url,
         p_indicado_por_id: null,
       });

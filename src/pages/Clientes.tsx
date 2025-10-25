@@ -27,6 +27,7 @@ import { PlusCircle, Search } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
 import { usePageActions } from "@/contexts/PageActionsContext";
+import { useSuperadminId } from "@/hooks/useSuperadminId";
 
 async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
   let query = supabase
@@ -50,6 +51,7 @@ async function fetchClientes(searchTerm: string): Promise<Cliente[]> {
 export default function ClientesPage() {
   const queryClient = useQueryClient();
   const { setPageActions } = usePageActions();
+  const { superadminId } = useSuperadminId();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetalhesOpen, setIsDetalhesOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
@@ -102,8 +104,7 @@ export default function ClientesPage() {
 
   const addClienteMutation = useMutation({
     mutationFn: async (newCliente: any) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado. Não é possível criar cliente.");
 
       const { avatar_urls, ...clienteData } = newCliente;
       
@@ -112,7 +113,7 @@ export default function ClientesPage() {
       }
       
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
-        p_user_id: user.id, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
+        p_user_id: superadminId, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
         p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: clienteData.avatar_url,
         p_indicado_por_id: clienteData.indicado_por_id,
       });
@@ -121,7 +122,7 @@ export default function ClientesPage() {
 
       try {
         if (clienteData.filhos && clienteData.filhos.length > 0) {
-          const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: user.id }));
+          const filhosData = clienteData.filhos.map((filho: any) => ({ ...filho, cliente_id: newClientId, user_id: superadminId }));
           const { error: filhosError } = await supabase.from("filhos").insert(filhosData);
           if (filhosError) throw new Error(`Erro ao adicionar filhos: ${filhosError.message}`);
         }
@@ -148,8 +149,7 @@ export default function ClientesPage() {
   const editClienteMutation = useMutation({
     mutationFn: async (updatedCliente: any) => {
       const { id, filhos, avatar_urls, ...clienteInfo } = updatedCliente;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.id) throw new Error("Usuário não autenticado");
+      if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
 
       const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo }).eq("id", id);
       if (clienteError) throw new Error(clienteError.message);
@@ -157,7 +157,7 @@ export default function ClientesPage() {
       await supabase.from("filhos").delete().eq("cliente_id", id);
 
       if (filhos && filhos.length > 0) {
-        const filhosData = filhos.map((filho: any) => ({ nome: filho.nome, idade: filho.idade, cliente_id: id, user_id: user.id }));
+        const filhosData = filhos.map((filho: any) => ({ nome: filho.nome, idade: filho.idade, cliente_id: id, user_id: superadminId }));
         const { error: insertFilhosError } = await supabase.from("filhos").insert(filhosData);
         if (insertFilhosError) throw new Error(insertFilhosError.message);
       }

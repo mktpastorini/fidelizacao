@@ -15,8 +15,7 @@ export function useSuperadminId() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["superadminId"],
     queryFn: fetchSuperadminId,
-    // Incluindo 'garcom' na lista de roles que precisam do ID do Superadmin para buscar dados globais
-    enabled: !!userRole && ['superadmin', 'admin', 'gerente', 'garcom'].includes(userRole),
+    enabled: !!userRole, // Habilita para qualquer usuário autenticado
     staleTime: Infinity, // O ID do Superadmin não deve mudar
   });
 
