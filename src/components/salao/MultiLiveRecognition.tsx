@@ -104,7 +104,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
   // --- Lógica de Varredura Automática por Câmera ---
   useEffect(() => {
-    const timeouts: number[] = [];
+    const timeouts: NodeJS.Timeout[] = [];
     const allocatedSet = new Set(allocatedClientIds);
 
     const scanCamera = async (cam: CameraInstance) => {
@@ -150,7 +150,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     };
   }, [
     cameraInstances.map(c => `${c.id}-${c.isCameraOn}-${c.isCameraReady}-${c.deviceId}-${c.mediaError}`).join(),
-    isRecognitionLoading, 
     recognizeMultiple, 
     updateCameraInstance, 
     allocatedClientIds
