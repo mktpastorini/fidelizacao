@@ -49,28 +49,41 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     }
   }, [isCameraOn, recognize, onClientRecognized]);
 
-  // Efeito para o scan automático
+  // Efeito para o scan automático usando recursão com setTimeout
   useEffect(() => {
     let timeoutId: number;
+    const SCAN_INTERVAL_MS = 3000; // Intervalo de 3 segundos entre scans
 
-    const scanLoop = () => {
-      if (isScanning) {
-        timeoutId = setTimeout(scanLoop, 5000);
+    const scanLoop = async () => {
+      if (!isCameraOn || !isReady || !isCameraReady || isScanning) {
+        // Se as condições não forem atendidas, tenta novamente em 1 segundo
+        timeoutId = setTimeout(scanLoop, 1000);
         return;
       }
-      handleRecognition(false).finally(() => {
-        timeoutId = setTimeout(scanLoop, 5000);
-      });
+      
+      // Se houver um match, pausa a varredura automática por 10 segundos
+      if (recognitionResult?.status === 'MATCH_FOUND') {
+        timeoutId = setTimeout(scanLoop, 10000);
+        return;
+      }
+
+      try {
+        await handleRecognition(false);
+      } catch (e) {
+        console.error("Erro durante o scan automático:", e);
+      } finally {
+        // Agenda o próximo scan após o intervalo
+        timeoutId = setTimeout(scanLoop, SCAN_INTERVAL_MS);
+      }
     };
 
-    if (isCameraOn && isReady && isCameraReady) {
-      timeoutId = setTimeout(scanLoop, 2000);
-    }
+    // Inicia o loop
+    timeoutId = setTimeout(scanLoop, 1000);
 
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [isCameraOn, isReady, isCameraReady, handleRecognition, isScanning]);
+  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, recognitionResult]);
 
   const handleMediaError = (err: any) => {
     console.error("[LiveRecognition] Erro ao acessar a câmera:", err);
