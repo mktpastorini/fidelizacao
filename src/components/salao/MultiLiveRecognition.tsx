@@ -58,11 +58,8 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         }
       } catch (err: any) {
         console.error("Erro ao listar dispositivos de câmera:", err);
-        setCameraInstances(prev => {
-          if (prev.length > 0) {
-            return prev.map((inst, idx) => idx === 0 ? { ...inst, mediaError: err.message } : inst);
-          }
-          return [{
+        if (cameraInstances.length === 0) {
+          setCameraInstances([{
             id: 'cam-1',
             deviceId: null,
             isCameraOn: false,
@@ -72,8 +69,8 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             recognizedFaces: [],
             lastRecognitionTime: 0,
             isCameraReady: false,
-          }];
-        });
+          }]);
+        }
       }
     };
     getDevices();
@@ -105,14 +102,13 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
   }, []);
 
-  // --- Lógica de Varredura Automática por Câmera (Recursão) ---
+  // --- Lógica de Varredura Automática por Câmera ---
   useEffect(() => {
     const timeouts: number[] = [];
     const allocatedSet = new Set(allocatedClientIds);
 
     const scanCamera = async (cam: CameraInstance) => {
       if (!cam.isCameraOn || !cam.isCameraReady || cam.mediaError || isRecognitionLoading || !cam.webcamRef.current) {
-        // Tenta novamente em 1 segundo se as condições não forem atendidas
         timeouts.push(setTimeout(() => scanCamera(cam), 1000));
         return;
       }
@@ -123,13 +119,10 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         return;
       }
 
-      // Inicia o reconhecimento
       const results = await recognizeMultiple(imageSrc);
       
-      // Atualiza a instância da câmera com os resultados
       updateCameraInstance(cam.id, { recognizedFaces: results, lastRecognitionTime: Date.now() });
 
-      // Atualiza a lista persistente de clientes
       setPersistentRecognizedClients(prevClients => {
         const now = Date.now();
         const updatedClients = [...prevClients];
@@ -144,15 +137,12 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             }
           }
         });
-        // Filtra clientes alocados e expirados
         return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
       });
 
-      // Agenda o próximo scan
       timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
     };
 
-    // Inicia o loop para cada câmera
     cameraInstances.forEach(scanCamera);
 
     return () => {
@@ -170,7 +160,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);
     
-    // Limpeza de clientes expirados (mantida separada para estabilidade)
     const cleanupInterval = setInterval(() => {
       setPersistentRecognizedClients(prevClients => {
         const now = Date.now();

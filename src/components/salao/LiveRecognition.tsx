@@ -13,12 +13,15 @@ type LiveRecognitionProps = {
   onClientRecognized: (cliente: Cliente) => void;
 };
 
+const PERSISTENCE_DURATION_MS = 10000; // Manter o resultado por 10 segundos
+
 export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
   const { isReady, isLoading: isScanning, error, recognize } = useFaceRecognition();
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [recognitionResult, setRecognitionResult] = useState<FaceRecognitionResult>(null);
+  const [persistentClient, setPersistentClient] = useState<{ client: Cliente; timestamp: number } | null>(null);
+  const [lastStatusMessage, setLastStatusMessage] = useState("Aguardando clientes...");
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
 
@@ -28,65 +31,64 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     deviceId: settings?.preferred_camera_device_id || undefined,
   };
 
-  // Função de reconhecimento que usa o estado mais recente (isScanning)
   const handleRecognition = useCallback(async (manualTrigger = false) => {
     if (!isCameraOn || !webcamRef.current || isScanning) return;
 
-    console.log(`[LiveRecognition] Iniciando varredura... (Manual: ${manualTrigger})`);
     const imageSrc = webcamRef.current.getScreenshot();
-    if (!imageSrc) {
-      console.warn("[LiveRecognition] Não foi possível capturar a imagem da webcam.");
-      return;
-    }
+    if (!imageSrc) return;
 
     const result = await recognize(imageSrc);
-    setRecognitionResult(result);
     
     if (result?.status === 'MATCH_FOUND' && result.match) {
-      console.log(`[LiveRecognition] Cliente reconhecido: ${result.match.nome} com similaridade de ${result.similarity}`);
-      onClientRecognized(result.match);
-    } else {
-      console.log(`[LiveRecognition] Nenhum match. Status: ${result?.status}, Mensagem: ${result?.message}`);
+      // Apenas atualiza se for um novo cliente ou se o anterior já expirou
+      if (persistentClient?.client.id !== result.match.id) {
+        const newPersistentClient = { client: result.match, timestamp: Date.now() };
+        setPersistentClient(newPersistentClient);
+        onClientRecognized(result.match);
+      }
+    } else if (result?.message) {
+      setLastStatusMessage(result.message);
     }
-  }, [isCameraOn, isScanning, recognize, onClientRecognized]);
+  }, [isCameraOn, isScanning, recognize, onClientRecognized, persistentClient]);
 
-  // Efeito para o scan automático usando recursão com setTimeout
+  // Efeito para o scan automático
   useEffect(() => {
     let timeoutId: number;
-    const SCAN_INTERVAL_MS = 3000; // Intervalo de 3 segundos entre scans
+    const SCAN_INTERVAL_MS = 3000;
 
     const scanLoop = async () => {
-      // Condição de parada/pausa
-      if (!isCameraOn || !isReady || !isCameraReady || isScanning) {
-        // Se as condições não forem atendidas, tenta novamente em 1 segundo
+      if (!isCameraOn || !isReady || !isCameraReady || isScanning || persistentClient) {
         timeoutId = setTimeout(scanLoop, 1000);
-        return;
-      }
-      
-      // Se houver um match, pausa a varredura automática por 10 segundos
-      if (recognitionResult?.status === 'MATCH_FOUND') {
-        timeoutId = setTimeout(scanLoop, 10000);
         return;
       }
 
       try {
-        // Chama a função de reconhecimento (que usa o estado mais recente de isScanning)
         await handleRecognition(false);
       } catch (e) {
-        console.error("Erro durante o scan automático:", e);
+        console.error("Erro no scan automático:", e);
       } finally {
-        // Agenda o próximo scan após o intervalo
         timeoutId = setTimeout(scanLoop, SCAN_INTERVAL_MS);
       }
     };
 
-    // Inicia o loop
     timeoutId = setTimeout(scanLoop, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, persistentClient]);
 
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, recognitionResult]);
+  // Efeito para limpar o cliente persistente após o tempo de expiração
+  useEffect(() => {
+    if (!persistentClient) return;
+
+    const timeoutId = setTimeout(() => {
+      const now = Date.now();
+      if (now - persistentClient.timestamp >= PERSISTENCE_DURATION_MS) {
+        setPersistentClient(null);
+        setLastStatusMessage("Aguardando clientes...");
+      }
+    }, PERSISTENCE_DURATION_MS);
+
+    return () => clearTimeout(timeoutId);
+  }, [persistentClient]);
 
   const handleMediaError = (err: any) => {
     console.error("[LiveRecognition] Erro ao acessar a câmera:", err);
@@ -113,31 +115,22 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
       );
     }
 
-    if (recognitionResult?.status === 'MATCH_FOUND' && recognitionResult.match) {
+    if (persistentClient) {
       return (
         <div className="text-center space-y-2 animate-in fade-in">
           <p className="text-sm text-muted-foreground">Bem-vindo(a) de volta!</p>
           <div className="flex items-center justify-center gap-2">
             <Avatar>
-              <AvatarImage src={recognitionResult.match.avatar_url || undefined} />
+              <AvatarImage src={persistentClient.client.avatar_url || undefined} />
               <AvatarFallback><User /></AvatarFallback>
             </Avatar>
-            <p className="text-xl font-bold">{recognitionResult.match.nome}</p>
+            <p className="text-xl font-bold">{persistentClient.client.nome}</p>
           </div>
-          <p className="text-xs text-muted-foreground">Similaridade: {(recognitionResult.similarity! * 100).toFixed(1)}%</p>
         </div>
       );
     }
 
-    if (recognitionResult?.status === 'NO_MATCH') {
-      return <p className="text-muted-foreground">{recognitionResult.message || "Rosto detectado, mas não reconhecido."}</p>;
-    }
-
-    if (recognitionResult?.status === 'NO_FACE_DETECTED') {
-      return <p className="text-muted-foreground">{recognitionResult.message || "Nenhum rosto detectado."}</p>;
-    }
-
-    return <p className="text-muted-foreground">{isCameraOn ? "Aguardando clientes..." : "Câmera pausada"}</p>;
+    return <p className="text-muted-foreground">{isCameraOn ? lastStatusMessage : "Câmera pausada"}</p>;
   };
 
   return (
@@ -175,7 +168,6 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         </div>
         
         <Button 
-            // O botão manual chama handleRecognition(true)
           onClick={() => handleRecognition(true)} 
           disabled={!isCameraOn || isScanning || !!displayError || !isCameraReady}
           className="w-full"
