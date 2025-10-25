@@ -51,7 +51,7 @@ export function Step3_Details({ form, clientes, isEditing }: StepProps) {
 
       <Accordion type="multiple" className="w-full space-y-2">
         <AccordionItem value="item-1" className="border rounded-md px-4">
-          <AccordionTrigger>Gostos e Preferências</AccordionTrigger>
+          <AccordionTrigger type="button">Gostos e Preferências</AccordionTrigger>
           <AccordionContent className="pt-4 space-y-4">
             <FormField control={form.control} name="gostos.pizza_favorita" render={({ field }) => (<FormItem><FormLabel className="text-sm">Pizza Favorita</FormLabel><FormControl><Input placeholder="Calabresa, 4 Queijos..." {...field} /></FormControl><FormMessage /></FormItem>)} />
             <FormField control={form.control} name="gostos.bebida_favorita" render={({ field }) => (<FormItem><FormLabel className="text-sm">Bebida Favorita</FormLabel><FormControl><Input placeholder="Coca-Cola, Suco de Laranja..." {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -59,7 +59,7 @@ export function Step3_Details({ form, clientes, isEditing }: StepProps) {
           </AccordionContent>
         </AccordionItem>
         <AccordionItem value="item-2" className="border rounded-md px-4">
-          <AccordionTrigger>Filhos</AccordionTrigger>
+          <AccordionTrigger type="button">Filhos</AccordionTrigger>
           <AccordionContent className="pt-4">
             <div className="space-y-2">
               {filhosFields.map((field, index) => (
