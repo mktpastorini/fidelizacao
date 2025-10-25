@@ -78,7 +78,18 @@ serve(async (req) => {
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
     console.log(`[RF-SINGLE] 2/8: Usuário autenticado: ${user.id}`);
 
-    console.log("[RF-SINGLE] 3/8: Buscando configurações do CompreFace...");
+    console.log("[RF-SINGLE] 3/8: Buscando ID do Super Admin para consulta de clientes...");
+    const { data: superadminProfile, error: superadminError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('role', 'superadmin')
+      .limit(1)
+      .single();
+    if (superadminError) throw new Error("Falha ao encontrar o usuário Super Admin do estabelecimento.");
+    const userIdForClients = superadminProfile.id;
+    console.log(`[RF-SINGLE] 3/8: ID do Super Admin para clientes: ${userIdForClients}`);
+
+    console.log("[RF-SINGLE] 4/8: Buscando configurações do CompreFace...");
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
@@ -87,10 +98,10 @@ serve(async (req) => {
         status: 400,
       });
     }
-    console.log("[RF-SINGLE] 3/8: Configurações carregadas.");
+    console.log("[RF-SINGLE] 4/8: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[RF-SINGLE] 4/8: Enviando para CompreFace para reconhecimento...");
+    console.log("[RF-SINGLE] 5/8: Enviando para CompreFace para reconhecimento...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
@@ -100,9 +111,9 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[RF-SINGLE] 5/8: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[RF-SINGLE] 6/8: Resposta recebida do CompreFace com status: ${response.status}`);
     const responseBody = await response.json().catch(() => response.text());
-    console.log(`[RF-SINGLE] 5/8: Corpo da resposta do CompreFace:`, responseBody);
+    console.log(`[RF-SINGLE] 6/8: Corpo da resposta do CompreFace:`, responseBody);
 
     if (!response.ok) {
       if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
@@ -115,18 +126,19 @@ serve(async (req) => {
     const bestMatch = responseBody.result?.[0]?.subjects?.[0];
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
-      console.log(`[RF-SINGLE] 6/8: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      console.log(`[RF-SINGLE] 7/8: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      console.log(`[RF-SINGLE] 7/8: Buscando cliente no DB com ID: ${bestMatch.subject}`);
+      console.log(`[RF-SINGLE] 8/8: Buscando cliente no DB com ID: ${bestMatch.subject} e user_id: ${userIdForClients}`);
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
+        .eq('user_id', userIdForClients)
         .single();
 
       if (clientError) {
         if (clientError.code === 'PGRST116') {
-            console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
+            console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados para este usuário.`);
             return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);

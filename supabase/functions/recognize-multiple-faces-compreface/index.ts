@@ -78,7 +78,18 @@ serve(async (req) => {
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
     console.log(`[RF-MULTI] 2/7: Usuário autenticado: ${user.id}`);
     
-    console.log("[RF-MULTI] 3/7: Buscando configurações do CompreFace...");
+    console.log("[RF-MULTI] 3/7: Buscando ID do Super Admin para consulta de clientes...");
+    const { data: superadminProfile, error: superadminError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('role', 'superadmin')
+      .limit(1)
+      .single();
+    if (superadminError) throw new Error("Falha ao encontrar o usuário Super Admin do estabelecimento.");
+    const userIdForClients = superadminProfile.id;
+    console.log(`[RF-MULTI] 3/7: ID do Super Admin para clientes: ${userIdForClients}`);
+
+    console.log("[RF-MULTI] 4/7: Buscando configurações do CompreFace...");
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
@@ -87,10 +98,10 @@ serve(async (req) => {
         status: 400,
       });
     }
-    console.log("[RF-MULTI] 3/7: Configurações carregadas.");
+    console.log("[RF-MULTI] 4/7: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[RF-MULTI] 4/7: Enviando para CompreFace para reconhecimento de múltiplas faces...");
+    console.log("[RF-MULTI] 5/7: Enviando para CompreFace para reconhecimento de múltiplas faces...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize?limit=0`, {
       method: 'POST',
       headers: {
@@ -100,9 +111,9 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[RF-MULTI] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[RF-MULTI] 6/7: Resposta recebida do CompreFace com status: ${response.status}`);
     const responseBody = await response.json().catch(() => response.text());
-    console.log(`[RF-MULTI] 5/7: Corpo da resposta do CompreFace:`, responseBody);
+    console.log(`[RF-MULTI] 6/7: Corpo da resposta do CompreFace:`, responseBody);
 
     if (!response.ok) {
       if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
@@ -116,7 +127,7 @@ serve(async (req) => {
     const minSimilarity = 0.85;
 
     if (responseBody.result && Array.isArray(responseBody.result)) {
-      console.log(`[RF-MULTI] 6/7: Processando ${responseBody.result.length} rosto(s) detectado(s)...`);
+      console.log(`[RF-MULTI] 7/7: Processando ${responseBody.result.length} rosto(s) detectado(s)...`);
       for (const faceResult of responseBody.result) {
         const bestSubject = faceResult.subjects?.[0];
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
@@ -126,6 +137,7 @@ serve(async (req) => {
             .from('clientes')
             .select('*, filhos(*)')
             .eq('id', bestSubject.subject)
+            .eq('user_id', userIdForClients)
             .single();
 
           if (clientError) {
