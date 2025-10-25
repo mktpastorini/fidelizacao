@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Utensils, Clock, Table as TableIcon, Loader2 } from "lucide-react";
+import { Utensils, Clock, Table as TableIcon, Loader2, Package } from "lucide-react";
 import { format, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { DateRange } from "react-day-picker";
@@ -18,7 +18,7 @@ import { ScrollArea } from "../ui/scroll-area";
 type CookDetail = {
   item_id: string;
   nome_produto: string;
-  mesa_numero: number;
+  local_pedido: string;
   hora_inicio_preparo: string;
   hora_entrega: string;
   tempo_conclusao_min: number;
@@ -92,7 +92,7 @@ export function CookDetailsModal({
               <TableHeader>
                 <TableRow>
                   <TableHead>Item</TableHead>
-                  <TableHead className="w-[100px] text-center">Mesa</TableHead>
+                  <TableHead className="w-[150px] text-center">Local do Pedido</TableHead>
                   <TableHead className="w-[150px]">Início Preparo</TableHead>
                   <TableHead className="w-[150px]">Conclusão</TableHead>
                   <TableHead className="w-[100px] text-right">Tempo (min)</TableHead>
@@ -102,8 +102,9 @@ export function CookDetailsModal({
                 {details?.map((detail) => (
                   <TableRow key={detail.item_id}>
                     <TableCell className="font-medium">{detail.nome_produto}</TableCell>
-                    <TableCell className="text-center flex items-center justify-center">
-                        <TableIcon className="w-4 h-4 mr-1" /> {detail.mesa_numero}
+                    <TableCell className="text-center text-xs">
+                        {detail.local_pedido.startsWith('Mesa') ? <TableIcon className="w-4 h-4 mr-1 inline-block" /> : <Package className="w-4 h-4 mr-1 inline-block" />}
+                        {detail.local_pedido}
                     </TableCell>
                     <TableCell className="text-xs">
                       {format(new Date(detail.hora_inicio_preparo), "dd/MM HH:mm", { locale: ptBR })}
