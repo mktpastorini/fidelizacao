@@ -23,6 +23,26 @@ const defaultTemplates = [
     conteudo: "Olá {nome}! Temos uma promoção especial hoje: 20% de desconto na sua pizza {pizza_favorita}!",
     tipo: "geral",
   },
+  {
+    nome: "Delivery - Pedido Confirmado",
+    conteudo: "Olá {nome}! Recebemos seu pedido ({codigo_pedido}) e ele já foi confirmado. Em breve iniciaremos o preparo! 🍕",
+    tipo: "delivery_confirmed",
+  },
+  {
+    nome: "Delivery - Em Preparo",
+    conteudo: "Boas notícias, {nome}! Seu pedido ({codigo_pedido}) já está sendo preparado com todo o carinho pela nossa equipe. 👨‍🍳",
+    tipo: "delivery_in_preparation",
+  },
+  {
+    nome: "Delivery - Pronto para Entrega",
+    conteudo: "Seu pedido ({codigo_pedido}) está pronto, {nome}! Nosso entregador já está se preparando para levar até você. 🛵",
+    tipo: "delivery_ready",
+  },
+  {
+    nome: "Delivery - Saiu para Entrega",
+    conteudo: "Oba! Seu pedido ({codigo_pedido}) saiu para entrega, {nome}! Prepare a mesa que a sua refeição está chegando. 🎉",
+    tipo: "delivery_out_for_delivery",
+  },
 ];
 
 type DefaultTemplatesProps = {

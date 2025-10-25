@@ -10,6 +10,8 @@ const variables = [
   { name: "{bebida_favorita}", description: "Vem das 'Preferências'." },
   { name: "{prato_favorito}", description: "Vem das 'Preferências'." },
   { name: "{observacoes}", description: "Vem das 'Preferências'." },
+  { name: "{codigo_pedido}", description: "ID do pedido (iFood ou interno)." },
+  { name: "{status_delivery}", description: "Status atual do pedido de delivery." },
 ];
 
 type VariableReferenceProps = {

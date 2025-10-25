@@ -6,7 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-function personalizeMessage(content: string, client: any): string {
+const statusLabels: { [key: string]: string } = {
+  'CONFIRMED': 'Confirmado',
+  'in_preparation': 'Em Preparo',
+  'ready_for_delivery': 'Pronto para Entrega',
+  'out_for_delivery': 'Saiu para Entrega',
+};
+
+function personalizeMessage(content: string, client: any, orderDetails: { orderId: string, status: string }): string {
   let personalized = content;
   const clientData = {
     nome: client.nome || '',
@@ -24,6 +31,11 @@ function personalizeMessage(content: string, client: any): string {
     }
   }
 
+  // Novas variáveis
+  personalized = personalized.replace(/{codigo_pedido}/g, orderDetails.orderId);
+  personalized = personalized.replace(/{status_delivery}/g, statusLabels[orderDetails.status] || orderDetails.status);
+
+  // Limpa variáveis não encontradas
   personalized = personalized.replace(/{[a-zA-Z_]+}/g, '');
   return personalized;
 }
@@ -64,7 +76,7 @@ serve(async (req) => {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from('pedidos')
-      .select('cliente_id')
+      .select('cliente_id, ifood_order_id')
       .eq('id', orderId)
       .eq('user_id', superadminId)
       .single();
@@ -125,7 +137,8 @@ serve(async (req) => {
     if (clientError) throw clientError;
     if (!client.whatsapp) throw new Error('Cliente não possui WhatsApp.');
 
-    const personalizedMessage = personalizeMessage(template.conteudo, client);
+    const displayOrderId = order.ifood_order_id ? `iFood #${order.ifood_order_id.slice(-4)}` : `Pedido #${orderId.slice(0, 4)}`;
+    const personalizedMessage = personalizeMessage(template.conteudo, client, { orderId: displayOrderId, status: newStatus });
 
     const webhookPayload = {
       recipients: [{
