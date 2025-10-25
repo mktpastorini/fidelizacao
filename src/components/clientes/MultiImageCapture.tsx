@@ -3,18 +3,37 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ImageUpload } from "@/components/ui/ImageUpload";
 import { FaceRegistration } from "@/components/clientes/FaceRegistration";
 import { Button } from "../ui/button";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { User } from "lucide-react";
+import { useFaceRecognition } from "@/hooks/useFaceRecognition";
+import { Cliente } from "@/types/supabase";
+import { showError } from "@/utils/toast";
 
 type MultiImageCaptureProps = {
   urls: string[];
   onUrlsChange: (urls: string[]) => void;
+  onDuplicateFound: (cliente: Cliente) => void;
 };
 
-export function MultiImageCapture({ urls, onUrlsChange }: MultiImageCaptureProps) {
-  const handleUpload = (url: string) => {
-    onUrlsChange([...urls, url]);
+export function MultiImageCapture({ urls, onUrlsChange, onDuplicateFound }: MultiImageCaptureProps) {
+  const { recognize } = useFaceRecognition();
+  const [isScanning, setIsScanning] = useState(false);
+
+  const handleUpload = async (url: string) => {
+    setIsScanning(true);
+    try {
+      const result = await recognize(url);
+      if (result && result.client) {
+        onDuplicateFound(result.client);
+      } else {
+        onUrlsChange([...urls, url]);
+      }
+    } catch (error: any) {
+      showError(`Erro na verificação facial: ${error.message}`);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleRemove = (indexToRemove: number) => {
@@ -25,8 +44,8 @@ export function MultiImageCapture({ urls, onUrlsChange }: MultiImageCaptureProps
     <div className="space-y-4">
       <Tabs defaultValue="upload" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="upload">Enviar Arquivo</TabsTrigger>
-          <TabsTrigger value="camera">Usar Câmera</TabsTrigger>
+          <TabsTrigger value="upload" disabled={isScanning}>Enviar Arquivo</TabsTrigger>
+          <TabsTrigger value="camera" disabled={isScanning}>Usar Câmera</TabsTrigger>
         </TabsList>
         <TabsContent value="upload">
           <ImageUpload
@@ -43,6 +62,13 @@ export function MultiImageCapture({ urls, onUrlsChange }: MultiImageCaptureProps
         </TabsContent>
       </Tabs>
       
+      {isScanning && (
+        <div className="flex items-center justify-center text-sm text-muted-foreground">
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          Verificando se o cliente já existe...
+        </div>
+      )}
+
       {urls.length > 0 && (
         <div>
           <h4 className="font-semibold text-sm mb-2">Fotos para Registro ({urls.length}/5)</h4>

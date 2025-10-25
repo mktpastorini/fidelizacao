@@ -11,6 +11,9 @@ import { Step2_BasicInfo } from "./stepper/Step2_BasicInfo";
 import { Step3_Details } from "./stepper/Step3_Details";
 import { Step4_Address } from "./stepper/Step4_Address";
 import React from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle, User } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome é obrigatório." }),
@@ -57,6 +60,7 @@ const fieldGroups = [
 
 export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, isEditing, mode = 'full' }: ClienteFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [duplicateClient, setDuplicateClient] = useState<Cliente | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -105,11 +109,16 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
     onSubmit(submissionData);
   };
 
+  const handleClearDuplicate = () => {
+    setDuplicateClient(null);
+    form.setValue('avatar_urls', []);
+  };
+
   if (mode === 'quick') {
     return (
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-          <Step1_Photos form={form} />
+          <Step1_Photos form={form} onDuplicateFound={setDuplicateClient} />
           <Step2_BasicInfo form={form} />
           <Button type="submit" disabled={isSubmitting} className="w-full">
             {isSubmitting ? "Cadastrando..." : "Cadastrar e Adicionar"}
@@ -125,7 +134,30 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
         <Stepper steps={steps} currentStep={currentStep} />
 
         <div className="min-h-[300px]">
-          {currentStep === 0 && <Step1_Photos form={form} />}
+          {currentStep === 0 && (
+            <>
+              {duplicateClient && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Cliente Duplicado Encontrado!</AlertTitle>
+                  <AlertDescription className="flex flex-col gap-4">
+                    <p>Este rosto já está associado ao cliente abaixo. Não é possível criar um novo cadastro.</p>
+                    <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-md">
+                      <Avatar>
+                        <AvatarImage src={duplicateClient.avatar_url || undefined} />
+                        <AvatarFallback><User /></AvatarFallback>
+                      </Avatar>
+                      <span className="font-semibold">{duplicateClient.nome}</span>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleClearDuplicate} className="self-start">
+                      Limpar e Tentar Novamente
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Step1_Photos form={form} onDuplicateFound={setDuplicateClient} />
+            </>
+          )}
           {currentStep === 1 && <Step2_BasicInfo form={form} />}
           {currentStep === 2 && <Step3_Details form={form} clientes={clientes} isEditing={isEditing} />}
           {currentStep === 3 && <Step4_Address form={form} />}
@@ -139,11 +171,11 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
           ) : <div />}
           
           {currentStep < steps.length - 1 ? (
-            <Button type="button" onClick={handleNext}>
+            <Button type="button" onClick={handleNext} disabled={!!duplicateClient}>
               Avançar
             </Button>
           ) : (
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting || !!duplicateClient}>
               {isSubmitting ? "Salvando..." : "Salvar Cliente"}
             </Button>
           )}
