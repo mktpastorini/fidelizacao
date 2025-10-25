@@ -21,8 +21,8 @@ type MultiLiveRecognitionProps = {
   allocatedClientIds: string[];
 };
 
-const PERSISTENCE_DURATION_MS = 30 * 1000; // 30 segundos
-const SCAN_INTERVAL_MS = 3000; // 3 segundos entre scans por câmera
+const PERSISTENCE_DURATION_MS = 10000; // 10 segundos
+const SCAN_INTERVAL_MS = 2000; // 2 segundos entre scans por câmera
 
 interface CameraInstance {
   id: string;

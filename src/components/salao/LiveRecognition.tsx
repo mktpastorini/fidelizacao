@@ -32,6 +32,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   };
 
   const handleRecognition = useCallback(async (manualTrigger = false) => {
+    if (!manualTrigger && persistentClient) return;
     if (!isCameraOn || !webcamRef.current || isScanning) return;
 
     const imageSrc = webcamRef.current.getScreenshot();
@@ -40,7 +41,6 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     const result = await recognize(imageSrc);
     
     if (result?.status === 'MATCH_FOUND' && result.match) {
-      // Apenas atualiza se for um novo cliente ou se o anterior já expirou
       if (persistentClient?.client.id !== result.match.id) {
         const newPersistentClient = { client: result.match, timestamp: Date.now() };
         setPersistentClient(newPersistentClient);
@@ -53,27 +53,18 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
 
   // Efeito para o scan automático
   useEffect(() => {
-    let timeoutId: number;
-    const SCAN_INTERVAL_MS = 3000;
-
-    const scanLoop = async () => {
-      if (!isCameraOn || !isReady || !isCameraReady || isScanning || persistentClient) {
-        timeoutId = setTimeout(scanLoop, 1000);
+    if (!isCameraOn || !isReady || !isCameraReady || isScanning || persistentClient) {
         return;
-      }
+    }
 
-      try {
-        await handleRecognition(false);
-      } catch (e) {
-        console.error("Erro no scan automático:", e);
-      } finally {
-        timeoutId = setTimeout(scanLoop, SCAN_INTERVAL_MS);
-      }
-    };
+    const SCAN_INTERVAL_MS = 2000; // A cada 2 segundos
 
-    timeoutId = setTimeout(scanLoop, 1000);
-    return () => clearTimeout(timeoutId);
-  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, persistentClient]);
+    const intervalId = setInterval(() => {
+        handleRecognition(false);
+    }, SCAN_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isCameraOn, isReady, isCameraReady, isScanning, persistentClient, handleRecognition]);
 
   // Efeito para limpar o cliente persistente após o tempo de expiração
   useEffect(() => {
