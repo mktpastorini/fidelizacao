@@ -5,7 +5,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ApprovalRequestsDialog } from "@/components/Notification/ApprovalRequestsDialog";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
-import { NovoPedidoDeliveryDialog } from "@/components/delivery/NovoPedidoDeliveryDialog";
+import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
 
 type HeaderProps = {
   pageActions?: React.ReactNode;
@@ -32,7 +32,7 @@ export function Header({ pageActions }: HeaderProps) {
 
         {pageActions && <div className="hidden lg:flex items-center gap-4">{pageActions}</div>}
       </div>
-      <NovoPedidoDeliveryDialog isOpen={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen} />
+      <NewDeliveryOrderDialog isOpen={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen} />
     </>
   );
 }
