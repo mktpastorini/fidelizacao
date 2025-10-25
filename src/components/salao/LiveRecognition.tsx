@@ -58,7 +58,6 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     const scanLoop = async () => {
       // Condição de parada/pausa
       if (!isCameraOn || !isReady || !isCameraReady || isScanning) {
-        // Se as condições não forem atendidas, tenta novamente em 1 segundo
         timeoutId = setTimeout(scanLoop, 1000);
         return;
       }
