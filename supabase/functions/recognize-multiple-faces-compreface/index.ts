@@ -68,7 +68,7 @@ serve(async (req) => {
       imageData = image_url.split(',')[1];
     }
 
-    // 2. Autenticação do usuário logado para obter o ID (necessário para buscar os clientes dele)
+    // 2. Autenticação do usuário logado (apenas para garantir que a requisição é válida)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error("Usuário não autenticado. O reconhecimento de múltiplos rostos requer autenticação.");
@@ -76,9 +76,19 @@ serve(async (req) => {
     
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    const userIdForClients = user.id;
-    console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${userIdForClients}`);
+    console.log(`[recognize-multiple-faces] 2/6: Usuário autenticado: ${user.id}`);
     
+    // CORREÇÃO: Buscar o ID do Super Admin para usar na busca de clientes
+    const { data: superadminProfile, error: superadminError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('role', 'superadmin')
+      .limit(1)
+      .single();
+    if (superadminError) throw new Error("Falha ao encontrar o usuário Super Admin do estabelecimento.");
+    const userIdForClients = superadminProfile.id;
+    console.log(`[recognize-multiple-faces] CORREÇÃO: Usando ID do Super Admin para buscar clientes: ${userIdForClients}`);
+
     // 3. Buscando configurações do CompreFace do Superadmin
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
@@ -122,7 +132,7 @@ serve(async (req) => {
         if (bestSubject && bestSubject.similarity >= minSimilarity) {
           console.log(`[recognize-multiple-faces] Match encontrado - Subject: ${bestSubject.subject}, Similaridade: ${bestSubject.similarity}`);
 
-          // Buscar dados do cliente usando o ID do usuário LOGADO
+          // Buscar dados do cliente usando o ID do Super Admin
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
             .select('*, filhos(*)')
