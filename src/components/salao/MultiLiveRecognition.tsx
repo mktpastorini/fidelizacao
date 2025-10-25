@@ -22,7 +22,8 @@ type MultiLiveRecognitionProps = {
 };
 
 const PERSISTENCE_DURATION_MS = 30 * 1000; // 30 segundos
-const SCAN_INTERVAL_MS = 3000; // 3 segundos entre scans por câmera
+const FAST_SCAN_INTERVAL_MS = 1000; // 1 segundo quando rostos são detectados
+const SLOW_SCAN_INTERVAL_MS = 3000; // 3 segundos quando não há rostos
 
 interface CameraInstance {
   id: string;
@@ -43,6 +44,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
   const [cameraInstances, setCameraInstances] = useState<CameraInstance[]>([]);
   const [allVideoDevices, setAllVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [persistentRecognizedClients, setPersistentRecognizedClients] = useState<RecognizedClientDisplay[]>([]);
+  const scanIntervalRef = useRef(SLOW_SCAN_INTERVAL_MS);
 
   // --- Setup Inicial de Câmeras ---
   useEffect(() => {
@@ -112,47 +114,48 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
     const scanCamera = async (cam: CameraInstance) => {
       if (!cam.isCameraOn || !cam.isCameraReady || cam.mediaError || isRecognitionLoading || !cam.webcamRef.current) {
-        // Tenta novamente em 1 segundo se as condições não forem atendidas
         timeouts.push(setTimeout(() => scanCamera(cam), 1000));
         return;
       }
 
       const imageSrc = cam.webcamRef.current.getScreenshot();
       if (!imageSrc) {
-        timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
+        timeouts.push(setTimeout(() => scanCamera(cam), scanIntervalRef.current));
         return;
       }
 
-      // Inicia o reconhecimento
       const results = await recognizeMultiple(imageSrc);
       
-      // Atualiza a instância da câmera com os resultados
-      updateCameraInstance(cam.id, { recognizedFaces: results, lastRecognitionTime: Date.now() });
+      // Filtra clientes que já estão alocados
+      const unallocatedResults = results.filter(match => !allocatedSet.has(match.client.id));
 
-      // Atualiza a lista persistente de clientes
+      // Otimização: ajusta o intervalo de varredura
+      if (unallocatedResults.length > 0) {
+        scanIntervalRef.current = FAST_SCAN_INTERVAL_MS;
+      } else {
+        scanIntervalRef.current = SLOW_SCAN_INTERVAL_MS;
+      }
+
+      updateCameraInstance(cam.id, { recognizedFaces: unallocatedResults, lastRecognitionTime: Date.now() });
+
       setPersistentRecognizedClients(prevClients => {
         const now = Date.now();
         const updatedClients = [...prevClients];
         
-        results.forEach(match => {
-          if (!allocatedSet.has(match.client.id)) {
-            const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
-            if (existingIndex !== -1) {
-              updatedClients[existingIndex].timestamp = now;
-            } else {
-              updatedClients.push({ client: match.client, timestamp: now });
-            }
+        unallocatedResults.forEach(match => {
+          const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
+          if (existingIndex !== -1) {
+            updatedClients[existingIndex].timestamp = now;
+          } else {
+            updatedClients.push({ client: match.client, timestamp: now });
           }
         });
-        // Filtra clientes alocados e expirados
         return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
       });
 
-      // Agenda o próximo scan
-      timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
+      timeouts.push(setTimeout(() => scanCamera(cam), scanIntervalRef.current));
     };
 
-    // Inicia o loop para cada câmera
     cameraInstances.forEach(scanCamera);
 
     return () => {
@@ -170,7 +173,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);
     
-    // Limpeza de clientes expirados (mantida separada para estabilidade)
     const cleanupInterval = setInterval(() => {
       setPersistentRecognizedClients(prevClients => {
         const now = Date.now();

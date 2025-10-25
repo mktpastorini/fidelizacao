@@ -28,7 +28,6 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     deviceId: settings?.preferred_camera_device_id || undefined,
   };
 
-  // Função de reconhecimento que usa o estado mais recente (isScanning)
   const handleRecognition = useCallback(async (manualTrigger = false) => {
     if (!isCameraOn || !webcamRef.current || isScanning) return;
 
@@ -50,38 +49,32 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     }
   }, [isCameraOn, isScanning, recognize, onClientRecognized]);
 
-  // Efeito para o scan automático usando recursão com setTimeout
   useEffect(() => {
     let timeoutId: number;
-    const SCAN_INTERVAL_MS = 3000; // Intervalo de 3 segundos entre scans
+    const SCAN_INTERVAL_MS = 3000;
+    const PAUSE_ON_MATCH_MS = 10000;
 
     const scanLoop = async () => {
-      // Condição de parada/pausa
       if (!isCameraOn || !isReady || !isCameraReady || isScanning) {
-        // Se as condições não forem atendidas, tenta novamente em 1 segundo
-        timeoutId = setTimeout(scanLoop, 1000);
+        timeoutId = setTimeout(scanLoop, 1000); // Tenta novamente em 1s se não estiver pronto
         return;
       }
-      
-      // Se houver um match, pausa a varredura automática por 10 segundos
+
       if (recognitionResult?.status === 'MATCH_FOUND') {
-        timeoutId = setTimeout(scanLoop, 10000);
+        timeoutId = setTimeout(scanLoop, PAUSE_ON_MATCH_MS); // Pausa após um match
         return;
       }
 
       try {
-        // Chama a função de reconhecimento (que usa o estado mais recente de isScanning)
         await handleRecognition(false);
       } catch (e) {
         console.error("Erro durante o scan automático:", e);
       } finally {
-        // Agenda o próximo scan após o intervalo
-        timeoutId = setTimeout(scanLoop, SCAN_INTERVAL_MS);
+        timeoutId = setTimeout(scanLoop, SCAN_INTERVAL_MS); // Agenda o próximo scan
       }
     };
 
-    // Inicia o loop
-    timeoutId = setTimeout(scanLoop, 1000);
+    timeoutId = setTimeout(scanLoop, 1000); // Inicia o loop
 
     return () => {
       clearTimeout(timeoutId);
@@ -175,7 +168,6 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         </div>
         
         <Button 
-            // O botão manual chama handleRecognition(true)
           onClick={() => handleRecognition(true)} 
           disabled={!isCameraOn || isScanning || !!displayError || !isCameraReady}
           className="w-full"
