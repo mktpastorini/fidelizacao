@@ -122,9 +122,13 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
           const now = Date.now();
           if (now - cam.lastRecognitionTime < 3000) return; // Scan a cada 3 segundos
 
+          console.log(`[MultiLiveRecognition] Iniciando varredura na câmera ${cam.id}...`);
           updateCameraInstance(cam.id, { lastRecognitionTime: now });
           const imageSrc = cam.webcamRef.current.getScreenshot();
-          if (!imageSrc) return;
+          if (!imageSrc) {
+            console.warn(`[MultiLiveRecognition] Não foi possível capturar imagem da câmera ${cam.id}.`);
+            return;
+          }
 
           const video = cam.webcamRef.current.video;
           if (!video) return;
@@ -138,6 +142,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           const results = await recognizeMultiple(imageSrc);
+          console.log(`[MultiLiveRecognition] Câmera ${cam.id} encontrou ${results.length} rosto(s).`);
           updateCameraInstance(cam.id, { recognizedFaces: results }); // Atualiza recognizedFaces para esta instância (não usado para desenhar)
 
           // Update global persistent list
@@ -145,19 +150,24 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             const updatedClients = [...prevClients];
             const currentClientIds = new Set(prevClients.map(c => c.client.id));
             const allocatedSet = new Set(allocatedClientIds);
+            let addedCount = 0;
 
             results.forEach(match => {
               if (!allocatedSet.has(match.client.id)) {
                 if (currentClientIds.has(match.client.id)) {
                   const index = updatedClients.findIndex(c => c.client.id === match.client.id);
                   if (index !== -1) {
-                    updatedClients[index].timestamp = now;
+                    updatedClients[index].timestamp = now; // Apenas atualiza o timestamp
                   }
                 } else {
+                  addedCount++;
                   updatedClients.push({ client: match.client, timestamp: now });
                 }
               }
             });
+            if (addedCount > 0) {
+              console.log(`[MultiLiveRecognition] Adicionados ${addedCount} novos clientes à lista persistente.`);
+            }
             return updatedClients.filter(c => !allocatedSet.has(c.client.id));
           });
         }, 1000); // Check every 1 second
@@ -167,7 +177,12 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
           setPersistentRecognizedClients(prevClients => {
             const now = Date.now();
             const allocatedSet = new Set(allocatedClientIds);
-            return prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+            const clientsBeforeCleanup = prevClients.length;
+            const clientsAfterCleanup = prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+            if (clientsBeforeCleanup > clientsAfterCleanup.length) {
+              console.log(`[MultiLiveRecognition] Limpeza: removidos ${clientsBeforeCleanup - clientsAfterCleanup.length} clientes expirados.`);
+            }
+            return clientsAfterCleanup;
           });
         }, 5000); // Clean up every 5 seconds
         cleanupIntervals.push(cleanupInterval);

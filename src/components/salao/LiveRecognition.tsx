@@ -35,15 +35,22 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     const now = Date.now();
     if (now - lastRecognitionTime < 5000) return; // Scan every 5 seconds
 
+    console.log("[LiveRecognition] Iniciando varredura...");
     setLastRecognitionTime(now);
     const imageSrc = webcamRef.current.getScreenshot();
-    if (!imageSrc) return;
+    if (!imageSrc) {
+      console.warn("[LiveRecognition] Não foi possível capturar a imagem da webcam.");
+      return;
+    }
 
     const result = await recognize(imageSrc);
+    
     if (result?.client) {
+      console.log(`[LiveRecognition] Cliente reconhecido: ${result.client.nome} com similaridade de ${(1 - result.distance) * 100}%`);
       setRecognizedClient(result.client);
       onClientRecognized(result.client);
     } else {
+      console.log("[LiveRecognition] Nenhum cliente correspondente encontrado.");
       setRecognizedClient(null);
     }
   }, [isScanning, isCameraOn, lastRecognitionTime, recognize, onClientRecognized]);
@@ -65,14 +72,14 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   }, [isCameraOn, isReady, handleRecognition]);
 
   const handleMediaError = (err: any) => {
-    console.error("Erro ao acessar a câmera no LiveRecognition:", err);
+    console.error("[LiveRecognition] Erro ao acessar a câmera:", err);
+    let errorMessage = `Erro de mídia: ${err.message}`;
     if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      setMediaError("Acesso à câmera negado. Verifique as permissões do navegador.");
+      errorMessage = "Acesso à câmera negado. Verifique as permissões do navegador.";
     } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-      setMediaError("Acesso à câmera bloqueado. O sistema deve ser acessado via HTTPS.");
-    } else {
-      setMediaError(`Erro de mídia: ${err.message}`);
+      errorMessage = "Acesso à câmera bloqueado. O sistema deve ser acessado via HTTPS.";
     }
+    setMediaError(errorMessage);
     setIsCameraOn(false);
   };
 

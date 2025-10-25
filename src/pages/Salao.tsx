@@ -430,26 +430,40 @@ export default function SalaoPage() {
   };
 
   const handleClientRecognized = (cliente: Cliente) => {
-    if (isClosed) return;
+    console.log(`[SalaoPage] Cliente reconhecido no modo único: ${cliente.nome}. Verificando se já está alocado...`);
+    if (isClosed) {
+      console.warn("[SalaoPage] Estabelecimento fechado. Ignorando reconhecimento.");
+      return;
+    }
     
     if (allocatedClientIds.includes(cliente.id)) {
-        console.log(`Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
+        console.log(`[SalaoPage] Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
         return;
     }
 
-    if (recognizedClient?.id === cliente.id && isArrivalOpen) return;
+    if (recognizedClient?.id === cliente.id && isArrivalOpen) {
+      console.log(`[SalaoPage] Modal de chegada para ${cliente.nome} já está aberto.`);
+      return;
+    }
     
+    console.log(`[SalaoPage] Abrindo modal de chegada para ${cliente.nome}.`);
     setRecognizedClient(cliente);
     setIsArrivalOpen(true);
   };
 
   const handleAllocateClientFromPanel = (client: Cliente) => {
+    console.log(`[SalaoPage] Tentando alocar cliente do painel: ${client.nome}`);
     if (isClosed) {
       showError("O estabelecimento está fechado. Não é possível alocar clientes.");
       return;
     }
     setRecognizedClient(client);
     setIsArrivalOpen(true);
+  };
+
+  const handleMultiFaceUpdate = (clients: { client: Cliente; timestamp: number }[]) => {
+    console.log(`[SalaoPage] Atualização do modo multi-câmera recebida. ${clients.length} cliente(s) na lista.`);
+    setCurrentRecognizedClients(clients);
   };
 
   if (isLoading || (needsSuperadminId && isLoadingSuperadminId)) {
@@ -481,7 +495,7 @@ export default function SalaoPage() {
       {isMultiDetectionMode ? (
         <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
           <ResizablePanel defaultSize={33} minSize={20}>
-            <MultiLiveRecognition onRecognizedFacesUpdate={setCurrentRecognizedClients} allocatedClientIds={allocatedClientIds} />
+            <MultiLiveRecognition onRecognizedFacesUpdate={handleMultiFaceUpdate} allocatedClientIds={allocatedClientIds} />
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={33} minSize={20}>
