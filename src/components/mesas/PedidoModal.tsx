@@ -364,24 +364,15 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onError: (error: Error) => showError(error.message),
   });
 
-  const pagarItemMesaMutation = useMutation({
-    mutationFn: async ({ itemId, quantidade, clienteId }: { itemId: string, quantidade: number, clienteId: string }) => {
+  const pagarItensParciaisMutation = useMutation({
+    mutationFn: async ({ clienteId, itens, gorjeta, garcomId }: { clienteId: string, itens: { item_id: string, quantidade: number }[], gorjeta: number, garcomId: string | null }) => {
         if (!pedido) throw new Error("Pedido não encontrado.");
-
-        const originalItem = pedido.itens_pedido.find(i => i.id === itemId);
-        if (!originalItem) throw new Error("Item original não encontrado.");
-
-        const precoUnitario = (originalItem.preco || 0);
-        const subtotalItem = precoUnitario * quantidade;
-        const gorjetaItem = tipEnabled ? subtotalItem * 0.1 : 0;
-
-        const { error } = await supabase.rpc('finalizar_pagamento_item_mesa', {
+        const { error } = await supabase.rpc('finalizar_pagamento_itens_parciais', {
             p_pedido_id: pedido.id,
-            p_item_id: itemId,
-            p_quantidade_a_pagar: quantidade,
             p_cliente_id: clienteId,
-            p_gorjeta_valor: gorjetaItem,
-            p_garcom_id: selectedGarcomId,
+            p_itens_a_pagar: itens,
+            p_gorjeta_valor: gorjeta,
+            p_garcom_id: garcomId,
         });
         if (error) throw error;
     },
@@ -418,11 +409,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         showError("Não há clientes ocupando a mesa para atribuir o pagamento.");
         return;
     }
-    if (item.original_ids.length > 1) {
-        showError("Não é possível pagar parcialmente um item agrupado com múltiplos registros originais. Remova e adicione novamente se necessário.");
-        return;
-    }
-    
     setItemMesaToPay(item);
     setQuantidadePagarMesa(1);
     setClientePagandoMesaId(ocupantes[0].id);
@@ -430,14 +416,43 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   };
   
   const handleConfirmMesaItemPayment = () => {
-    if (itemMesaToPay && clientePagandoMesaId && quantidadePagarMesa > 0) {
-        const originalItemId = itemMesaToPay.original_ids[0];
-        pagarItemMesaMutation.mutate({
-            itemId: originalItemId,
-            quantidade: quantidadePagarMesa,
-            clienteId: clientePagandoMesaId,
-        });
+    if (!itemMesaToPay || !clientePagandoMesaId || quantidadePagarMesa <= 0 || !pedido) return;
+
+    let quantidadeRestanteAPagar = quantidadePagarMesa;
+    const itensAPagar: { item_id: string, quantidade: number }[] = [];
+
+    const itensOriginais = itemMesaToPay.original_ids
+        .map(id => pedido.itens_pedido.find(i => i.id === id))
+        .filter((item): item is ItemPedido => !!item);
+
+    for (const item of itensOriginais) {
+        if (quantidadeRestanteAPagar <= 0) break;
+
+        const quantidadeNesteItem = Math.min(quantidadeRestanteAPagar, item.quantidade);
+        itensAPagar.push({ item_id: item.id, quantidade: quantidadeNesteItem });
+        quantidadeRestanteAPagar -= quantidadeNesteItem;
     }
+
+    if (quantidadeRestanteAPagar > 0) {
+        showError("Não foi possível encontrar itens suficientes para pagar a quantidade solicitada.");
+        return;
+    }
+    
+    const subtotalItensPagos = itensAPagar.reduce((acc, itemToPay) => {
+        const originalItem = itensOriginais.find(i => i.id === itemToPay.item_id);
+        if (!originalItem) return acc;
+        const precoUnitario = (originalItem.preco || 0);
+        return acc + (precoUnitario * itemToPay.quantidade);
+    }, 0);
+    
+    const gorjetaCalculada = tipEnabled ? subtotalItensPagos * 0.1 : 0;
+
+    pagarItensParciaisMutation.mutate({
+        clienteId: clientePagandoMesaId,
+        itens: itensAPagar,
+        gorjeta: gorjetaCalculada,
+        garcomId: selectedGarcomId,
+    });
   };
 
   const precoUnitarioComDescontoMesa = useMemo(() => {
@@ -535,7 +550,6 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                           {itens.map((item) => {
                             const precoOriginal = (item.preco || 0) * item.total_quantidade;
                             const precoFinal = item.subtotal;
-                            const isSingleOriginalItem = item.original_ids.length === 1;
                             
                             return (
                               <li key={item.id} className="flex justify-between items-center p-2 bg-secondary/50 rounded text-sm">
@@ -561,8 +575,8 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                                     variant="outline" 
                                     className="h-8 bg-green-600 hover:bg-green-700 text-white"
                                     onClick={() => handleMesaItemPartialPaymentOpen(item)}
-                                    disabled={!hasActiveOccupants || !isSingleOriginalItem}
-                                    title={!isSingleOriginalItem ? "Pagamento parcial indisponível para itens agrupados de múltiplos registros." : "Pagar item da mesa"}
+                                    disabled={!hasActiveOccupants}
+                                    title={"Pagar item da mesa"}
                                   >
                                     <DollarSign className="w-4 h-4" />
                                   </Button>
@@ -799,7 +813,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                 <Select 
                   value={clientePagandoMesaId || ''} 
                   onValueChange={setClientePagandoMesaId}
-                  disabled={ocupantes.length === 0 || pagarItemMesaMutation.isPending}
+                  disabled={ocupantes.length === 0 || pagarItensParciaisMutation.isPending}
                 >
                   <SelectTrigger id="cliente-pagando-mesa" className="mt-1">
                     <SelectValue placeholder="Selecione o cliente" />
@@ -821,7 +835,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     variant="outline" 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.max(1, prev - 1))} 
-                    disabled={quantidadePagarMesa <= 1 || pagarItemMesaMutation.isPending}
+                    disabled={quantidadePagarMesa <= 1 || pagarItensParciaisMutation.isPending}
                   >
                     <Minus className="w-4 h-4" />
                   </Button>
@@ -832,13 +846,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                     value={quantidadePagarMesa} 
                     onChange={(e) => setQuantidadePagarMesa(Math.max(1, Math.min(itemMesaToPay.total_quantidade, parseInt(e.target.value) || 1)))} 
                     className="w-16 text-center"
-                    disabled={pagarItemMesaMutation.isPending}
+                    disabled={pagarItensParciaisMutation.isPending}
                   >
                   </Input>
                   <Button 
                     size="icon" 
                     onClick={() => setQuantidadePagarMesa(prev => Math.min(itemMesaToPay.total_quantidade, prev + 1))} 
-                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || pagarItemMesaMutation.isPending}
+                    disabled={quantidadePagarMesa >= itemMesaToPay.total_quantidade || pagarItensParciaisMutation.isPending}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -853,12 +867,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
           )}
 
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={pagarItemMesaMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={pagarItensParciaisMutation.isPending}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleConfirmMesaItemPayment} 
-              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || pagarItemMesaMutation.isPending}
+              disabled={!clientePagandoMesaId || quantidadePagarMesa <= 0 || pagarItensParciaisMutation.isPending}
             >
-              {pagarItemMesaMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
+              {pagarItensParciaisMutation.isPending ? "Processando..." : "Confirmar Pagamento"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
