@@ -53,9 +53,12 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
 
   const handleNextAction = () => {
     if (nextAction) {
+      console.log(`[DEBUG] Botão de próxima ação clicado. Ação: ${nextAction.label}, Novo Status: ${nextAction.next}, Pedido ID: ${order.id}`);
       if (currentStatus === 'ready_for_delivery') {
+        console.log("[DEBUG] Abrindo checklist...");
         onOpenChecklist(order);
       } else {
+        console.log("[DEBUG] Chamando onStatusChange...");
         onStatusChange(order.id, nextAction.next);
       }
     }

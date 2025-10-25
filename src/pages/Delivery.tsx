@@ -136,40 +136,67 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
+      console.log(`[DEBUG] Iniciando mutação para atualizar status. Pedido ID: ${orderId}, Novo Status: ${newStatus}`);
+      
       if (newStatus === 'in_preparation') {
+        console.log(`[DEBUG] Chamando RPC 'confirm_delivery_order' para o pedido ${orderId}`);
         const { error: rpcError } = await supabase.rpc('confirm_delivery_order', {
           p_pedido_id: orderId,
         });
-        if (rpcError) throw rpcError;
+        if (rpcError) {
+          console.error("[DEBUG] Erro no RPC 'confirm_delivery_order':", rpcError);
+          throw rpcError;
+        }
+        console.log(`[DEBUG] RPC 'confirm_delivery_order' concluído com sucesso.`);
       } else {
+        console.log(`[DEBUG] Atualizando 'pedidos.delivery_status' para ${newStatus}`);
         const { error: orderError } = await supabase
           .from("pedidos")
           .update({ delivery_status: newStatus })
           .eq("id", orderId);
-        if (orderError) throw orderError;
+        if (orderError) {
+          console.error("[DEBUG] Erro ao atualizar 'pedidos.delivery_status':", orderError);
+          throw orderError;
+        }
+        console.log(`[DEBUG] 'pedidos.delivery_status' atualizado com sucesso.`);
       }
 
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
+        console.log(`[DEBUG] Pedido do iFood detectado. Chamando função 'update-ifood-status'.`);
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
           body: { pedido_id: orderId, new_status: newStatus },
         });
         if (ifoodError) {
+          console.error("[DEBUG] Erro na função 'update-ifood-status':", ifoodError);
           showError(`Status atualizado, mas falha ao notificar iFood: ${ifoodError.message}`);
+        } else {
+          console.log(`[DEBUG] Função 'update-ifood-status' executada com sucesso.`);
         }
       }
+      return { orderId, newStatus }; // Retorna os dados para o onSuccess
     },
-    onSuccess: (_, { orderId, newStatus }) => {
+    onSuccess: ({ orderId, newStatus }) => {
+      console.log(`[DEBUG] onSuccess da mutação. Pedido ID: ${orderId}, Novo Status: ${newStatus}`);
+      
       // Atualiza o cache do React Query manualmente para uma resposta visual instantânea
       queryClient.setQueryData(['activeDeliveryOrders'], (oldData: DeliveryOrder[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.map(order =>
+        if (!oldData) {
+          console.log("[DEBUG] setQueryData: oldData está indefinido. Retornando array vazio.");
+          return [];
+        }
+        console.log("[DEBUG] setQueryData: oldData encontrado. Mapeando para atualizar o pedido...");
+        const newData = oldData.map(order =>
           order.id === orderId
             ? { ...order, delivery_status: newStatus as any }
             : order
         );
+        console.log("[DEBUG] setQueryData: Dados atualizados:", newData);
+        return newData;
       });
 
+      console.log("[DEBUG] Invalidando queries: activeDeliveryOrders, deliveryKitchenItems, kitchenItems");
+      queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
       queryClient.invalidateQueries({ queryKey: ["deliveryKitchenItems"] });
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       showSuccess("Status do pedido atualizado!");
@@ -177,6 +204,7 @@ export default function DeliveryPage() {
       setIsChecklistOpen(false);
     },
     onError: (error: Error) => {
+      console.error("[DEBUG] onError da mutação:", error);
       showError(`Falha ao atualizar status: ${error.message}`);
     },
   });
