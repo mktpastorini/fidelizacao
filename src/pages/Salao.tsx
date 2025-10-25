@@ -22,6 +22,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
+import { usePageActions } from "@/contexts/PageActionsContext";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -78,6 +79,7 @@ export default function SalaoPage() {
   const { requestApproval, isRequesting } = useApprovalRequest();
   const { userRole } = useSettings();
   const { superadminId, isLoadingSuperadminId } = useSuperadminId();
+  const { setPageActions } = usePageActions();
   
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
@@ -105,6 +107,71 @@ export default function SalaoPage() {
   const isClosed = data?.settings?.establishment_is_closed || false;
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
   const canCloseDay = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
+
+  useEffect(() => {
+    const pageActions = (
+      <div className="flex items-center gap-2">
+        {isClosed ? (
+          <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
+            <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
+          </Button>
+        ) : (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div tabIndex={0}>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady || !canCloseDay}>
+                        <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </TooltipTrigger>
+              {!isCloseDayReady && (
+                <TooltipContent>
+                  <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
+                </TooltipContent>
+              )}
+              {!canCloseDay && isCloseDayReady && (
+                <TooltipContent>
+                  <p>Apenas Gerentes, Admins e Superadmins podem fechar o dia.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
+        <Button 
+          variant="outline" 
+          onClick={() => setIsMultiDetectionMode(prev => !prev)} 
+          disabled={isClosed}
+        >
+          {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
+          {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
+        </Button>
+      </div>
+    );
+
+    setPageActions(pageActions);
+
+    return () => {
+      setPageActions(null);
+    };
+  }, [setPageActions, isClosed, openDayMutation, closeDayMutation, isCloseDayReady, canCloseDay, isMultiDetectionMode]);
 
   const allocatedClientIds = data?.mesas
     .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
@@ -408,60 +475,6 @@ export default function SalaoPage() {
         <div>
           <h1 className="text-3xl font-bold">Visão do Salão</h1>
           <p className="text-muted-foreground mt-1">Acompanhe suas mesas e o movimento em tempo real.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isClosed ? (
-            <Button onClick={() => openDayMutation.mutate()} disabled={openDayMutation.isPending}>
-              <Unlock className="w-4 h-4 mr-2" /> {openDayMutation.isPending ? "Abrindo..." : "Abrir Dia"}
-            </Button>
-          ) : (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div tabIndex={0}>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={closeDayMutation.isPending || !isCloseDayReady || !canCloseDay}>
-                          <Lock className="w-4 h-4 mr-2" /> {closeDayMutation.isPending ? "Fechando..." : "Fechar o Dia"}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar Fechamento do Dia?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Esta ação irá bloquear novas operações e enviar o relatório diário para o número configurado. Deseja continuar?
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => closeDayMutation.mutate()}>Confirmar</AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                </TooltipTrigger>
-                {!isCloseDayReady && (
-                  <TooltipContent>
-                    <p>Configure a URL do Webhook e o Nº para Relatório nas Configurações.</p>
-                  </TooltipContent>
-                )}
-                {!canCloseDay && isCloseDayReady && (
-                  <TooltipContent>
-                    <p>Apenas Gerentes, Admins e Superadmins podem fechar o dia.</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            </TooltipProvider>
-          )}
-          <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsMultiDetectionMode(prev => !prev)} 
-            disabled={isClosed}
-          >
-            {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
-            {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
-          </Button>
         </div>
       </div>
 
