@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ApprovalRequestsDialog } from "@/components/Notification/ApprovalRequestsDialog";
@@ -13,6 +14,7 @@ type HeaderProps = {
 
 export function Header({ pageActions }: HeaderProps) {
   const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
+  const location = useLocation();
 
   return (
     <>
@@ -25,10 +27,12 @@ export function Header({ pageActions }: HeaderProps) {
         <NotificationCenter />
         <ApprovalRequestsDialog />
         
-        <Button onClick={() => setIsDeliveryDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Novo pedido Delivery
-        </Button>
+        {location.pathname === '/' && (
+          <Button onClick={() => setIsDeliveryDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Novo pedido Delivery
+          </Button>
+        )}
 
         {pageActions && <div className="hidden lg:flex items-center gap-4">{pageActions}</div>}
       </div>
