@@ -108,7 +108,7 @@ export default function DeliveryPage() {
             complement: values.address_complement,
           },
         },
-        channel: values.channel, // Adicionado o canal
+        channel: values.channel,
       };
 
       const { data: newPedido, error: pedidoError } = await supabase
@@ -153,27 +153,20 @@ export default function DeliveryPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
-      let finalStatus = newStatus;
+      // Atualiza o status do pedido diretamente no banco de dados.
+      const { error: orderError } = await supabase
+        .from("pedidos")
+        .update({ delivery_status: newStatus })
+        .eq("id", orderId);
+      if (orderError) throw orderError;
 
-      if (newStatus === 'CONFIRMED') {
-        const { error: rpcError } = await supabase.rpc('confirm_delivery_order', { p_pedido_id: orderId });
-        if (rpcError) throw rpcError;
-        
-        const { data: updatedOrder } = await supabase.from("pedidos").select('delivery_status').eq('id', orderId).single();
-        finalStatus = updatedOrder?.delivery_status || 'in_preparation';
-      } else {
-        const { error: orderError } = await supabase
-          .from("pedidos")
-          .update({ delivery_status: newStatus })
-          .eq("id", orderId);
-        if (orderError) throw orderError;
-      }
-
+      // Lógica para notificar o iFood, se aplicável.
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
         let ifoodStatus = null;
-        if (finalStatus === 'in_preparation') ifoodStatus = 'CONFIRMED';
-        if (finalStatus === 'out_for_delivery') ifoodStatus = 'out_for_delivery';
+        // O iFood considera 'CONFIRMED' como o início da preparação.
+        if (newStatus === 'CONFIRMED') ifoodStatus = 'in_preparation'; 
+        if (newStatus === 'out_for_delivery') ifoodStatus = 'out_for_delivery';
 
         if (ifoodStatus) {
           const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
@@ -185,9 +178,10 @@ export default function DeliveryPage() {
         }
       }
 
+      // Dispara a notificação por webhook para o cliente.
       try {
         const { error: functionError } = await supabase.functions.invoke('send-delivery-status-update', {
-          body: { orderId, newStatus: finalStatus },
+          body: { orderId, newStatus },
         });
         if (functionError) {
           console.error("Falha ao enviar notificação de status:", functionError);
@@ -197,7 +191,7 @@ export default function DeliveryPage() {
         console.error("Erro inesperado ao chamar a função de notificação:", e);
       }
 
-      return { orderId, newStatus: finalStatus };
+      return { orderId, newStatus };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
@@ -309,6 +303,9 @@ export default function DeliveryPage() {
           <h1 className="text-3xl font-bold">Painel de Delivery</h1>
           <p className="text-muted-foreground mt-2">Gerencie todos os pedidos para entrega em tempo real.</p>
         </div>
+        <Button onClick={() => setIsNewOrderOpen(true)} disabled={isLoading}>
+            <PlusCircle className="w-4 h-4 mr-2" /> Novo Pedido Delivery
+        </Button>
       </div>
 
       <div className="flex-1 flex gap-4 min-h-0">
