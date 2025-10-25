@@ -28,6 +28,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     deviceId: settings?.preferred_camera_device_id || undefined,
   };
 
+  // Função de reconhecimento que usa o estado mais recente (isScanning)
   const handleRecognition = useCallback(async (manualTrigger = false) => {
     if (!isCameraOn || !webcamRef.current || isScanning) return;
 
@@ -47,7 +48,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     } else {
       console.log(`[LiveRecognition] Nenhum match. Status: ${result?.status}, Mensagem: ${result?.message}`);
     }
-  }, [isCameraOn, isScanning, recognize, onClientRecognized]); // Adicionado isScanning à dependência
+  }, [isCameraOn, isScanning, recognize, onClientRecognized]);
 
   // Efeito para o scan automático usando recursão com setTimeout
   useEffect(() => {
@@ -55,8 +56,8 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     const SCAN_INTERVAL_MS = 3000; // Intervalo de 3 segundos entre scans
 
     const scanLoop = async () => {
+      // Condição de parada/pausa
       if (!isCameraOn || !isReady || !isCameraReady || isScanning) {
-        // Se as condições não forem atendidas, tenta novamente em 1 segundo
         timeoutId = setTimeout(scanLoop, 1000);
         return;
       }
@@ -68,7 +69,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
       }
 
       try {
-        // Chama a função de reconhecimento (que gerencia o estado isScanning internamente)
+        // Chama a função de reconhecimento (que usa o estado mais recente de isScanning)
         await handleRecognition(false);
       } catch (e) {
         console.error("Erro durante o scan automático:", e);
@@ -84,7 +85,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     return () => {
       clearTimeout(timeoutId);
     };
-  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, recognitionResult]); // Dependências ajustadas
+  }, [isCameraOn, isReady, isCameraReady, isScanning, handleRecognition, recognitionResult]);
 
   const handleMediaError = (err: any) => {
     console.error("[LiveRecognition] Erro ao acessar a câmera:", err);
