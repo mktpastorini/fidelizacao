@@ -124,6 +124,7 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
             screenshotFormat="image/jpeg"
             videoConstraints={videoConstraints}
             className="w-full h-full object-cover"
+            mirrored={true}
             onUserMediaError={(e) => {
               console.error("Erro ao acessar a câmera:", e);
               setCameraError("Não foi possível acessar a câmera. Verifique as permissões do navegador.");

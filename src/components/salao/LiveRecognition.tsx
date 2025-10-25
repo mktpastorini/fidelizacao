@@ -95,7 +95,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
               screenshotFormat="image/jpeg"
               videoConstraints={videoConstraints}
               className="w-full h-full object-cover"
-              mirrored={false}
+              mirrored={true}
               onUserMediaError={handleMediaError}
             />
           ) : (
