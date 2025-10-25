@@ -10,11 +10,21 @@ import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { QuickClientForm } from './QuickClientForm';
 import { supabase } from '@/integrations/supabase/client';
+import * as z from 'zod';
 
 type ItemToOrder = {
   produto: Produto;
   quantidade: number;
   observacoes: string;
+};
+
+type ClientIdentificationModalProps = {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  itemToOrder: ItemToOrder | null;
+  mesaId: string;
+  mesaUserId: string;
+  onOrderConfirmed: (clienteId: string | null) => void;
 };
 
 type FaceRecognitionResult = {
@@ -166,7 +176,21 @@ export function ClientIdentificationModal({
       if (rpcError) throw new Error(rpcError.message);
       if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      // 2. Registra a face no CompreFace
+      // 2. Adicionar o novo cliente como ocupante da mesa
+      const { error: occupantError } = await supabase
+        .from("mesa_ocupantes")
+        .insert({
+          mesa_id: mesaId,
+          cliente_id: newClientId,
+          user_id: mesaUserId,
+        });
+      if (occupantError) {
+        // Se falhar ao adicionar como ocupante, é melhor reverter o cadastro do cliente para evitar inconsistência.
+        await supabase.from("clientes").delete().eq("id", newClientId);
+        throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
+      }
+
+      // 3. Registra a face no CompreFace
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
         body: { subject: newClientId, image_urls: [values.avatar_url] }
       });
