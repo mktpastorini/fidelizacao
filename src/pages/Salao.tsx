@@ -438,6 +438,8 @@ export default function SalaoPage() {
     
     if (allocatedClientIds.includes(cliente.id)) {
         console.log(`[SalaoPage] Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
+        // Se o cliente já está alocado, limpamos o resultado do reconhecimento para evitar repetição
+        setRecognizedClient(null); 
         return;
     }
 
