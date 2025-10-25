@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationCenter } from "@/components/NotificationCenter";
-import { ApprovalRequestsDialog } from "@/components/ApprovalRequestsDialog";
+import { ApprovalRequestsDialog } from "@/components/Notification/ApprovalRequestsDialog";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import { NovoPedidoDeliveryDialog } from "@/components/delivery/NovoPedidoDeliveryDialog";
