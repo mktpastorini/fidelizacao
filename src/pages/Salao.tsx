@@ -205,11 +205,9 @@ export default function SalaoPage() {
     };
   }, [setPageActions, isClosed, openDayMutation, closeDayMutation, isCloseDayReady, canCloseDay, isMultiDetectionMode]);
 
-  const allocatedClientIds = useMemo(() => {
-    return data?.mesas
-      .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
-      .filter((value, index, self) => self.indexOf(value) === index) || [];
-  }, [data?.mesas]);
+  const allocatedClientIds = data?.mesas
+    .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
+    .filter((value, index, self) => self.indexOf(value) === index) || [];
 
   const allocateTableMutation = useMutation({
     mutationFn: async ({ cliente, mesaId }: { cliente: Cliente; mesaId: string }) => {
@@ -440,6 +438,7 @@ export default function SalaoPage() {
     
     if (allocatedClientIds.includes(cliente.id)) {
         console.log(`[SalaoPage] Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
+        // Se o cliente já está alocado, limpamos o resultado do reconhecimento para evitar repetição
         setRecognizedClient(null); 
         return;
     }
