@@ -27,9 +27,9 @@ async function fetchDeliveryKitchenItems(): Promise<KitchenItem[]> {
       cliente:clientes!consumido_por_cliente_id(nome),
       cozinheiro:cozinheiros(nome)
     `)
-    .in("status", ["pendente", "preparando", "entregue"])
+    .in("pedido.order_type", ["DELIVERY", "IFOOD"])
+    .in("pedido.delivery_status", ["CONFIRMED", "in_preparation", "ready_for_delivery"])
     .eq("requer_preparo", true)
-    .in("pedido.order_type", ["DELIVERY", "IFOOD"]) // Apenas pedidos de delivery
     .order("created_at", { ascending: true });
 
   if (error) throw new Error(error.message);

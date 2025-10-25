@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Package, Clock, User, Hash, DollarSign, MapPin, Phone, ArrowRight, CheckCircle, Utensils, Bike } from "lucide-react";
+import { Package, Clock, User, Hash, DollarSign, MapPin, Phone, ArrowRight, CheckCircle, Utensils, Bike, Check } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 
 type DeliveryOrder = Pedido & {
@@ -24,6 +24,7 @@ const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style:
 
 const statusMap: { [key: string]: { label: string; color: string; icon: React.ElementType } } = {
   awaiting_confirmation: { label: "Aguardando Confirmação", color: "bg-yellow-500", icon: Clock },
+  CONFIRMED: { label: "Confirmado", color: "bg-cyan-500", icon: Check },
   in_preparation: { label: "Em Preparo", color: "bg-blue-500", icon: Utensils },
   ready_for_delivery: { label: "Pronto para Entrega", color: "bg-purple-500", icon: Package },
   out_for_delivery: { label: "Saiu para Entrega", color: "bg-orange-500", icon: Bike },
@@ -34,8 +35,9 @@ const statusMap: { [key: string]: { label: string; color: string; icon: React.El
 };
 
 const statusFlow: { [key: string]: { next: string; label: string; icon: React.ElementType } } = {
-  awaiting_confirmation: { next: "in_preparation", label: "Confirmar e Enviar para Cozinha", icon: Utensils },
-  in_preparation: { next: "ready_for_delivery", label: "Marcar como Pronto para Entrega", icon: Package },
+  awaiting_confirmation: { next: "CONFIRMED", label: "Confirmar Pedido", icon: Check },
+  aberto: { next: "CONFIRMED", label: "Confirmar Pedido", icon: Check },
+  // Não há ação para 'CONFIRMED' aqui, pois a ação agora é da cozinha
   ready_for_delivery: { next: "out_for_delivery", label: "Enviar para Entrega", icon: Bike },
   out_for_delivery: { next: "delivered", label: "Marcar como Entregue", icon: CheckCircle },
 };
