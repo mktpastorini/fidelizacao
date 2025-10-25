@@ -9,7 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'; // Importado ScrollArea e ScrollBar
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 type RecognizedClientDisplay = {
   client: FaceMatch['client'];
@@ -24,14 +24,15 @@ type MultiLiveRecognitionProps = {
 const PERSISTENCE_DURATION_MS = 30 * 1000; // 30 segundos
 
 interface CameraInstance {
-  id: string; // Unique ID for this camera instance
-  deviceId: string | null; // Selected camera device ID
-  isCameraOn: boolean; // Is this camera feed active?
+  id: string;
+  deviceId: string | null;
+  isCameraOn: boolean;
   webcamRef: React.RefObject<Webcam>;
   canvasRef: React.RefObject<HTMLCanvasElement>;
   mediaError: string | null;
-  recognizedFaces: FaceMatch[]; // Faces detected by this specific camera
+  recognizedFaces: FaceMatch[];
   lastRecognitionTime: number;
+  isCameraReady: boolean;
 }
 
 export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientIds }: MultiLiveRecognitionProps) {
@@ -41,23 +42,19 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
   const [cameraInstances, setCameraInstances] = useState<CameraInstance[]>([]);
   const [allVideoDevices, setAllVideoDevices] = useState<MediaDeviceInfo[]>([]);
 
-  // Fetch all video devices once
   useEffect(() => {
     const getDevices = async () => {
       try {
-        // Request media access to ensure all devices are listed
         await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         const mediaDevices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
         setAllVideoDevices(videoDevices);
 
-        // Add initial camera if none exist
         if (cameraInstances.length === 0 && videoDevices.length > 0) {
           addCameraInstance(videoDevices[0].deviceId);
         }
       } catch (err: any) {
         console.error("Erro ao listar dispositivos de câmera:", err);
-        // Set error on the first camera instance if it exists, or globally if no cameras
         setCameraInstances(prev => {
           if (prev.length > 0) {
             return prev.map((inst, idx) => idx === 0 ? { ...inst, mediaError: err.message } : inst);
@@ -71,14 +68,14 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             mediaError: err.message,
             recognizedFaces: [],
             lastRecognitionTime: 0,
+            isCameraReady: false,
           }];
         });
       }
     };
     getDevices();
-  }, []); // Run only once on mount
+  }, []);
 
-  // Add a new camera instance
   const addCameraInstance = (initialDeviceId: string | null = null) => {
     const newId = `cam-${Date.now()}`;
     setCameraInstances(prev => [
@@ -92,35 +89,32 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         mediaError: null,
         recognizedFaces: [],
         lastRecognitionTime: 0,
+        isCameraReady: false,
       }
     ]);
   };
 
-  // Remove a camera instance
   const removeCameraInstance = (id: string) => {
     setCameraInstances(prev => prev.filter(cam => cam.id !== id));
   };
 
-  // Update a specific camera instance's state
   const updateCameraInstance = useCallback((id: string, updates: Partial<CameraInstance>) => {
     setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
   }, []);
 
-  // Consolidated list of all recognized clients from all active cameras
   const [persistentRecognizedClients, setPersistentRecognizedClients] = useState<RecognizedClientDisplay[]>([]);
 
-  // Effect to manage recognition intervals for each camera
   useEffect(() => {
     const intervals: NodeJS.Timeout[] = [];
     const cleanupIntervals: NodeJS.Timeout[] = [];
 
     cameraInstances.forEach(cam => {
-      if (cam.isCameraOn && cam.deviceId && !cam.mediaError) {
+      if (cam.isCameraOn && cam.deviceId && !cam.mediaError && cam.isCameraReady) {
         const recognitionInterval = setInterval(async () => {
           if (isRecognitionLoading || !cam.webcamRef.current || !cam.canvasRef.current) return;
 
           const now = Date.now();
-          if (now - cam.lastRecognitionTime < 3000) return; // Scan a cada 3 segundos
+          if (now - cam.lastRecognitionTime < 3000) return;
 
           console.log(`[MultiLiveRecognition] Iniciando varredura na câmera ${cam.id}...`);
           updateCameraInstance(cam.id, { lastRecognitionTime: now });
@@ -143,9 +137,8 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
           const results = await recognizeMultiple(imageSrc);
           console.log(`[MultiLiveRecognition] Câmera ${cam.id} encontrou ${results.length} rosto(s).`);
-          updateCameraInstance(cam.id, { recognizedFaces: results }); // Atualiza recognizedFaces para esta instância (não usado para desenhar)
+          updateCameraInstance(cam.id, { recognizedFaces: results });
 
-          // Update global persistent list
           setPersistentRecognizedClients(prevClients => {
             const updatedClients = [...prevClients];
             const currentClientIds = new Set(prevClients.map(c => c.client.id));
@@ -157,7 +150,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                 if (currentClientIds.has(match.client.id)) {
                   const index = updatedClients.findIndex(c => c.client.id === match.client.id);
                   if (index !== -1) {
-                    updatedClients[index].timestamp = now; // Apenas atualiza o timestamp
+                    updatedClients[index].timestamp = now;
                   }
                 } else {
                   addedCount++;
@@ -170,7 +163,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             }
             return updatedClients.filter(c => !allocatedSet.has(c.client.id));
           });
-        }, 1000); // Check every 1 second
+        }, 1000);
         intervals.push(recognitionInterval);
 
         const cleanupInterval = setInterval(() => {
@@ -184,7 +177,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             }
             return clientsAfterCleanup;
           });
-        }, 5000); // Clean up every 5 seconds
+        }, 5000);
         cleanupIntervals.push(cleanupInterval);
       }
     });
@@ -195,12 +188,10 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     };
   }, [cameraInstances, isRecognitionLoading, recognizeMultiple, updateCameraInstance, allocatedClientIds]);
 
-  // Notify parent component about recognized clients
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);
   }, [persistentRecognizedClients, onRecognizedFacesUpdate]);
 
-  // Filter available devices for each select dropdown
   const getAvailableDevices = useCallback((currentDeviceId: string | null) => {
     const usedDeviceIds = new Set(cameraInstances.map(c => c.deviceId).filter(Boolean));
     return allVideoDevices.filter(device => 
@@ -208,11 +199,11 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     );
   }, [allVideoDevices, cameraInstances]);
 
-  const displayError = recognitionError; // Global recognition error
+  const displayError = recognitionError;
 
   return (
     <Card className="sticky top-6 h-full flex flex-col">
-      <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0 min-h-0"> {/* Adicionado min-h-0 aqui */}
+      <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0 min-h-0">
         <div className="flex justify-end">
           <Button 
             variant="outline" 
@@ -226,8 +217,8 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
         {displayError && <Alert variant="destructive"><AlertTitle>Erro Global</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
-        <ScrollArea className="flex-1"> {/* Adicionado ScrollArea aqui */}
-          <div className="grid grid-cols-1 gap-4 pr-2"> {/* Removido overflow-y-auto e flex-1 daqui */}
+        <ScrollArea className="flex-1">
+          <div className="grid grid-cols-1 gap-4 pr-2">
             {cameraInstances.length === 0 && allVideoDevices.length > 0 && (
               <div className="text-center text-muted-foreground p-4">
                 <p>Clique em "Adicionar Câmera" para começar.</p>
@@ -244,11 +235,10 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                       videoConstraints={{ deviceId: cam.deviceId ? { exact: cam.deviceId } : undefined, width: 1280, height: 720 }}
                       className="w-full h-full object-cover"
                       mirrored={true}
-                      onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false })}
+                      onUserMedia={() => updateCameraInstance(cam.id, { isCameraReady: true })}
+                      onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false, isCameraReady: false })}
                     />
-                    {/* O canvas ainda é necessário para limpar a tela, mesmo que não desenhemos nada */}
                     <canvas ref={cam.canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
-                    {/* Botão de ativar/desativar a câmera sobreposto */}
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -298,7 +288,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
               </div>
             ))}
           </div>
-          <ScrollBar orientation="vertical" /> {/* Adicionado ScrollBar vertical */}
+          <ScrollBar orientation="vertical" />
         </ScrollArea>
         
         <div className="w-full h-24 flex items-center justify-center shrink-0">

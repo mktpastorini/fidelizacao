@@ -21,6 +21,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const [recognitionResult, setRecognitionResult] = useState<FaceRecognitionResult>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const videoConstraints = {
@@ -56,7 +57,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
 
   // Efeito para o scan automático
   useEffect(() => {
-    if (isCameraOn && isReady) {
+    if (isCameraOn && isReady && isCameraReady) {
       recognitionIntervalRef.current = setInterval(() => handleRecognition(false), 2000); // Check every 2 seconds
     } else {
       if (recognitionIntervalRef.current) {
@@ -69,7 +70,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         clearInterval(recognitionIntervalRef.current);
       }
     };
-  }, [isCameraOn, isReady, handleRecognition]);
+  }, [isCameraOn, isReady, isCameraReady, handleRecognition]);
 
   const handleMediaError = (err: any) => {
     console.error("[LiveRecognition] Erro ao acessar a câmera:", err);
@@ -81,6 +82,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     }
     setMediaError(errorMessage);
     setIsCameraOn(false);
+    setIsCameraReady(false);
   };
 
   const displayError = error || mediaError;
@@ -140,6 +142,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
               videoConstraints={videoConstraints}
               className="w-full h-full object-cover"
               mirrored={true}
+              onUserMedia={() => setIsCameraReady(true)}
               onUserMediaError={handleMediaError}
             />
           ) : (
@@ -157,7 +160,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         
         <Button 
           onClick={() => handleRecognition(true)} 
-          disabled={!isCameraOn || isScanning || !!displayError}
+          disabled={!isCameraOn || isScanning || !!displayError || !isCameraReady}
           className="w-full"
         >
           {isScanning ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
