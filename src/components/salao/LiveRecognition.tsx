@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
-import { useFaceRecognition } from '@/hooks/useFaceRecognition';
+import { useFaceRecognition, FaceRecognitionResult } from '@/hooks/useFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Cliente } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const { isReady, isLoading: isScanning, error, recognize } = useFaceRecognition();
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
-  const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
+  const [recognitionResult, setRecognitionResult] = useState<FaceRecognitionResult>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -44,14 +44,13 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     }
 
     const result = await recognize(imageSrc);
+    setRecognitionResult(result);
     
-    if (result?.client) {
-      console.log(`[LiveRecognition] Cliente reconhecido: ${result.client.nome} com similaridade de ${(1 - result.distance) * 100}%`);
-      setRecognizedClient(result.client);
-      onClientRecognized(result.client);
+    if (result?.status === 'MATCH_FOUND' && result.match) {
+      console.log(`[LiveRecognition] Cliente reconhecido: ${result.match.nome} com similaridade de ${result.similarity}`);
+      onClientRecognized(result.match);
     } else {
-      console.log("[LiveRecognition] Nenhum cliente correspondente encontrado.");
-      setRecognizedClient(null);
+      console.log(`[LiveRecognition] Nenhum match. Status: ${result?.status}, Mensagem: ${result?.message}`);
     }
   }, [isScanning, isCameraOn, lastRecognitionTime, recognize, onClientRecognized]);
 
@@ -85,6 +84,42 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
 
   const displayError = error || mediaError;
 
+  const renderStatus = () => {
+    if (isScanning) {
+      return (
+        <div className="text-center space-y-2">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto" />
+          <p>Analisando...</p>
+        </div>
+      );
+    }
+
+    if (recognitionResult?.status === 'MATCH_FOUND' && recognitionResult.match) {
+      return (
+        <div className="text-center space-y-2 animate-in fade-in">
+          <p className="text-sm text-muted-foreground">Bem-vindo(a) de volta!</p>
+          <div className="flex items-center justify-center gap-2">
+            <Avatar>
+              <AvatarImage src={recognitionResult.match.avatar_url || undefined} />
+              <AvatarFallback><User /></AvatarFallback>
+            </Avatar>
+            <p className="text-xl font-bold">{recognitionResult.match.nome}</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (recognitionResult?.status === 'NO_MATCH') {
+      return <p className="text-muted-foreground">{recognitionResult.message || "Rosto detectado, mas não reconhecido."}</p>;
+    }
+
+    if (recognitionResult?.status === 'NO_FACE_DETECTED') {
+      return <p className="text-muted-foreground">{recognitionResult.message || "Nenhum rosto detectado."}</p>;
+    }
+
+    return <p className="text-muted-foreground">{isCameraOn ? "Aguardando clientes..." : "Câmera pausada"}</p>;
+  };
+
   return (
     <Card className="sticky top-6">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -115,25 +150,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         {displayError && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         
         <div className="w-full h-24 flex items-center justify-center">
-          {isScanning ? (
-            <div className="text-center space-y-2">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto" />
-              <p>Analisando...</p>
-            </div>
-          ) : recognizedClient ? (
-            <div className="text-center space-y-2 animate-in fade-in">
-              <p className="text-sm text-muted-foreground">Bem-vindo(a) de volta!</p>
-              <div className="flex items-center justify-center gap-2">
-                <Avatar>
-                  <AvatarImage src={recognizedClient.avatar_url || undefined} />
-                  <AvatarFallback><User /></AvatarFallback>
-                </Avatar>
-                <p className="text-xl font-bold">{recognizedClient.nome}</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">{isCameraOn ? "Aguardando clientes..." : "Câmera pausada"}</p>
-          )}
+          {renderStatus()}
         </div>
       </CardContent>
     </Card>

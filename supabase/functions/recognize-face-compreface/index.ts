@@ -103,41 +103,45 @@ serve(async (req) => {
 
     console.log(`[RF-SINGLE] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
     const responseBody = await response.json().catch(() => response.text());
-    console.log(`[RF-SINGLE] 5/7: Corpo da resposta do CompreFace:`, responseBody);
+    console.log(`[RF-SINGLE] 5/7: Corpo da resposta do CompreFace:`, JSON.stringify(responseBody));
 
     if (!response.ok) {
       if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
         console.log("[RF-SINGLE] CompreFace não encontrou um rosto na imagem.");
-        return new Response(JSON.stringify({ match: null, distance: null, message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        return new Response(JSON.stringify({ success: true, status: 'NO_FACE_DETECTED', message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
       throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(responseBody)}`);
     }
 
     const bestMatch = responseBody.result?.[0]?.subjects?.[0];
 
-    if (bestMatch && bestMatch.similarity >= 0.85) {
-      console.log(`[RF-SINGLE] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+    if (bestMatch) {
+      console.log(`[RF-SINGLE] 6/7: Melhor match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      if (bestMatch.similarity >= 0.85) {
+        console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject}`);
+        const { data: client, error: clientError } = await supabaseAdmin
+          .from('clientes')
+          .select('*, filhos(*)')
+          .eq('id', bestMatch.subject)
+          .single();
 
-      console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject}`);
-      const { data: client, error: clientError } = await supabaseAdmin
-        .from('clientes')
-        .select('*, filhos(*)')
-        .eq('id', bestMatch.subject)
-        .single();
-
-      if (clientError) {
-        if (clientError.code === 'PGRST116') {
-            console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
-            return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        if (clientError) {
+          if (clientError.code === 'PGRST116') {
+              console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
+              return new Response(JSON.stringify({ success: true, status: 'NO_MATCH', message: 'Rosto conhecido, mas não encontrado no sistema.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
+          throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
         }
-        throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
+        console.log("[RF-SINGLE] 7/7: Cliente encontrado no DB. Retornando sucesso.");
+        return new Response(JSON.stringify({ success: true, status: 'MATCH_FOUND', match: client, similarity: bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      } else {
+        console.log(`[RF-SINGLE] Similaridade ${bestMatch.similarity} abaixo do limiar de 0.85.`);
+        return new Response(JSON.stringify({ success: true, status: 'NO_MATCH', message: `Rosto detectado, mas não reconhecido. (Similaridade: ${(bestMatch.similarity * 100).toFixed(0)}%)`, similarity: bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
-      console.log("[RF-SINGLE] 7/7: Cliente encontrado no DB. Retornando sucesso.");
-      return new Response(JSON.stringify({ match: client, distance: 1 - bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    console.log("[RF-SINGLE] 6/7: Nenhum match encontrado com similaridade suficiente. Retornando nulo.");
-    return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    console.log("[RF-SINGLE] 6/7: Nenhum match encontrado na resposta do CompreFace.");
+    return new Response(JSON.stringify({ success: true, status: 'NO_MATCH', message: 'Rosto detectado, mas não corresponde a nenhum cliente cadastrado.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
     console.error("--- [RF-SINGLE] ERRO FATAL ---");

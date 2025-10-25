@@ -51,7 +51,7 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
   const videoConstraints = {
     width: 400,
     height: 400,
-    deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+    deviceId: selectedDeviceId || undefined,
   };
 
   const capture = useCallback(() => {

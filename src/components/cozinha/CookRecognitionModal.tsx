@@ -134,7 +134,7 @@ export function CookRecognitionModal({ isOpen, onOpenChange, item, action, onCoo
   const videoConstraints = {
     width: 400,
     height: 400,
-    deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+    deviceId: selectedDeviceId || undefined,
   };
 
   const renderContent = () => {

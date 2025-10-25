@@ -1,17 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Cliente } from '@/types/supabase';
+
+export type FaceRecognitionResult = {
+  status: 'MATCH_FOUND' | 'NO_MATCH' | 'NO_FACE_DETECTED';
+  match?: Cliente;
+  similarity?: number;
+  message?: string;
+} | null;
 
 export function useFaceRecognition() {
   const [isReady, setIsReady] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const recognize = useCallback(async (imageSrc: string) => {
+  const recognize = useCallback(async (imageSrc: string): Promise<FaceRecognitionResult> => {
     setIsLoading(true);
     setError(null);
     try {
-      // Não passamos mesa_id aqui, o Edge Function usará o token de autenticação do usuário logado
       const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
         body: { image_url: imageSrc },
       });
@@ -19,8 +25,9 @@ export function useFaceRecognition() {
       if (functionError) throw functionError;
 
       setIsLoading(false);
-      if (data.match) {
-        return { client: data.match as Cliente, distance: data.distance };
+      if (data.success) {
+        const { success, ...result } = data;
+        return result as FaceRecognitionResult;
       }
       return null;
 
