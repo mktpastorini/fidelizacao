@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { ImageCapture } from "@/components/clientes/ImageCapture";
-import { Cliente } from "@/types/supabase";
 import { UserPlus } from "lucide-react";
 
 const formSchema = z.object({
