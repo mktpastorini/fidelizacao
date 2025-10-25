@@ -1,25 +1,38 @@
-import { NotificationCenter } from "./NotificationCenter";
-import { ThemeToggle } from "./ThemeToggle";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import React from "react";
-import { ApprovalRequestsDialog } from "./Notification/ApprovalRequestsDialog"; // Importado
+"use client";
+import { useState } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificationCenter } from "@/components/NotificationCenter";
+import { ApprovalRequestsDialog } from "@/components/ApprovalRequestsDialog";
+import { Button } from "@/components/ui/button";
+import { PlusCircle } from "lucide-react";
+import { NovoPedidoDeliveryDialog } from "@/components/delivery/NovoPedidoDeliveryDialog";
 
-export function Header() {
-  const { pageActions } = usePageActions();
+type HeaderProps = {
+  pageActions?: React.ReactNode;
+};
+
+export function Header({ pageActions }: HeaderProps) {
+  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
 
   return (
-    <div className="absolute top-6 right-6 lg:top-8 lg:right-8 z-10 flex flex-row-reverse flex-nowrap items-center gap-4 max-w-full">
-      {/* 
-        Ordem visual (direita para esquerda):
-        [ThemeToggle] [NotificationCenter] [ApprovalRequestsDialog] [pageActions]
-      */}
-      <ThemeToggle />
-      <NotificationCenter />
-      <ApprovalRequestsDialog /> {/* Novo botão de aprovação */}
-      {/* Envolve pageActions em um div para garantir que o gap funcione corretamente */}
-      <div className="flex items-center gap-4">
-        {pageActions}
+    <>
+      <div className="absolute top-6 right-6 lg:top-8 lg:right-8 z-10 flex flex-row-reverse flex-nowrap items-center gap-4 max-w-full">
+        {/* 
+          Ordem visual (direita para esquerda):
+          [ThemeToggle] [NotificationCenter] [ApprovalRequestsDialog] [pageActions]
+        */}
+        <ThemeToggle />
+        <NotificationCenter />
+        <ApprovalRequestsDialog />
+        
+        <Button onClick={() => setIsDeliveryDialogOpen(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Novo pedido Delivery
+        </Button>
+
+        {pageActions && <div className="hidden lg:flex items-center gap-4">{pageActions}</div>}
       </div>
-    </div>
+      <NovoPedidoDeliveryDialog isOpen={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen} />
+    </>
   );
 }
