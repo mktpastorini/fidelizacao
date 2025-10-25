@@ -10,6 +10,7 @@ import { Step1_Photos } from "./stepper/Step1_Photos";
 import { Step2_BasicInfo } from "./stepper/Step2_BasicInfo";
 import { Step3_Details } from "./stepper/Step3_Details";
 import { Step4_Address } from "./stepper/Step4_Address";
+import React from "react";
 
 const formSchema = z.object({
   nome: z.string().min(2, { message: "O nome é obrigatório." }),
@@ -81,7 +82,8 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
     },
   });
 
-  const handleNext = async () => {
+  const handleNext = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     const fieldsToValidate = fieldGroups[currentStep];
     const isValid = await form.trigger(fieldsToValidate as any);
     if (isValid) {
@@ -89,7 +91,8 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
     }
   };
 
-  const handleBack = () => {
+  const handleBack = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     setCurrentStep(prev => prev - 1);
   };
 
