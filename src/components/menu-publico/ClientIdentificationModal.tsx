@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Check, X, UserPlus, Loader2, Camera, VideoOff, RefreshCw, User } from 'lucide-react';
 import { showError, showSuccess } from '@/utils/toast';
-import { useFaceRecognition } from '@/hooks/useFaceRecognition';
+import { useFaceRecognition, FaceRecognitionResult } from '@/hooks/useFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { QuickRegistrationStepper } from './QuickRegistrationStepper';
@@ -27,46 +27,6 @@ type ClientIdentificationModalProps = {
   onOrderConfirmed: (clienteId: string | null) => void;
 };
 
-type FaceRecognitionResult = {
-  client: Cliente;
-  distance: number;
-} | null;
-
-// Hook useFaceRecognition modificado para aceitar mesaId
-function useFaceRecognitionForMenu() {
-  const [isReady, setIsReady] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const recognize = useCallback(async (imageSrc: string, mesaId: string): Promise<FaceRecognitionResult> => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
-        body: { image_url: imageSrc, mesa_id: mesaId }, // Passando mesa_id
-      });
-
-      if (functionError) throw functionError;
-
-      setIsLoading(false);
-      if (data.match) {
-        return { client: data.match as Cliente, distance: data.distance };
-      }
-      return null;
-
-    } catch (err: any) {
-      console.error("Erro ao invocar a função de reconhecimento:", err);
-      const errorMessage = err.context?.error_message || err.message || "Falha na comunicação com o serviço de reconhecimento.";
-      setError(errorMessage);
-      setIsLoading(false);
-      return null;
-    }
-  }, []);
-
-  return { isReady, isLoading, error, recognize };
-}
-
-
 export function ClientIdentificationModal({
   isOpen,
   onOpenChange,
@@ -77,25 +37,26 @@ export function ClientIdentificationModal({
 }: ClientIdentificationModalProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
-  const { isReady, isLoading: isScanning, error: recognitionError, recognize } = useFaceRecognitionForMenu(); // Usando o hook modificado
+  const { isReady, isLoading: isScanning, error: recognitionError, recognize } = useFaceRecognition();
   
   const [step, setStep] = useState<'capture' | 'identifying' | 'match' | 'no_match' | 'quick_register'>('capture');
   const [match, setMatch] = useState<Cliente | null>(null);
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [isSubmittingNewClient, setIsSubmittingNewClient] = useState(false);
-  const [mediaError, setMediaError] = useState<string | null>(null); // Novo estado para erro de mídia
+  const [mediaError, setMediaError] = useState<string | null>(null);
 
   const videoConstraints = {
     width: 400,
     height: 400,
     facingMode: "user",
+    deviceId: settings?.preferred_camera_device_id || undefined,
   };
 
   const resetState = useCallback(() => {
     setMatch(null);
     setSnapshot(null);
     setStep('capture');
-    setMediaError(null); // Resetar erro de mídia
+    setMediaError(null);
   }, []);
 
   useEffect(() => {
@@ -119,17 +80,22 @@ export function ClientIdentificationModal({
     if (!isReady || !recognize) return;
 
     setStep('identifying');
-    // Passando mesaId para o Edge Function
-    const result = await recognize(imageSrc, mesaId); 
+    // O hook global agora usa o Edge Function que não precisa do mesaId, mas retorna o status detalhado
+    const result = await recognize(imageSrc); 
     
-    if (result) {
-      setMatch(result.client);
+    if (result?.status === 'MATCH_FOUND' && result.match) {
+      setMatch(result.match);
       setStep('match');
+    } else if (result?.status === 'NO_MATCH' || result?.status === 'NO_FACE_DETECTED') {
+      setMatch(null);
+      setStep('no_match');
+      if (result.message) showError(result.message);
     } else {
       setMatch(null);
       setStep('no_match');
+      showError("Falha desconhecida no reconhecimento.");
     }
-  }, [isReady, recognize, mesaId]);
+  }, [isReady, recognize]);
 
   const handleCapture = useCallback(() => {
     if (mediaError) {
@@ -323,8 +289,8 @@ export function ClientIdentificationModal({
               <X className="w-4 h-4 mr-2" /> Pedir como Mesa (Geral)
             </Button>
           </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        )}
+      </DialogContent>
     </Dialog>
   );
 }
