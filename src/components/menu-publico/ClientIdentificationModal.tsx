@@ -8,7 +8,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { QuickClientForm } from './QuickClientForm';
+import { QuickRegistrationStepper } from './QuickRegistrationStepper';
 import { supabase } from '@/integrations/supabase/client';
 import * as z from 'zod';
 
@@ -288,15 +288,10 @@ export function ClientIdentificationModal({
         );
       case 'quick_register':
         return (
-          <div className="space-y-4">
-            <DialogDescription>
-              Preencha apenas o essencial para que possamos te reconhecer na próxima vez.
-            </DialogDescription>
-            <QuickClientForm 
-              onSubmit={handleQuickRegister} 
-              isSubmitting={isSubmittingNewClient} 
-            />
-          </div>
+          <QuickRegistrationStepper 
+            onSubmit={handleQuickRegister} 
+            isSubmitting={isSubmittingNewClient} 
+          />
         );
       default:
         return null;
