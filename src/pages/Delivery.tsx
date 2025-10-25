@@ -137,13 +137,11 @@ export default function DeliveryPage() {
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, newStatus }: { orderId: string, newStatus: string }) => {
       if (newStatus === 'in_preparation') {
-        // Chama a nova função RPC para lidar com a confirmação de forma atômica
         const { error: rpcError } = await supabase.rpc('confirm_delivery_order', {
           p_pedido_id: orderId,
         });
         if (rpcError) throw rpcError;
       } else {
-        // Para todas as outras transições de status (ex: 'out_for_delivery', 'delivered')
         const { error: orderError } = await supabase
           .from("pedidos")
           .update({ delivery_status: newStatus })
@@ -151,7 +149,6 @@ export default function DeliveryPage() {
         if (orderError) throw orderError;
       }
 
-      // Comunicação com a API do iFood, se aplicável
       const order = orders?.find(o => o.id === orderId);
       if (order?.order_type === 'IFOOD') {
         const { error: ifoodError } = await supabase.functions.invoke('update-ifood-status', {
@@ -162,8 +159,17 @@ export default function DeliveryPage() {
         }
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
+    onSuccess: (_, { orderId, newStatus }) => {
+      // Atualiza o cache do React Query manualmente para uma resposta visual instantânea
+      queryClient.setQueryData(['activeDeliveryOrders'], (oldData: DeliveryOrder[] | undefined) => {
+        if (!oldData) return [];
+        return oldData.map(order =>
+          order.id === orderId
+            ? { ...order, delivery_status: newStatus as any }
+            : order
+        );
+      });
+
       queryClient.invalidateQueries({ queryKey: ["deliveryKitchenItems"] });
       queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
       showSuccess("Status do pedido atualizado!");
