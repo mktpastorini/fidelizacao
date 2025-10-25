@@ -228,7 +228,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                       screenshotFormat="image/jpeg"
                       videoConstraints={{ deviceId: cam.deviceId ? { exact: cam.deviceId } : undefined, width: 1280, height: 720 }}
                       className="w-full h-full object-cover"
-                      mirrored={true}
+                      mirrored={false}
                       onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false })}
                     />
                     {/* O canvas ainda é necessário para limpar a tela, mesmo que não desenhemos nada */}
