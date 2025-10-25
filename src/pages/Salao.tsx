@@ -8,7 +8,7 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { UserPlus, Lock, Unlock, ScanFace, Users, PlusCircle } from "lucide-react";
+import { UserPlus, Lock, Unlock, ScanFace, Users } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
@@ -22,8 +22,6 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
-import { usePageActions } from "@/contexts/PageActionsContext";
-import { NewDeliveryOrderDialog } from "@/components/delivery/NewDeliveryOrderDialog";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -80,7 +78,6 @@ export default function SalaoPage() {
   const { requestApproval, isRequesting } = useApprovalRequest();
   const { userRole } = useSettings();
   const { superadminId, isLoadingSuperadminId } = useSuperadminId();
-  const { setPageActions } = usePageActions();
   
   const [isArrivalOpen, setIsArrivalOpen] = useState(false);
   const [isNewClientOpen, setIsNewClientOpen] = useState(false);
@@ -93,22 +90,6 @@ export default function SalaoPage() {
   const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
     { client: Cliente; timestamp: number }[]
   >([]);
-  const [isDeliveryDialogOpen, setIsDeliveryDialogOpen] = useState(false);
-
-  useEffect(() => {
-    const pageSpecificActions = (
-      <Button onClick={() => setIsDeliveryDialogOpen(true)}>
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Novo pedido Delivery
-      </Button>
-    );
-
-    setPageActions(pageSpecificActions);
-
-    return () => {
-      setPageActions(null);
-    };
-  }, [setPageActions]);
 
   const needsSuperadminId = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
   const idForFetch = needsSuperadminId ? superadminId : null;
@@ -556,7 +537,6 @@ export default function SalaoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <NewDeliveryOrderDialog isOpen={isDeliveryDialogOpen} onOpenChange={setIsDeliveryDialogOpen} />
     </div>
   );
 }

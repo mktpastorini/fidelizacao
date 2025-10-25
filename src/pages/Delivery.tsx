@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Pedido, ItemPedido, Cliente, Produto } from "@/types/supabase";
@@ -20,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { usePageActions } from "@/contexts/PageActionsContext";
 
 type DeliveryOrder = Pedido & {
   itens_pedido: ItemPedido[];
@@ -52,12 +53,27 @@ async function fetchProdutos(): Promise<Produto[]> {
 
 export default function DeliveryPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions();
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<DeliveryOrder | null>(null);
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [orderForChecklist, setOrderForChecklist] = useState<DeliveryOrder | null>(null);
   const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    const pageActions = (
+      <Button onClick={() => setIsNewOrderOpen(true)}>
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Novo Pedido Delivery
+      </Button>
+    );
+    setPageActions(pageActions);
+
+    return () => {
+      setPageActions(null);
+    };
+  }, [setPageActions]);
 
   const { data: orders, isLoading: isLoadingOrders, isError: isOrdersError } = useQuery({
     queryKey: ["activeDeliveryOrders"],
@@ -126,7 +142,7 @@ export default function DeliveryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activeDeliveryOrders"] });
-      queryClient.invalidateQueries({ queryKey: ["kitchenItems"] });
+      queryClient.invalidateQueries({ queryKey: ["deliveryKitchenItems"] });
       showSuccess("Novo pedido de delivery criado com sucesso!");
       setIsNewOrderOpen(false);
     },
@@ -293,9 +309,6 @@ export default function DeliveryPage() {
           <h1 className="text-3xl font-bold">Painel de Delivery</h1>
           <p className="text-muted-foreground mt-2">Gerencie todos os pedidos para entrega em tempo real.</p>
         </div>
-        <Button onClick={() => setIsNewOrderOpen(true)} disabled={isLoading}>
-            <PlusCircle className="w-4 h-4 mr-2" /> Novo Pedido Delivery
-        </Button>
       </div>
 
       <div className="flex-1 flex gap-4 min-h-0">
