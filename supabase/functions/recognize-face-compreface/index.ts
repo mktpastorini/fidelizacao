@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // Função auxiliar para buscar as configurações do Superadmin
 async function getComprefaceSettings(supabaseAdmin: any) {
-  console.log(`[recognize-face] Buscando configurações do CompreFace do Superadmin principal...`);
+  console.log(`[RF-SINGLE] Buscando configurações do CompreFace do Superadmin principal...`);
 
   // 1. Buscar o ID do Superadmin
   const { data: superadminProfile, error: profileError } = await supabaseAdmin
@@ -19,12 +19,12 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .maybeSingle();
 
   if (profileError || !superadminProfile) {
-    console.error("[recognize-face] Erro ao buscar Superadmin:", profileError?.message || "Perfil não encontrado.");
+    console.error("[RF-SINGLE] Erro ao buscar Superadmin:", profileError?.message || "Perfil não encontrado.");
     return { settings: null, error: new Error("Falha ao encontrar o Superadmin principal.") };
   }
   
   const superadminId = superadminProfile.id;
-  console.log(`[recognize-face] Superadmin ID encontrado: ${superadminId}`);
+  console.log(`[RF-SINGLE] Superadmin ID encontrado: ${superadminId}`);
 
   // 2. Buscar as configurações do Superadmin
   const { data: settings, error: settingsError } = await supabaseAdmin
@@ -34,7 +34,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
     .single();
 
   if (settingsError) {
-    console.error(`[recognize-face] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError.message);
+    console.error(`[RF-SINGLE] Erro ao buscar configurações do Superadmin ${superadminId}:`, settingsError.message);
     return { settings: null, error: new Error("Falha ao carregar configurações do sistema.") };
   }
 
@@ -46,7 +46,7 @@ async function getComprefaceSettings(supabaseAdmin: any) {
 }
 
 serve(async (req) => {
-  console.log("--- [recognize-face] INICIANDO EXECUÇÃO ---");
+  console.log("--- [RF-SINGLE] INICIANDO EXECUÇÃO ---");
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -58,17 +58,17 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[recognize-face] 1/7: Parsing body da requisição...");
+    console.log("[RF-SINGLE] 1/8: Parsing body da requisição...");
     const { image_url, mesa_id } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
-    console.log(`[recognize-face] 1/7: Body recebido. Mesa ID: ${mesa_id}`);
+    console.log(`[RF-SINGLE] 1/8: Body recebido. Mesa ID: ${mesa_id}`);
 
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
     }
 
-    // 2. Autenticação do usuário logado (apenas para garantir que a requisição é válida)
+    console.log("[RF-SINGLE] 2/8: Autenticando usuário logado...");
     const authHeader = req.headers.get('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         throw new Error("Usuário não autenticado. O reconhecimento facial requer autenticação.");
@@ -76,9 +76,9 @@ serve(async (req) => {
     
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
     if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    console.log(`[recognize-face] 2/7: Usuário autenticado: ${user.id}`);
+    console.log(`[RF-SINGLE] 2/8: Usuário autenticado: ${user.id}`);
 
-    // CORREÇÃO: Buscar o ID do Super Admin para usar na busca de clientes
+    console.log("[RF-SINGLE] 3/8: Buscando ID do Super Admin para consulta de clientes...");
     const { data: superadminProfile, error: superadminError } = await supabaseAdmin
       .from('profiles')
       .select('id')
@@ -87,9 +87,9 @@ serve(async (req) => {
       .single();
     if (superadminError) throw new Error("Falha ao encontrar o usuário Super Admin do estabelecimento.");
     const userIdForClients = superadminProfile.id;
-    console.log(`[recognize-face] CORREÇÃO: Usando ID do Super Admin para buscar clientes: ${userIdForClients}`);
+    console.log(`[RF-SINGLE] 3/8: ID do Super Admin para clientes: ${userIdForClients}`);
 
-    // 3. Buscando configurações do CompreFace do Superadmin
+    console.log("[RF-SINGLE] 4/8: Buscando configurações do CompreFace...");
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
@@ -98,11 +98,10 @@ serve(async (req) => {
         status: 400,
       });
     }
-
-    console.log("[recognize-face] 3/7: Configurações carregadas.");
+    console.log("[RF-SINGLE] 4/8: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[recognize-face] 4/7: Enviando para CompreFace para reconhecimento...");
+    console.log("[RF-SINGLE] 5/8: Enviando para CompreFace para reconhecimento...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
@@ -112,51 +111,49 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[recognize-face] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[RF-SINGLE] 6/8: Resposta recebida do CompreFace com status: ${response.status}`);
+    const responseBody = await response.json().catch(() => response.text());
+    console.log(`[RF-SINGLE] 6/8: Corpo da resposta do CompreFace:`, responseBody);
+
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => response.text());
-      if (response.status === 400 && typeof errorBody === 'object' && errorBody.code === 28) {
-        console.log("[recognize-face] CompreFace não encontrou um rosto na imagem.");
+      if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
+        console.log("[RF-SINGLE] CompreFace não encontrou um rosto na imagem.");
         return new Response(JSON.stringify({ match: null, distance: null, message: "Nenhum rosto detectado na imagem." }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
-      // Lançar erro com detalhes da resposta
-      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
+      throw new Error(`Erro na API do CompreFace. Status: ${response.status}. Detalhes: ${JSON.stringify(responseBody)}`);
     }
 
-    const data = await response.json();
-    const bestMatch = data.result?.[0]?.subjects?.[0];
+    const bestMatch = responseBody.result?.[0]?.subjects?.[0];
 
     if (bestMatch && bestMatch.similarity >= 0.85) {
-      console.log(`[recognize-face] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      console.log(`[RF-SINGLE] 7/8: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      // 7. Buscar dados do cliente usando o ID do Super Admin
+      console.log(`[RF-SINGLE] 8/8: Buscando cliente no DB com ID: ${bestMatch.subject} e user_id: ${userIdForClients}`);
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', userIdForClients) // <-- CORREÇÃO APLICADA AQUI
+        .eq('user_id', userIdForClients)
         .single();
 
       if (clientError) {
-        // Se o cliente não for encontrado (ex: foi deletado do banco mas não do CompreFace)
         if (clientError.code === 'PGRST116') {
-            console.warn(`[recognize-face] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados para este usuário.`);
+            console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados para este usuário.`);
             return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
       }
-      console.log("[recognize-face] Dados do cliente recuperados com sucesso.");
+      console.log("[RF-SINGLE] 8/8: Cliente encontrado no DB. Retornando sucesso.");
       return new Response(JSON.stringify({ match: client, distance: 1 - bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    console.log("[recognize-face] 6/7: Nenhum match encontrado com similaridade suficiente.");
+    console.log("[RF-SINGLE] 7/8: Nenhum match encontrado com similaridade suficiente. Retornando nulo.");
     return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
-    console.error("--- [recognize-face] ERRO FATAL ---");
+    console.error("--- [RF-SINGLE] ERRO FATAL ---");
     console.error("Mensagem:", error.message);
     console.error("Stack:", error.stack);
-    // Retorna 500 com a mensagem de erro para o frontend
     return new Response(JSON.stringify({ error: `Erro interno na função: ${error.message}` }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
