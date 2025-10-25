@@ -18,11 +18,9 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const { settings } = useSettings();
   const { isReady, isLoading: isScanning, error, recognize } = useFaceRecognition();
   const [isCameraOn, setIsCameraOn] = useState(true);
-  const [lastRecognitionTime, setLastRecognitionTime] = useState(0);
   const [recognitionResult, setRecognitionResult] = useState<FaceRecognitionResult>(null);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const recognitionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const videoConstraints = {
     width: 400,
@@ -31,13 +29,9 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   };
 
   const handleRecognition = useCallback(async (manualTrigger = false) => {
-    if (isScanning || !isCameraOn || !webcamRef.current) return;
-
-    const now = Date.now();
-    if (!manualTrigger && (now - lastRecognitionTime < 5000)) return; // Scan every 5 seconds automatically
+    if (!isCameraOn || !webcamRef.current) return;
 
     console.log(`[LiveRecognition] Iniciando varredura... (Manual: ${manualTrigger})`);
-    setLastRecognitionTime(now);
     const imageSrc = webcamRef.current.getScreenshot();
     if (!imageSrc) {
       console.warn("[LiveRecognition] Não foi possível capturar a imagem da webcam.");
@@ -53,24 +47,30 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     } else {
       console.log(`[LiveRecognition] Nenhum match. Status: ${result?.status}, Mensagem: ${result?.message}`);
     }
-  }, [isScanning, isCameraOn, lastRecognitionTime, recognize, onClientRecognized]);
+  }, [isCameraOn, recognize, onClientRecognized]);
 
   // Efeito para o scan automático
   useEffect(() => {
-    if (isCameraOn && isReady && isCameraReady) {
-      recognitionIntervalRef.current = setInterval(() => handleRecognition(false), 2000); // Check every 2 seconds
-    } else {
-      if (recognitionIntervalRef.current) {
-        clearInterval(recognitionIntervalRef.current);
+    let timeoutId: number;
+
+    const scanLoop = () => {
+      if (isScanning) {
+        timeoutId = setTimeout(scanLoop, 5000);
+        return;
       }
+      handleRecognition(false).finally(() => {
+        timeoutId = setTimeout(scanLoop, 5000);
+      });
+    };
+
+    if (isCameraOn && isReady && isCameraReady) {
+      timeoutId = setTimeout(scanLoop, 2000);
     }
 
     return () => {
-      if (recognitionIntervalRef.current) {
-        clearInterval(recognitionIntervalRef.current);
-      }
+      clearTimeout(timeoutId);
     };
-  }, [isCameraOn, isReady, isCameraReady, handleRecognition]);
+  }, [isCameraOn, isReady, isCameraReady, handleRecognition, isScanning]);
 
   const handleMediaError = (err: any) => {
     console.error("[LiveRecognition] Erro ao acessar a câmera:", err);

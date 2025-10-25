@@ -106,87 +106,64 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
   useEffect(() => {
     const intervals: NodeJS.Timeout[] = [];
-    const cleanupIntervals: NodeJS.Timeout[] = [];
+    const cleanupInterval = setInterval(() => {
+      setPersistentRecognizedClients(prevClients => {
+        const now = Date.now();
+        const allocatedSet = new Set(allocatedClientIds);
+        const clientsBeforeCleanup = prevClients.length;
+        const clientsAfterCleanup = prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+        if (clientsBeforeCleanup > clientsAfterCleanup.length) {
+          console.log(`[MultiLiveRecognition] Limpeza: removidos ${clientsBeforeCleanup - clientsAfterCleanup.length} clientes expirados.`);
+        }
+        return clientsAfterCleanup;
+      });
+    }, 5000);
+    intervals.push(cleanupInterval);
 
     cameraInstances.forEach(cam => {
-      if (cam.isCameraOn && cam.deviceId && !cam.mediaError && cam.isCameraReady) {
+      if (cam.isCameraOn && cam.isCameraReady && !cam.mediaError) {
         const recognitionInterval = setInterval(async () => {
-          if (isRecognitionLoading || !cam.webcamRef.current || !cam.canvasRef.current) return;
+          if (isRecognitionLoading || !cam.webcamRef.current) return;
 
-          const now = Date.now();
-          if (now - cam.lastRecognitionTime < 3000) return;
-
-          console.log(`[MultiLiveRecognition] Iniciando varredura na câmera ${cam.id}...`);
-          updateCameraInstance(cam.id, { lastRecognitionTime: now });
           const imageSrc = cam.webcamRef.current.getScreenshot();
-          if (!imageSrc) {
-            console.warn(`[MultiLiveRecognition] Não foi possível capturar imagem da câmera ${cam.id}.`);
-            return;
-          }
-
-          const video = cam.webcamRef.current.video;
-          if (!video) return;
-
-          const canvas = cam.canvasRef.current;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          if (!imageSrc) return;
 
           const results = await recognizeMultiple(imageSrc);
-          console.log(`[MultiLiveRecognition] Câmera ${cam.id} encontrou ${results.length} rosto(s).`);
           updateCameraInstance(cam.id, { recognizedFaces: results });
 
           setPersistentRecognizedClients(prevClients => {
+            const now = Date.now();
             const updatedClients = [...prevClients];
             const currentClientIds = new Set(prevClients.map(c => c.client.id));
             const allocatedSet = new Set(allocatedClientIds);
-            let addedCount = 0;
 
             results.forEach(match => {
               if (!allocatedSet.has(match.client.id)) {
-                if (currentClientIds.has(match.client.id)) {
-                  const index = updatedClients.findIndex(c => c.client.id === match.client.id);
-                  if (index !== -1) {
-                    updatedClients[index].timestamp = now;
-                  }
+                const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
+                if (existingIndex !== -1) {
+                  updatedClients[existingIndex].timestamp = now;
                 } else {
-                  addedCount++;
                   updatedClients.push({ client: match.client, timestamp: now });
                 }
               }
             });
-            if (addedCount > 0) {
-              console.log(`[MultiLiveRecognition] Adicionados ${addedCount} novos clientes à lista persistente.`);
-            }
-            return updatedClients.filter(c => !allocatedSet.has(c.client.id));
+            return updatedClients;
           });
-        }, 1000);
+        }, 3000);
         intervals.push(recognitionInterval);
-
-        const cleanupInterval = setInterval(() => {
-          setPersistentRecognizedClients(prevClients => {
-            const now = Date.now();
-            const allocatedSet = new Set(allocatedClientIds);
-            const clientsBeforeCleanup = prevClients.length;
-            const clientsAfterCleanup = prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
-            if (clientsBeforeCleanup > clientsAfterCleanup.length) {
-              console.log(`[MultiLiveRecognition] Limpeza: removidos ${clientsBeforeCleanup - clientsAfterCleanup.length} clientes expirados.`);
-            }
-            return clientsAfterCleanup;
-          });
-        }, 5000);
-        cleanupIntervals.push(cleanupInterval);
       }
     });
 
     return () => {
       intervals.forEach(clearInterval);
-      cleanupIntervals.forEach(clearInterval);
     };
-  }, [cameraInstances, isRecognitionLoading, recognizeMultiple, updateCameraInstance, allocatedClientIds]);
+  }, [
+    cameraInstances.map(c => `${c.id}-${c.isCameraOn}-${c.isCameraReady}-${c.mediaError}`).join(),
+    isRecognitionLoading, 
+    recognizeMultiple, 
+    updateCameraInstance, 
+    allocatedClientIds
+  ]);
 
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);
