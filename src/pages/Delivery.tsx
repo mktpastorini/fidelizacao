@@ -303,9 +303,6 @@ export default function DeliveryPage() {
           <h1 className="text-3xl font-bold">Painel de Delivery</h1>
           <p className="text-muted-foreground mt-2">Gerencie todos os pedidos para entrega em tempo real.</p>
         </div>
-        <Button onClick={() => setIsNewOrderOpen(true)} disabled={isLoading}>
-            <PlusCircle className="w-4 h-4 mr-2" /> Novo Pedido Delivery
-        </Button>
       </div>
 
       <div className="flex-1 flex gap-4 min-h-0">
