@@ -87,6 +87,76 @@ export function ApiDocumentation() {
 
       <Card>
         <CardHeader>
+          <CardTitle>Listar Produtos</CardTitle>
+          <CardDescription>
+            Retorna uma lista de todos os produtos cadastrados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="GET https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/list-products" />
+          <h4 className="font-semibold">Exemplo de Resposta de Sucesso:</h4>
+          <CodeBlock code={`{
+  "success": true,
+  "products": [
+    {
+      "id": "uuid-do-produto-1",
+      "nome": "Pizza de Calabresa",
+      "preco": 45.50,
+      "descricao": "Molho de tomate, calabresa e cebola.",
+      "tipo": "venda",
+      "requer_preparo": true,
+      "estoque_atual": 50,
+      "mostrar_no_menu": true
+    },
+    { ... }
+  ]
+}`} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Criar Pedido de Delivery</CardTitle>
+          <CardDescription>
+            Cria um novo pedido de delivery para um cliente existente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="POST https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/create-delivery-order" />
+          <h4 className="font-semibold">Exemplo de Corpo (Body):</h4>
+          <CodeBlock code={`{
+  "cliente_id": "uuid-do-cliente-existente",
+  "channel": "whatsapp",
+  "items": [
+    { "produto_id": "uuid-do-produto-1", "quantidade": 2 },
+    { "produto_id": "uuid-do-produto-2", "quantidade": 1 }
+  ],
+  "delivery_address": {
+    "streetName": "Rua Nova",
+    "streetNumber": "456",
+    "neighborhood": "Bairro Novo",
+    "city": "Cidade Nova",
+    "postalCode": "12345-678",
+    "complement": "Casa"
+  }
+}`} />
+          <h4 className="font-semibold">Notas:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+            <li>O campo <code className="bg-muted p-1 rounded">delivery_address</code> é opcional. Se não for fornecido, o endereço salvo no cadastro do cliente será utilizado.</li>
+          </ul>
+          <h4 className="font-semibold">Exemplo de Resposta de Sucesso:</h4>
+          <CodeBlock code={`{
+  "success": true,
+  "message": "Pedido de delivery criado com sucesso.",
+  "order_id": "uuid-do-novo-pedido"
+}`} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Atualizar Status de Entrega</CardTitle>
           <CardDescription>
             Após seu sistema tentar enviar a mensagem, ele **deve** chamar este endpoint para nos informar o resultado.
