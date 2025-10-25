@@ -130,8 +130,12 @@ serve(async (req) => {
             .single();
 
           if (clientError) {
-            console.error(`[RF-MULTI]   - Erro ao buscar cliente ${bestSubject.subject} no DB: ${clientError.message}`);
-            continue; // Pula para o próximo rosto
+            if (clientError.code === 'PGRST116') {
+              console.warn(`[RF-MULTI] Cliente ${bestSubject.subject} encontrado no CompreFace, mas não no banco de dados. Ignorando.`);
+            } else {
+              console.error(`[RF-MULTI] Erro ao buscar cliente ${bestSubject.subject} no DB: ${clientError.message}`);
+            }
+            continue; // Pula para o próximo rosto em ambos os casos de erro
           }
 
           console.log(`[RF-MULTI]   - Cliente ${client.nome} encontrado no DB.`);
