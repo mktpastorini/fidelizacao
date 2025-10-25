@@ -21,7 +21,7 @@ const DockContent = () => {
   const { pageActions } = usePageActions();
   return (
     // Ocupa todo o espaço vertical disponível, permitindo rolagem interna
-    <main className="flex-1 p-6 lg:p-8 pb-24 pt-20 pr-28 relative overflow-y-auto bg-secondary/50">
+    <main className="flex-1 p-6 lg:p-8 pb-32 pt-20 pr-28 relative overflow-y-auto bg-secondary/50">
       <Header pageActions={pageActions} />
       <Outlet />
     </main>
