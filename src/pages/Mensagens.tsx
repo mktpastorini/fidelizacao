@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MessageTemplate, MessageLog, Cliente } from "@/types/supabase";
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSettings } from "@/contexts/SettingsContext"; // Importado useSettings
+import { usePageActions } from "@/contexts/PageActionsContext";
 
 // Função auxiliar para obter o ID do usuário cujos dados devem ser buscados
 async function getTargetUserId(userRole: string): Promise<string> {
@@ -65,6 +66,7 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MensagensPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions();
   const { userRole, isLoading: isLoadingSettings } = useSettings();
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -94,6 +96,25 @@ export default function MensagensPage() {
     queryKey: ["clientes_list_simple"],
     queryFn: fetchClientes,
   });
+
+  const isLoadingAny = isLoadingSettings || isLoadingTargetUser || isLoadingTemplates || isLoadingLogs || isLoadingClientes;
+
+  useEffect(() => {
+    const pageActions = (
+      <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingAny}>
+          <Send className="w-4 h-4 mr-2" />
+          Enviar Mensagem
+        </Button>
+        <Button onClick={() => { setEditingTemplate(null); setIsTemplateDialogOpen(true); }}>
+          <PlusCircle className="w-4 h-4 mr-2" />Adicionar Template
+        </Button>
+      </div>
+    );
+    setPageActions(pageActions);
+
+    return () => setPageActions(null);
+  }, [setPageActions, isLoadingAny]);
 
   const handleTemplateDialogChange = (isOpen: boolean) => {
     if (!isOpen) setEditingTemplate(null);
@@ -195,30 +216,11 @@ export default function MensagensPage() {
     }
   };
 
-  const isLoadingAny = isLoadingSettings || isLoadingTargetUser || isLoadingTemplates || isLoadingLogs || isLoadingClientes;
-
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Mensagens</h1>
-          <p className="text-muted-foreground mt-2">Crie templates e acompanhe o histórico de envios.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setIsSendDialogOpen(true)} disabled={isLoadingAny}>
-            <Send className="w-4 h-4 mr-2" />
-            Enviar Mensagem
-          </Button>
-          <Dialog open={isTemplateDialogOpen} onOpenChange={handleTemplateDialogChange}>
-            <DialogTrigger asChild>
-              <Button><PlusCircle className="w-4 h-4 mr-2" />Adicionar Template</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl">
-              <DialogHeader><DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle></DialogHeader>
-              <MessageTemplateForm onSubmit={handleTemplateSubmit} isSubmitting={addTemplateMutation.isPending || editTemplateMutation.isPending} defaultValues={editingTemplate || undefined} />
-            </DialogContent>
-          </Dialog>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Mensagens</h1>
+        <p className="text-muted-foreground mt-2">Crie templates e acompanhe o histórico de envios.</p>
       </div>
 
       <Tabs defaultValue="templates">
@@ -283,6 +285,13 @@ export default function MensagensPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isTemplateDialogOpen} onOpenChange={handleTemplateDialogChange}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader><DialogTitle>{editingTemplate ? "Editar Template" : "Adicionar Novo Template"}</DialogTitle></DialogHeader>
+          <MessageTemplateForm onSubmit={handleTemplateSubmit} isSubmitting={addTemplateMutation.isPending || editTemplateMutation.isPending} defaultValues={editingTemplate || undefined} />
+        </DialogContent>
+      </Dialog>
 
       <LogDetailsModal isOpen={isLogModalOpen} onOpenChange={setIsLogModalOpen} log={selectedLog} />
       

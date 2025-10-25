@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Mesa, Cliente } from "@/types/supabase";
@@ -22,6 +22,7 @@ import { MesaCard } from "@/components/mesas/MesaCard";
 import { PlusCircle } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { useApprovalRequest } from "@/hooks/useApprovalRequest"; // Importado
+import { usePageActions } from "@/contexts/PageActionsContext";
 
 type MesaComOcupantes = Mesa & { ocupantes_count: number };
 
@@ -46,6 +47,7 @@ async function fetchClientes(): Promise<Cliente[]> {
 
 export default function MesasPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions();
   const { requestApproval, isRequesting } = useApprovalRequest(); // Usando o hook
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isOcuparMesaOpen, setIsOcuparMesaOpen] = useState(false);
@@ -62,6 +64,15 @@ export default function MesasPage() {
     setEditingMesa(mesa);
     setIsFormOpen(true);
   };
+
+  useEffect(() => {
+    const pageActions = (
+      <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
+    );
+    setPageActions(pageActions);
+
+    return () => setPageActions(null);
+  }, [setPageActions]);
 
   const handleFormClose = () => {
     setEditingMesa(null);
@@ -228,14 +239,9 @@ export default function MesasPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Painel de Mesas</h1>
-          <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Mesa</Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Painel de Mesas</h1>
+        <p className="text-muted-foreground mt-2">Visualize a ocupação e gerencie os pedidos.</p>
       </div>
 
       {isLoading ? <p>Carregando mesas...</p> : isError ? <p className="text-destructive">Erro ao carregar mesas.</p> : (

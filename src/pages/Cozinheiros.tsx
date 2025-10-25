@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Cozinheiro } from "@/types/supabase";
@@ -27,6 +27,7 @@ import { showError, showSuccess } from "@/utils/toast";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
+import { usePageActions } from "@/contexts/PageActionsContext";
 
 async function fetchCozinheiros(): Promise<Cozinheiro[]> {
   const { data, error } = await supabase
@@ -40,6 +41,7 @@ async function fetchCozinheiros(): Promise<Cozinheiro[]> {
 
 export default function CozinheirosPage() {
   const queryClient = useQueryClient();
+  const { setPageActions } = usePageActions();
   const { superadminId, isLoadingSuperadminId } = useSuperadminId();
   
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -56,6 +58,21 @@ export default function CozinheirosPage() {
     setEditingCozinheiro(cozinheiro);
     setIsFormOpen(true);
   };
+
+  useEffect(() => {
+    const pageActions = (
+      <div className="flex items-center gap-4">
+        <div className="relative w-full max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Buscar cozinheiro..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+        </div>
+        <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cozinheiro</Button>
+      </div>
+    );
+    setPageActions(pageActions);
+
+    return () => setPageActions(null);
+  }, [setPageActions, searchTerm]);
 
   const handleFormClose = () => {
     setEditingCozinheiro(null);
@@ -165,18 +182,9 @@ export default function CozinheirosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Gerenciamento de Cozinheiros</h1>
-          <p className="text-muted-foreground mt-1">Cadastre e gerencie a equipe da cozinha para o controle de preparo.</p>
-        </div>
-        <div className="flex items-center gap-4">
-            <div className="relative w-full max-w-xs">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input placeholder="Buscar cozinheiro..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
-            </div>
-            <Button onClick={() => handleFormOpen()}><PlusCircle className="w-4 h-4 mr-2" />Adicionar Cozinheiro</Button>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold">Gerenciamento de Cozinheiros</h1>
+        <p className="text-muted-foreground mt-1">Cadastre e gerencie a equipe da cozinha para o controle de preparo.</p>
       </div>
 
       {filteredCozinheiros.length > 0 ? (
