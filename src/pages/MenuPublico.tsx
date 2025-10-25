@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Produto, Mesa, Categoria, ItemPedido } from "@/types/supabase";
+import { Produto, Mesa, Categoria, ItemPedido, Cliente } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { showError, showSuccess } from "@/utils/toast";
 import { ClientIdentificationModal } from "@/components/menu-publico/ClientIdentificationModal";
+import { useQueryClient } from "@tanstack/react-query";
 
 type MesaData = Mesa & { user_id: string };
 
@@ -55,6 +56,7 @@ async function fetchMesaData(mesaId: string): Promise<MesaData | null> {
 }
 
 export default function MenuPublicoPage() {
+  const queryClient = useQueryClient();
   const [menuData, setMenuData] = useState<MenuData>({ produtos: [], categorias: [] });
   const [mesaData, setMesaData] = useState<MesaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,6 +123,34 @@ export default function MenuPublicoPage() {
     const userId = mesaData.user_id;
 
     try {
+      // Se um cliente foi identificado, verifica se ele já é um ocupante. Se não, adiciona.
+      if (clienteId) {
+        const { data: existingOccupant, error: checkError } = await supabase
+          .from('mesa_ocupantes')
+          .select('id')
+          .eq('mesa_id', mesaId)
+          .eq('cliente_id', clienteId)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+
+        if (!existingOccupant) {
+          const { error: insertError } = await supabase
+            .from('mesa_ocupantes')
+            .insert({
+              mesa_id: mesaId,
+              cliente_id: clienteId,
+              user_id: mesaData.user_id,
+            });
+          if (insertError) throw insertError;
+          
+          // Invalida queries para atualizar a UI do salão e da comanda
+          queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+          queryClient.invalidateQueries({ queryKey: ["ocupantes", mesaId] });
+          queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
+        }
+      }
+
       // 1. Verifica se já existe pedido aberto para a mesa
       let pedidoId: string | null = null;
       const { data: pedidoAberto, error: pedidoError } = await supabase
