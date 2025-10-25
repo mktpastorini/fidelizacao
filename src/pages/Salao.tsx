@@ -108,6 +108,38 @@ export default function SalaoPage() {
   const isCloseDayReady = !!data?.settings?.webhook_url && !!data?.settings?.daily_report_phone_number;
   const canCloseDay = !!userRole && ['superadmin', 'admin', 'gerente'].includes(userRole);
 
+  const closeDayMutation = useMutation({
+    mutationFn: async () => {
+      if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+      const { error } = await supabase.functions.invoke('close-day');
+      if (error) throw new Error(error.message);
+      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: true }).eq("id", superadminId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      showSuccess("Dia fechado com sucesso e relatório enviado!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const openDayMutation = useMutation({
+    mutationFn: async () => {
+      if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
+      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", superadminId);
+      if (updateError) throw updateError;
+      const { error: functionError } = await supabase.functions.invoke('open-day');
+      if (functionError) {
+        showError(`Dia aberto, mas falha ao enviar notificação: ${functionError.message}`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+      showSuccess("Estabelecimento aberto para um novo dia!");
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
   useEffect(() => {
     const pageActions = (
       <div className="flex items-center gap-2">
@@ -176,38 +208,6 @@ export default function SalaoPage() {
   const allocatedClientIds = data?.mesas
     .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
     .filter((value, index, self) => self.indexOf(value) === index) || [];
-
-  const closeDayMutation = useMutation({
-    mutationFn: async () => {
-      if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
-      const { error } = await supabase.functions.invoke('close-day');
-      if (error) throw new Error(error.message);
-      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: true }).eq("id", superadminId);
-      if (updateError) throw updateError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      showSuccess("Dia fechado com sucesso e relatório enviado!");
-    },
-    onError: (error: Error) => showError(error.message),
-  });
-
-  const openDayMutation = useMutation({
-    mutationFn: async () => {
-      if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
-      const { error: updateError } = await supabase.from("user_settings").update({ establishment_is_closed: false }).eq("id", superadminId);
-      if (updateError) throw updateError;
-      const { error: functionError } = await supabase.functions.invoke('open-day');
-      if (functionError) {
-        showError(`Dia aberto, mas falha ao enviar notificação: ${functionError.message}`);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-      showSuccess("Estabelecimento aberto para um novo dia!");
-    },
-    onError: (error: Error) => showError(error.message),
-  });
 
   const allocateTableMutation = useMutation({
     mutationFn: async ({ cliente, mesaId }: { cliente: Cliente; mesaId: string }) => {
