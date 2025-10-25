@@ -125,7 +125,7 @@ serve(async (req) => {
           // Buscar dados do cliente usando o ID do Superadmin
           const { data: client, error: clientError } = await supabaseAdmin
             .from('clientes')
-            .select('id, nome, avatar_url, gostos, casado_com, visitas')
+            .select('*, filhos(*)')
             .eq('id', bestSubject.subject)
             .eq('user_id', superadminId) // <--- USANDO O ID DO SUPERADMIN AQUI
             .single();
