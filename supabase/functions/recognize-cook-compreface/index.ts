@@ -130,7 +130,6 @@ serve(async (req) => {
         .from('cozinheiros')
         .select('*')
         .eq('id', bestMatch.subject)
-        .eq('user_id', superadminId) // Cozinheiros devem pertencer ao Superadmin
         .single();
 
       if (cookError) {

@@ -127,7 +127,6 @@ serve(async (req) => {
             .from('clientes')
             .select('*, filhos(*)')
             .eq('id', bestSubject.subject)
-            .eq('user_id', superadminId) // Usa o ID do Superadmin
             .single();
 
           if (clientError) {

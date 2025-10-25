@@ -118,17 +118,16 @@ serve(async (req) => {
     if (bestMatch && bestMatch.similarity >= 0.85) {
       console.log(`[RF-SINGLE] 6/7: Match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
 
-      console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject} e user_id: ${superadminId}`);
+      console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject}`);
       const { data: client, error: clientError } = await supabaseAdmin
         .from('clientes')
         .select('*, filhos(*)')
         .eq('id', bestMatch.subject)
-        .eq('user_id', superadminId) // Usa o ID do Superadmin
         .single();
 
       if (clientError) {
         if (clientError.code === 'PGRST116') {
-            console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados para este usuário.`);
+            console.warn(`[RF-SINGLE] Cliente ${bestMatch.subject} encontrado no CompreFace, mas não no banco de dados.`);
             return new Response(JSON.stringify({ match: null, distance: null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
         throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
