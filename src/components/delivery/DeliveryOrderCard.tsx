@@ -32,6 +32,7 @@ export function DeliveryOrderCard({ order }: DeliveryOrderCardProps) {
   const total = order.delivery_details?.total?.orderAmount || order.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
   const customerName = order.delivery_details?.customer?.name || "Cliente Balcão";
   const orderId = order.ifood_order_id ? `iFood #${order.ifood_order_id.slice(-4)}` : `Pedido #${order.id.slice(0, 4)}`;
+  const channel = order.delivery_details?.channel;
   
   const statusInfo = statusMap[order.delivery_status || order.status] || { label: "Desconhecido", color: "bg-gray-500" };
 
@@ -47,6 +48,9 @@ export function DeliveryOrderCard({ order }: DeliveryOrderCardProps) {
             <CardDescription className="flex items-center gap-2 text-xs">
               <Hash className="w-3 h-3" /> {orderId}
             </CardDescription>
+            {order.order_type === 'DELIVERY' && channel && (
+              <Badge variant="outline" className="mt-1 text-xs capitalize">{channel}</Badge>
+            )}
           </div>
           <Badge className={`${statusInfo.color} text-white`}>{statusInfo.label}</Badge>
         </div>

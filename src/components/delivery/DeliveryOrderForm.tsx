@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Cliente, Produto } from "@/types/supabase";
 import { Check, ChevronsUpDown, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const orderItemSchema = z.object({
   produtoId: z.string(),
@@ -27,6 +28,7 @@ const deliveryFormSchema = z.object({
   address_city: z.string().min(1, "Cidade é obrigatória."),
   address_zip: z.string().optional(),
   address_complement: z.string().optional(),
+  channel: z.string().optional(), // Adicionado campo de canal
   items: z.array(orderItemSchema).min(1, "Adicione pelo menos um item ao pedido."),
 });
 
@@ -53,6 +55,7 @@ export function DeliveryOrderForm({ clientes, produtos, onSubmit, isSubmitting }
       address_city: "",
       address_zip: "",
       address_complement: "",
+      channel: undefined,
     },
   });
 
@@ -132,6 +135,32 @@ export function DeliveryOrderForm({ clientes, produtos, onSubmit, isSubmitting }
           <FormField control={form.control} name="address_city" render={({ field }) => (<FormItem><FormControl><Input placeholder="Cidade" {...field} /></FormControl><FormMessage /></FormItem>)} />
           <FormField control={form.control} name="address_complement" render={({ field }) => (<FormItem><FormControl><Input placeholder="Complemento (opcional)" {...field} /></FormControl><FormMessage /></FormItem>)} />
         </div>
+
+        <FormField
+          control={form.control}
+          name="channel"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Canal de Venda</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o canal de origem do pedido" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  <SelectItem value="instagram">Instagram</SelectItem>
+                  <SelectItem value="facebook">Facebook</SelectItem>
+                  <SelectItem value="site">Site</SelectItem>
+                  <SelectItem value="telefone">Telefone</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="space-y-2 p-4 border rounded-md">
           <h4 className="font-medium">Itens do Pedido</h4>

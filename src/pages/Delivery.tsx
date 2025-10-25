@@ -92,6 +92,7 @@ export default function DeliveryPage() {
             complement: values.address_complement,
           },
         },
+        channel: values.channel, // Adicionado o canal
       };
 
       const { data: newPedido, error: pedidoError } = await supabase

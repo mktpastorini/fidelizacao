@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Package, Clock, User, Hash, DollarSign, MapPin, Phone, ArrowRight, CheckCircle, Utensils, Bike, Check } from "lucide-react";
+import { Package, Clock, User, Hash, DollarSign, MapPin, Phone, ArrowRight, CheckCircle, Utensils, Bike, Check, Share2 } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 
 type DeliveryOrder = Pedido & {
@@ -48,6 +48,7 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
   const total = order.delivery_details?.total?.orderAmount || order.itens_pedido.reduce((acc, item) => acc + (item.preco || 0) * item.quantidade, 0);
   const customer = order.delivery_details?.customer;
   const address = order.delivery_details?.delivery?.deliveryAddress;
+  const channel = order.delivery_details?.channel;
   const orderId = order.ifood_order_id ? `iFood #${order.ifood_order_id.slice(-4)}` : `Pedido #${order.id.slice(0, 4)}`;
   const currentStatus = order.delivery_status || order.status;
   const statusInfo = statusMap[currentStatus] || { label: "Desconhecido", color: "bg-gray-500", icon: Package };
@@ -92,6 +93,12 @@ export function DeliveryOrderDetailsModal({ isOpen, onOpenChange, order, onStatu
                 <h3 className="font-semibold mb-2 flex items-center gap-2"><MapPin className="w-4 h-4" /> Endereço de Entrega</h3>
                 <p>{address.streetName}, {address.streetNumber} {address.complement && `- ${address.complement}`}</p>
                 <p className="text-sm text-muted-foreground">{address.neighborhood}, {address.city}</p>
+              </div>
+            )}
+            {order.order_type === 'DELIVERY' && channel && (
+              <div className="p-4 border rounded-lg bg-secondary">
+                <h3 className="font-semibold mb-2 flex items-center gap-2"><Share2 className="w-4 h-4" /> Canal de Venda</h3>
+                <p className="capitalize">{channel}</p>
               </div>
             )}
             <div className="p-4 border rounded-lg bg-secondary">
