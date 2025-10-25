@@ -44,6 +44,7 @@ type ClienteFormProps = {
   defaultValues?: Partial<Cliente & { filhos: Filho[] }>;
   clientes: Cliente[];
   isEditing?: boolean;
+  mode?: 'full' | 'quick';
 };
 
 const steps = ["Fotos", "Informações", "Detalhes", "Endereço"];
@@ -54,7 +55,7 @@ const fieldGroups = [
   ["address_street", "address_number", "address_neighborhood", "address_city", "address_zip", "address_complement"],
 ];
 
-export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, isEditing }: ClienteFormProps) {
+export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, isEditing, mode = 'full' }: ClienteFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -103,6 +104,20 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
     };
     onSubmit(submissionData);
   };
+
+  if (mode === 'quick') {
+    return (
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <Step1_Photos form={form} />
+          <Step2_BasicInfo form={form} />
+          <Button type="submit" disabled={isSubmitting} className="w-full">
+            {isSubmitting ? "Cadastrando..." : "Cadastrar e Adicionar"}
+          </Button>
+        </form>
+      </Form>
+    );
+  }
 
   return (
     <Form {...form}>

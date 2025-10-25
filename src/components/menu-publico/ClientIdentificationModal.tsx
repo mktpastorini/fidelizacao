@@ -8,7 +8,7 @@ import { showError, showSuccess } from '@/utils/toast';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { QuickClientForm } from './QuickClientForm';
+import { ClienteForm } from '../clientes/ClienteForm';
 import { supabase } from '@/integrations/supabase/client';
 import * as z from 'zod';
 
@@ -155,8 +155,8 @@ export function ClientIdentificationModal({
     }
   };
 
-  const handleQuickRegister = async (values: z.infer<typeof QuickClientForm>) => {
-    if (!values.avatar_url) {
+  const handleQuickRegister = async (values: any) => {
+    if (!values.avatar_urls || values.avatar_urls.length === 0) {
       showError("A foto é obrigatória para o cadastro rápido.");
       return;
     }
@@ -170,7 +170,7 @@ export function ClientIdentificationModal({
         p_casado_com: null,
         p_whatsapp: values.whatsapp, 
         p_gostos: null, 
-        p_avatar_url: values.avatar_url,
+        p_avatar_url: values.avatar_urls[0],
         p_indicado_por_id: null,
       });
       if (rpcError) throw new Error(rpcError.message);
@@ -192,7 +192,7 @@ export function ClientIdentificationModal({
 
       // 3. Registra a face no CompreFace
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
-        body: { subject: newClientId, image_urls: [values.avatar_url] }
+        body: { subject: newClientId, image_urls: values.avatar_urls }
       });
       if (faceError) {
         // Se falhar o registro facial, remove o cliente para evitar inconsistência
@@ -292,9 +292,12 @@ export function ClientIdentificationModal({
             <DialogDescription>
               Preencha apenas o essencial para que possamos te reconhecer na próxima vez.
             </DialogDescription>
-            <QuickClientForm 
+            <ClienteForm 
+              mode="quick"
               onSubmit={handleQuickRegister} 
-              isSubmitting={isSubmittingNewClient} 
+              isSubmitting={isSubmittingNewClient}
+              clientes={[]}
+              isEditing={false}
             />
           </div>
         );

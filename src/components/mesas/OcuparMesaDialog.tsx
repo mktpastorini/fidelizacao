@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Cliente, Mesa } from "@/types/supabase";
 import { Check, ChevronsUpDown, X, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { QuickClienteForm } from "../clientes/QuickClienteForm";
+import { ClienteForm } from "../clientes/ClienteForm";
 import { showError, showSuccess } from "@/utils/toast";
 
 type OcuparMesaDialogProps = {
@@ -204,10 +204,12 @@ export function OcuparMesaDialog({
             <DialogTitle>Cadastrar Novo Acompanhante</DialogTitle>
             <DialogDescription>Preencha os dados do novo cliente. Ele será adicionado à mesa automaticamente.</DialogDescription>
           </DialogHeader>
-          <QuickClienteForm
+          <ClienteForm
+            mode="quick"
             onSubmit={(values) => addCompanionMutation.mutate(values)}
             isSubmitting={addCompanionMutation.isPending}
             clientes={clientes}
+            isEditing={false}
           />
         </DialogContent>
       </Dialog>
