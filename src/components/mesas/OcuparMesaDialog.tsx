@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Cliente, Mesa } from "@/types/supabase";
 import { Check, ChevronsUpDown, X, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ClienteForm } from "../clientes/ClienteForm";
+import { QuickClienteForm } from "../clientes/QuickClienteForm";
 import { showError, showSuccess } from "@/utils/toast";
 
 type OcuparMesaDialogProps = {
@@ -93,9 +93,9 @@ export function OcuparMesaDialog({
       if (!user?.id) throw new Error("Usuário não autenticado");
 
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
-        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: newCliente.casado_com,
-        p_whatsapp: newCliente.whatsapp, p_gostos: newCliente.gostos, p_avatar_url: newCliente.avatar_url,
-        p_indicado_por_id: newCliente.indicado_por_id,
+        p_user_id: user.id, p_nome: newCliente.nome, p_casado_com: null,
+        p_whatsapp: newCliente.whatsapp, p_gostos: null, p_avatar_url: newCliente.avatar_url,
+        p_indicado_por_id: null,
       });
       if (rpcError) throw new Error(rpcError.message);
       
@@ -204,7 +204,7 @@ export function OcuparMesaDialog({
             <DialogTitle>Cadastrar Novo Acompanhante</DialogTitle>
             <DialogDescription>Preencha os dados do novo cliente. Ele será adicionado à mesa automaticamente.</DialogDescription>
           </DialogHeader>
-          <ClienteForm
+          <QuickClienteForm
             onSubmit={(values) => addCompanionMutation.mutate(values)}
             isSubmitting={addCompanionMutation.isPending}
             clientes={clientes}
