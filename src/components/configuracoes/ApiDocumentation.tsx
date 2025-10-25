@@ -1,6 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CodeBlock } from "./CodeBlock";
 import { Badge } from "@/components/ui/badge";
+import { useSettings } from "@/contexts/SettingsContext";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const unifiedPayload = `{
   "recipients": [
@@ -24,28 +27,45 @@ const triggerPayload = `{
 }`;
 
 export function ApiDocumentation() {
+  const { settings } = useSettings();
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id || null);
+    };
+    fetchUserId();
+  }, []);
+
+  const ifoodWebhookUrl = `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/ifood-webhook-handler?user_id=${userId || 'SEU_USER_ID'}`;
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Introdução</CardTitle>
+          <CardTitle>Introdução à API</CardTitle>
           <CardDescription>
-            Esta documentação detalha como seu sistema pode interagir com a API do Fidelize.
+            Esta documentação detalha como seu sistema pode interagir com a API do Fidelize para automações.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <h4 className="font-semibold">Autenticação</h4>
           <p className="text-sm">
-            As interações são feitas via webhooks (Fidelize → Seu Sistema) e endpoints de API (Seu Sistema → Fidelize).
-            A autenticação para a API do Fidelize é feita via Bearer Token no cabeçalho `Authorization`, usando a Chave de API da aba "Perfil & Integrações".
+            Todas as requisições para a API do Fidelize devem ser autenticadas usando sua Chave de API.
+            A chave deve ser enviada no cabeçalho `Authorization` como um Bearer Token.
           </p>
+          <CodeBlock code={`Authorization: Bearer ${settings?.api_key || 'SUA_CHAVE_DE_API'}`} />
         </CardContent>
       </Card>
 
+      <h2 className="text-2xl font-bold pt-4">Webhooks (Fidelize → Seu Sistema)</h2>
+
       <Card>
         <CardHeader>
-          <CardTitle>Webhook: Eventos do Fidelize</CardTitle>
+          <CardTitle>Recebimento de Eventos</CardTitle>
           <CardDescription>
-            Quando um evento ocorre, enviamos uma requisição <Badge variant="secondary">POST</Badge> para a sua URL de webhook configurada com o payload abaixo.
+            Quando um evento ocorre (chegada de cliente, pagamento, etc.), enviamos uma requisição <Badge variant="secondary">POST</Badge> para a sua URL de webhook configurada.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -53,15 +73,99 @@ export function ApiDocumentation() {
           <CodeBlock code={unifiedPayload} />
           <h4 className="font-semibold mt-4">Campos do Payload:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">recipients</code>: Um array de objetos, um para cada destinatário. Para eventos únicos (chegada, pagamento), este array conterá apenas um elemento.</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">log_id</code>: O ID único desta transação. **Guarde este ID** para nos informar o status da entrega (string, UUID).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">phone</code>: O número de WhatsApp do cliente (string).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">message</code>: A mensagem final, já personalizada (string).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">client_name</code>: O nome completo do cliente (string).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">callback_endpoint</code>: A URL de callback que seu sistema deve chamar para nos informar o status da entrega (string, URL).</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">recipients</code>: Um array de objetos, um para cada destinatário.</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">log_id</code>: O ID único desta transação. **Guarde este ID** para nos informar o status da entrega.</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">phone</code>: O número de WhatsApp do cliente.</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">message</code>: A mensagem final, já personalizada.</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">client_name</code>: O nome completo do cliente.</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">callback_endpoint</code>: A URL que seu sistema deve chamar para nos informar o status da entrega.</li>
           </ul>
         </CardContent>
       </Card>
+
+      <h2 className="text-2xl font-bold pt-4">API Endpoints (Seu Sistema → Fidelize)</h2>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Atualizar Status de Entrega</CardTitle>
+          <CardDescription>
+            Após seu sistema tentar enviar a mensagem, ele **deve** chamar este endpoint para nos informar o resultado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="POST https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/update-message-status" />
+          <h4 className="font-semibold">Exemplo de Corpo (Body):</h4>
+          <CodeBlock code={updateStatusPayload} />
+          <h4 className="font-semibold">Campos do Corpo:</h4>
+          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
+            <li><code className="bg-muted p-1 rounded text-foreground">log_id</code>: O ID que você recebeu no webhook.</li>
+            <li><code className="bg-muted p-1 rounded text-foreground">status</code>: Valores possíveis: <code className="bg-muted p-1 rounded text-foreground">"delivered"</code> ou <code className="bg-muted p-1 rounded text-foreground">"failed"</code>.</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Acionar Envio de Mensagens de Aniversário</CardTitle>
+          <CardDescription>
+            Chame este endpoint para que o sistema verifique os aniversariantes do dia e envie as mensagens configuradas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="POST https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-birthday-wishes" />
+          <h4 className="font-semibold">Corpo (Body):</h4>
+          <CodeBlock code={triggerPayload} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Obter Horário de Envio de Aniversários</CardTitle>
+          <CardDescription>
+            Consulte o horário configurado para o envio automático de mensagens de aniversário.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="GET https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-birthday-schedule" />
+          <h4 className="font-semibold">Exemplo de Resposta:</h4>
+          <CodeBlock code={`{\n  "success": true,\n  "aniversario_horario": "09:00"\n}`} />
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle>Acionar Fechamento Automático do Dia</CardTitle>
+          <CardDescription>
+            Chame este endpoint para acionar o fechamento do dia e o envio do relatório diário no horário programado.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="POST https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-close-day" />
+          <h4 className="font-semibold">Corpo (Body):</h4>
+          <CodeBlock code={triggerPayload} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Obter Horário de Fechamento</CardTitle>
+          <CardDescription>
+            Consulte o horário configurado para o fechamento automático do dia.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="text-sm font-semibold">Endpoint:</div>
+          <CodeBlock code="GET https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-close-day-schedule" />
+          <h4 className="font-semibold">Exemplo de Resposta:</h4>
+          <CodeBlock code={`{\n  "success": true,\n  "auto_close_time": "23:00"\n}`} />
+        </CardContent>
+      </Card>
+
+      <h2 className="text-2xl font-bold pt-4">Integrações de Terceiros</h2>
 
       <Card>
         <CardHeader>
@@ -71,153 +175,13 @@ export function ApiDocumentation() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/ifood-webhook-handler?user_id=SEU_USER_ID`
-          </div>
+          <div className="text-sm font-semibold">Sua URL de Webhook iFood:</div>
+          <CodeBlock code={ifoodWebhookUrl} />
           <h4 className="font-semibold">Instruções:</h4>
           <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li>Copie a URL acima.</li>
-            <li>Substitua <code className="bg-muted p-1 rounded text-foreground">SEU_USER_ID</code> pelo seu ID de usuário, que você pode encontrar na aba "Acesso & Segurança".</li>
+            <li>Copie a URL acima. Ela já contém seu ID de usuário.</li>
             <li>Cole a URL completa no campo de webhook no seu painel do iFood.</li>
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>API: Atualizar Status de Entrega</CardTitle>
-          <CardDescription>
-            Após seu sistema tentar enviar a mensagem, ele **deve** chamar este endpoint para nos informar o resultado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/update-message-status`
-          </div>
-          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">Authorization</code>: <code className="bg-muted p-1 rounded text-foreground">Bearer SUA_CHAVE_DE_API</code></li>
-            <li><code className="bg-muted p-1 rounded text-foreground">Content-Type</code>: <code className="bg-muted p-1 rounded text-foreground">application/json</code></li>
-          </ul>
-          <h4 className="font-semibold">Exemplo de Corpo (Body):</h4>
-          <CodeBlock code={updateStatusPayload} />
-          <h4 className="font-semibold">Campos do Corpo:</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">log_id</code>: O ID que você recebeu no webhook (string, UUID).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">status</code>: O status final da entrega. Valores possíveis: <code className="bg-muted p-1 rounded text-foreground">"delivered"</code> ou <code className="bg-muted p-1 rounded text-foreground">"failed"</code> (string).</li>
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>API: Envio de Mensagens de Aniversário</CardTitle>
-          <CardDescription>
-            Endpoint para acionar o envio automático de mensagens de aniversário.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-birthday-wishes`
-          </div>
-          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">Authorization</code>: <code className="bg-muted p-1 rounded text-foreground">Bearer SUA_CHAVE_DE_API</code></li>
-            <li><code className="bg-muted p-1 rounded text-foreground">Content-Type</code>: <code className="bg-muted p-1 rounded text-foreground">application/json</code></li>
-          </ul>
-          <h4 className="font-semibold">Corpo (Body):</h4>
-          <CodeBlock code={triggerPayload} />
-          <div className="text-sm text-muted-foreground">
-            <p>Este endpoint não requer um corpo específico. Apenas a autenticação via header é necessária.</p>
-            <p className="mt-2">Quando chamado, o sistema:</p>
-            <ul className="list-disc list-inside mt-1">
-              <li>Verifica os clientes que fazem aniversário hoje</li>
-              <li>Usa o template de aniversário configurado nas "Automações"</li>
-              <li>Envia as mensagens personalizadas através do webhook configurado</li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>API: Obter Horário de Envio de Aniversários</CardTitle>
-          <CardDescription>
-            Endpoint para consultar o horário configurado para envio de mensagens de aniversário.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm">
-            <Badge variant="secondary">GET</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-birthday-schedule`
-          </div>
-          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">Authorization</code>: <code className="bg-muted p-1 rounded text-foreground">Bearer SUA_CHAVE_DE_API</code></li>
-            <li><code className="bg-muted p-1 rounded text-foreground">Content-Type</code>: <code className="bg-muted p-1 rounded text-foreground">application/json</code></li>
-          </ul>
-          <h4 className="font-semibold">Exemplo de Resposta:</h4>
-          <CodeBlock code={`{
-  "success": true,
-  "aniversario_horario": "09:00"
-}`} />
-          <h4 className="font-semibold">Campos da Resposta:</h4>
-          <ul className="list-disc list-inside space-y-2 text-foreground text-sm">
-            <li><code className="bg-muted p-1 rounded text-foreground">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">aniversario_horario</code>: O horário configurado para envio das mensagens de aniversário (string, formato HH:MM).</li>
-          </ul>
-        </CardContent>
-      </Card>
-      
-      {/* NOVOS ENDPOINTS DE FECHAMENTO DO DIA */}
-      <Card>
-        <CardHeader>
-          <CardTitle>API: Fechamento Automático do Dia</CardTitle>
-          <CardDescription>
-            Endpoint para acionar o fechamento do dia e o envio do relatório diário no horário programado.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm">
-            <Badge variant="secondary">POST</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/trigger-close-day`
-          </div>
-          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">Authorization</code>: <code className="bg-muted p-1 rounded text-foreground">Bearer SUA_CHAVE_DE_API</code></li>
-            <li><code className="bg-muted p-1 rounded text-foreground">Content-Type</code>: <code className="bg-muted p-1 rounded text-foreground">application/json</code></li>
-          </ul>
-          <h4 className="font-semibold">Corpo (Body):</h4>
-          <CodeBlock code={triggerPayload} />
-          <div className="text-sm text-muted-foreground">
-            <p>Este endpoint deve ser chamado pelo seu agendador externo no horário configurado. Ele verifica se o fechamento automático está habilitado e se o estabelecimento já está fechado antes de prosseguir.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>API: Obter Horário de Fechamento</CardTitle>
-          <CardDescription>
-            Endpoint para consultar o horário configurado para o fechamento automático do dia.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-sm">
-            <Badge variant="secondary">GET</Badge> `https://hgqcmpuihoflkkobtyfa.supabase.co/functions/v1/get-close-day-schedule`
-          </div>
-          <h4 className="font-semibold">Cabeçalhos (Headers):</h4>
-          <ul className="list-disc list-inside space-y-2 text-sm text-foreground">
-            <li><code className="bg-muted p-1 rounded text-foreground">Authorization</code>: <code className="bg-muted p-1 rounded text-foreground">Bearer SUA_CHAVE_DE_API</code></li>
-            <li><code className="bg-muted p-1 rounded text-foreground">Content-Type</code>: <code className="bg-muted p-1 rounded text-foreground">application/json</code></li>
-          </ul>
-          <h4 className="font-semibold">Exemplo de Resposta:</h4>
-          <CodeBlock code={`{
-  "success": true,
-  "auto_close_time": "23:00"
-}`} />
-          <h4 className="font-semibold">Campos da Resposta:</h4>
-          <ul className="list-disc list-inside space-y-2 text-foreground text-sm">
-            <li><code className="bg-muted p-1 rounded text-foreground">success</code>: Indica se a requisição foi bem-sucedida (boolean).</li>
-            <li><code className="bg-muted p-1 rounded text-foreground">auto_close_time</code>: O horário configurado para o fechamento automático (string, formato HH:MM).</li>
+            <li>Certifique-se de que as credenciais do iFood estão salvas como "Secrets" no Supabase (veja a aba "iFood").</li>
           </ul>
         </CardContent>
       </Card>
