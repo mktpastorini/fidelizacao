@@ -20,6 +20,12 @@ export type Cliente = {
   visitas: number;
   data_nascimento?: string | null;
   pontos: number; // NOVO CAMPO
+  address_street?: string | null;
+  address_number?: string | null;
+  address_neighborhood?: string | null;
+  address_city?: string | null;
+  address_zip?: string | null;
+  address_complement?: string | null;
 };
 
 export type Cozinheiro = {
@@ -44,7 +50,7 @@ export type MessageTemplate = {
   id: string;
   nome: string;
   conteudo: string;
-  tipo: 'chegada' | 'pagamento' | 'geral' | 'aniversario';
+  tipo: 'chegada' | 'pagamento' | 'geral' | 'aniversario' | 'delivery_confirmed' | 'delivery_in_preparation' | 'delivery_ready' | 'delivery_out_for_delivery';
   created_at: string;
 };
 
@@ -66,6 +72,10 @@ export type UserSettings = {
   preferred_camera_device_id?: string | null;
   compreface_url?: string | null;
   compreface_api_key?: string | null;
+  delivery_confirmed_template_id?: string | null;
+  delivery_in_preparation_template_id?: string | null;
+  delivery_ready_template_id?: string | null;
+  delivery_out_for_delivery_template_id?: string | null;
 };
 
 export type Pedido = {
@@ -79,6 +89,10 @@ export type Pedido = {
   acompanhantes?: { id: string; nome: string }[];
   gorjeta_valor?: number | null; // NOVO CAMPO
   garcom_id?: string | null; // NOVO CAMPO
+  order_type: 'SALAO' | 'IFOOD' | 'DELIVERY';
+  ifood_order_id: string | null;
+  delivery_details: any | null;
+  delivery_status: 'awaiting_confirmation' | 'CONFIRMED' | 'in_preparation' | 'ready_for_delivery' | 'out_for_delivery' | 'delivered' | 'cancelled' | null;
 };
 
 export type ItemPedido = {
@@ -159,4 +173,11 @@ export type StaffProfile = {
   first_name: string | null;
   last_name: string | null;
   role: UserRole;
+};
+
+export type LowStockProduct = {
+  id: string;
+  nome: string;
+  estoque_atual: number;
+  alerta_estoque_baixo: number;
 };
