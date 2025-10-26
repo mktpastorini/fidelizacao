@@ -104,59 +104,52 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
 
   // --- Lógica de Varredura Automática por Câmera ---
   useEffect(() => {
-    let isLoopRunning = true;
-    let currentCameraIndex = 0;
+    const timeouts: NodeJS.Timeout[] = [];
+    const allocatedSet = new Set(allocatedClientIds);
 
-    const scanLoop = async () => {
-      if (!isLoopRunning) return;
-
-      const activeCameras = cameraInstances.filter(c => c.isCameraOn && c.isCameraReady && !c.mediaError && c.webcamRef.current);
-
-      if (activeCameras.length > 0 && !isRecognitionLoading) {
-        const cam = activeCameras[currentCameraIndex % activeCameras.length];
-        
-        const imageSrc = cam.webcamRef.current.getScreenshot();
-        if (imageSrc) {
-          const results = await recognizeMultiple(imageSrc);
-          
-          updateCameraInstance(cam.id, { recognizedFaces: results, lastRecognitionTime: Date.now() });
-
-          const allocatedSet = new Set(allocatedClientIds);
-          setPersistentRecognizedClients(prevClients => {
-            const now = Date.now();
-            const updatedClients = [...prevClients];
-            
-            results.forEach(match => {
-              if (!allocatedSet.has(match.client.id)) {
-                const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
-                if (existingIndex !== -1) {
-                  updatedClients[existingIndex].timestamp = now;
-                } else {
-                  updatedClients.push({ client: match.client, timestamp: now });
-                }
-              }
-            });
-            return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
-          });
-        }
-        
-        currentCameraIndex++;
+    const scanCamera = async (cam: CameraInstance) => {
+      if (!cam.isCameraOn || !cam.isCameraReady || cam.mediaError || isRecognitionLoading || !cam.webcamRef.current) {
+        timeouts.push(setTimeout(() => scanCamera(cam), 1000));
+        return;
       }
 
-      if (isLoopRunning) {
-        setTimeout(scanLoop, SCAN_INTERVAL_MS);
+      const imageSrc = cam.webcamRef.current.getScreenshot();
+      if (!imageSrc) {
+        timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
+        return;
       }
+
+      const results = await recognizeMultiple(imageSrc);
+      
+      updateCameraInstance(cam.id, { recognizedFaces: results, lastRecognitionTime: Date.now() });
+
+      setPersistentRecognizedClients(prevClients => {
+        const now = Date.now();
+        const updatedClients = [...prevClients];
+        
+        results.forEach(match => {
+          if (!allocatedSet.has(match.client.id)) {
+            const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
+            if (existingIndex !== -1) {
+              updatedClients[existingIndex].timestamp = now;
+            } else {
+              updatedClients.push({ client: match.client, timestamp: now });
+            }
+          }
+        });
+        return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+      });
+
+      timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
     };
 
-    const timeoutId = setTimeout(scanLoop, 500);
+    cameraInstances.forEach(scanCamera);
 
     return () => {
-      isLoopRunning = false;
-      clearTimeout(timeoutId);
+      timeouts.forEach(clearTimeout);
     };
   }, [
-    cameraInstances.map(c => `${c.id}-${c.isCameraOn}-${c.isCameraReady}-${c.deviceId}-${c.mediaError}`).join(), 
-    isRecognitionLoading,
+    cameraInstances.map(c => `${c.id}-${c.isCameraOn}-${c.isCameraReady}-${c.deviceId}-${c.mediaError}`).join(),
     recognizeMultiple, 
     updateCameraInstance, 
     allocatedClientIds

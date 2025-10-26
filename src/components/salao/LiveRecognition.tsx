@@ -54,26 +54,15 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
 
   // Efeito para o scan automático com loop estável
   useEffect(() => {
-    let isLoopRunning = true;
+    if (!isCameraOn || !isReady || !isCameraReady || isScanning || persistentClient) {
+        return;
+    }
 
-    const scanLoop = async () => {
-      if (!isLoopRunning) return;
+    const intervalId = setInterval(() => {
+        handleRecognition(false);
+    }, SCAN_INTERVAL_MS);
 
-      if (isCameraOn && isReady && isCameraReady && !isScanning && !persistentClient) {
-        await handleRecognition(false);
-      }
-
-      if (isLoopRunning) {
-        setTimeout(scanLoop, SCAN_INTERVAL_MS);
-      }
-    };
-
-    const timeoutId = setTimeout(scanLoop, 500); // Inicia o loop
-
-    return () => {
-      isLoopRunning = false;
-      clearTimeout(timeoutId);
-    };
+    return () => clearInterval(intervalId);
   }, [isCameraOn, isReady, isCameraReady, isScanning, persistentClient, handleRecognition]);
 
   // Efeito para limpar o cliente persistente após o tempo de expiração
