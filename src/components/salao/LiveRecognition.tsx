@@ -14,6 +14,7 @@ type LiveRecognitionProps = {
 };
 
 const PERSISTENCE_DURATION_MS = 10000; // Manter o resultado por 10 segundos
+const SCAN_INTERVAL_MS = 2000; // A cada 2 segundos
 
 export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const webcamRef = useRef<Webcam>(null);
@@ -31,7 +32,8 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     deviceId: settings?.preferred_camera_device_id || undefined,
   };
 
-  const handleRecognition = useCallback(async () => {
+  const handleRecognition = useCallback(async (manualTrigger = false) => {
+    if (!manualTrigger && persistentClient) return;
     if (!isCameraOn || !webcamRef.current || isScanning) return;
 
     const imageSrc = webcamRef.current.getScreenshot();
@@ -40,13 +42,28 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     const result = await recognize(imageSrc);
     
     if (result?.status === 'MATCH_FOUND' && result.match) {
-      const newPersistentClient = { client: result.match, timestamp: Date.now() };
-      setPersistentClient(newPersistentClient);
-      onClientRecognized(result.match);
+      if (persistentClient?.client.id !== result.match.id) {
+        const newPersistentClient = { client: result.match, timestamp: Date.now() };
+        setPersistentClient(newPersistentClient);
+        onClientRecognized(result.match);
+      }
     } else if (result?.message) {
       setLastStatusMessage(result.message);
     }
-  }, [isCameraOn, isScanning, recognize, onClientRecognized]);
+  }, [isCameraOn, isScanning, recognize, onClientRecognized, persistentClient]);
+
+  // Efeito para o scan automático com loop estável
+  useEffect(() => {
+    if (!isCameraOn || !isReady || !isCameraReady || isScanning || persistentClient) {
+        return;
+    }
+
+    const intervalId = setInterval(() => {
+        handleRecognition(false);
+    }, SCAN_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isCameraOn, isReady, isCameraReady, isScanning, persistentClient, handleRecognition]);
 
   // Efeito para limpar o cliente persistente após o tempo de expiração
   useEffect(() => {
@@ -141,7 +158,7 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
         </div>
         
         <Button 
-          onClick={() => handleRecognition()} 
+          onClick={() => handleRecognition(true)} 
           disabled={!isCameraOn || isScanning || !!displayError || !isCameraReady}
           className="w-full"
         >

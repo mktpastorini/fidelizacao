@@ -22,7 +22,7 @@ type MultiLiveRecognitionProps = {
 };
 
 const PERSISTENCE_DURATION_MS = 10000; // 10 segundos
-const SCAN_INTERVAL_MS = 1000; // 1 segundo entre scans
+const SCAN_INTERVAL_MS = 2000; // 2 segundos entre scans por câmera
 
 interface CameraInstance {
   id: string;
@@ -43,12 +43,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
   const [cameraInstances, setCameraInstances] = useState<CameraInstance[]>([]);
   const [allVideoDevices, setAllVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [persistentRecognizedClients, setPersistentRecognizedClients] = useState<RecognizedClientDisplay[]>([]);
-  const cameraIndexRef = useRef(0);
-  const cameraInstancesRef = useRef(cameraInstances);
-
-  useEffect(() => {
-    cameraInstancesRef.current = cameraInstances;
-  }, [cameraInstances]);
 
   // --- Setup Inicial de Câmeras ---
   useEffect(() => {
@@ -108,25 +102,27 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
   }, []);
 
-  // --- Lógica de Varredura Automática (Loop Único) ---
+  // --- Lógica de Varredura Automática por Câmera ---
   useEffect(() => {
-    const scanLoop = async () => {
-      if (isRecognitionLoading) return;
+    const timeouts: NodeJS.Timeout[] = [];
+    const allocatedSet = new Set(allocatedClientIds);
 
-      const activeCameras = cameraInstancesRef.current.filter(c => c.isCameraOn && c.isCameraReady && !c.mediaError && c.webcamRef.current);
-      if (activeCameras.length === 0) return;
-
-      const cam = activeCameras[cameraIndexRef.current % activeCameras.length];
-      cameraIndexRef.current += 1;
+    const scanCamera = async (cam: CameraInstance) => {
+      if (!cam.isCameraOn || !cam.isCameraReady || cam.mediaError || isRecognitionLoading || !cam.webcamRef.current) {
+        timeouts.push(setTimeout(() => scanCamera(cam), 1000));
+        return;
+      }
 
       const imageSrc = cam.webcamRef.current.getScreenshot();
-      if (!imageSrc) return;
+      if (!imageSrc) {
+        timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
+        return;
+      }
 
       const results = await recognizeMultiple(imageSrc);
       
       updateCameraInstance(cam.id, { recognizedFaces: results, lastRecognitionTime: Date.now() });
 
-      const allocatedSet = new Set(allocatedClientIds);
       setPersistentRecognizedClients(prevClients => {
         const now = Date.now();
         const updatedClients = [...prevClients];
@@ -143,12 +139,21 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         });
         return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
       });
+
+      timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
     };
 
-    const intervalId = setInterval(scanLoop, SCAN_INTERVAL_MS);
+    cameraInstances.forEach(scanCamera);
 
-    return () => clearInterval(intervalId);
-  }, [isRecognitionLoading, recognizeMultiple, updateCameraInstance, allocatedClientIds]);
+    return () => {
+      timeouts.forEach(clearTimeout);
+    };
+  }, [
+    cameraInstances.map(c => `${c.id}-${c.isCameraOn}-${c.isCameraReady}-${c.deviceId}-${c.mediaError}`).join(),
+    recognizeMultiple, 
+    updateCameraInstance, 
+    allocatedClientIds
+  ]);
 
   // --- Sincronização e Limpeza de Clientes Persistentes ---
   useEffect(() => {
@@ -268,7 +273,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
           {isRecognitionLoading ? (
             <div className="text-center space-y-2">
               <Loader2 className="w-8 h-8 animate-spin mx-auto" />
-              <p>Analisando...</p>
+              <p>Analisando múltiplos rostos...</p>
             </div>
           ) : persistentRecognizedClients.length > 0 ? (
             <div className="text-center space-y-2 animate-in fade-in">
