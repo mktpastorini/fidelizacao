@@ -14,6 +14,7 @@ type LiveRecognitionProps = {
 };
 
 const PERSISTENCE_DURATION_MS = 10000; // Manter o resultado por 10 segundos
+const SCAN_INTERVAL_MS = 2000; // A cada 2 segundos
 
 export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
   const webcamRef = useRef<Webcam>(null);
@@ -51,19 +52,28 @@ export function LiveRecognition({ onClientRecognized }: LiveRecognitionProps) {
     }
   }, [isCameraOn, isScanning, recognize, onClientRecognized, persistentClient]);
 
-  // Efeito para o scan automático
+  // Efeito para o scan automático com loop estável
   useEffect(() => {
-    if (!isCameraOn || !isReady || !isCameraReady || isScanning || persistentClient) {
-        return;
-    }
+    let isLoopRunning = true;
 
-    const SCAN_INTERVAL_MS = 2000; // A cada 2 segundos
+    const scanLoop = async () => {
+      if (!isLoopRunning) return;
 
-    const intervalId = setInterval(() => {
-        handleRecognition(false);
-    }, SCAN_INTERVAL_MS);
+      if (isCameraOn && isReady && isCameraReady && !isScanning && !persistentClient) {
+        await handleRecognition(false);
+      }
 
-    return () => clearInterval(intervalId);
+      if (isLoopRunning) {
+        setTimeout(scanLoop, SCAN_INTERVAL_MS);
+      }
+    };
+
+    const timeoutId = setTimeout(scanLoop, 500); // Inicia o loop
+
+    return () => {
+      isLoopRunning = false;
+      clearTimeout(timeoutId);
+    };
   }, [isCameraOn, isReady, isCameraReady, isScanning, persistentClient, handleRecognition]);
 
   // Efeito para limpar o cliente persistente após o tempo de expiração
