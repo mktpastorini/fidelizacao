@@ -143,11 +143,13 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
 
     const loop = () => {
-      scanAllCameras();
-      scanTimeoutRef.current = setTimeout(loop, scanInterval);
+      scanAllCameras().finally(() => {
+        scanTimeoutRef.current = setTimeout(loop, scanInterval);
+      });
     };
 
-    scanTimeoutRef.current = setTimeout(loop, scanInterval);
+    // Start the first scan immediately
+    loop();
 
     return () => {
       if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);

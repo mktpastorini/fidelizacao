@@ -18,6 +18,7 @@ import {
   UtensilsCrossed,
   DollarSign,
   Package, // Importado
+  ScanFace,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +28,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 const allNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
+  { to: "/caixa", icon: ScanFace, label: "Caixa", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/delivery", icon: Package, label: "Delivery", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
