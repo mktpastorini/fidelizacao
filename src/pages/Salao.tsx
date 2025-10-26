@@ -8,14 +8,13 @@ import { NewClientDialog } from "@/components/dashboard/NewClientDialog";
 import { MesaCard } from "@/components/mesas/MesaCard";
 import { PedidoModal } from "@/components/mesas/PedidoModal";
 import { OcuparMesaDialog } from "@/components/mesas/OcuparMesaDialog";
-import { UserPlus, Lock, Unlock, ScanFace, Users } from "lucide-react";
+import { UserPlus, Lock, Unlock } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { CashierMode } from "@/components/caixa/CashierMode";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -23,6 +22,7 @@ import { useApprovalRequest } from "@/hooks/useApprovalRequest";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useSuperadminId } from "@/hooks/useSuperadminId";
 import { usePageActions } from "@/contexts/PageActionsContext";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type Ocupante = { cliente: { id: string; nome: string } | null };
 type MesaComOcupantes = Mesa & { ocupantes: Ocupante[] };
@@ -88,7 +88,6 @@ export default function SalaoPage() {
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
-  const [recognitionMode, setRecognitionMode] = useState<'caixa' | 'multi'>('multi');
   const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
     { client: Cliente; timestamp: number }[]
   >([]);
@@ -187,14 +186,6 @@ export default function SalaoPage() {
           </TooltipProvider>
         )}
         <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
-        <Button 
-          variant="outline" 
-          onClick={() => setRecognitionMode(prev => prev === 'caixa' ? 'multi' : 'caixa')} 
-          disabled={isClosed}
-        >
-          {recognitionMode === 'caixa' ? <Users className="w-4 h-4 mr-2" /> : <ScanFace className="w-4 h-4 mr-2" />}
-          {recognitionMode === 'caixa' ? "Multi-Detecção" : "Modo Caixa"}
-        </Button>
       </div>
     );
 
@@ -203,7 +194,7 @@ export default function SalaoPage() {
     return () => {
       setPageActions(null);
     };
-  }, [setPageActions, isClosed, openDayMutation, closeDayMutation, isCloseDayReady, canCloseDay, recognitionMode]);
+  }, [setPageActions, isClosed, openDayMutation, closeDayMutation, isCloseDayReady, canCloseDay]);
 
   const allocatedClientIds = data?.mesas
     .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
@@ -469,35 +460,31 @@ export default function SalaoPage() {
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize={30} minSize={25}>
-          {recognitionMode === 'caixa' ? (
-            <CashierMode />
-          ) : (
-            <MultiLiveRecognition onRecognizedFacesUpdate={handleMultiFaceUpdate} allocatedClientIds={allocatedClientIds} />
-          )}
+        <ResizablePanel defaultSize={25} minSize={20}>
+          <MultiLiveRecognition onRecognizedFacesUpdate={handleMultiFaceUpdate} allocatedClientIds={allocatedClientIds} />
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={70} minSize={30}>
-          {recognitionMode === 'caixa' ? (
-            <div className="h-full overflow-y-auto p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {mesasComPedidos?.map(mesa => (
-                  <MesaCard 
-                    key={mesa.id} 
-                    mesa={mesa} 
-                    ocupantesCount={mesa.ocupantes.length} 
-                    onClick={() => handleMesaClick(mesa)} 
-                    onEditMesa={() => {}} 
-                    onFreeMesa={() => setMesaToFree(mesa)}
-                    onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
-                    onDelete={() => {}} 
-                  />
-                ))}
-              </div>
+        <ResizablePanel defaultSize={25} minSize={20}>
+          <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={50} minSize={30}>
+          <ScrollArea className="h-full">
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {mesasComPedidos?.map(mesa => (
+                <MesaCard 
+                  key={mesa.id} 
+                  mesa={mesa} 
+                  ocupantesCount={mesa.ocupantes.length} 
+                  onClick={() => handleMesaClick(mesa)} 
+                  onEditMesa={() => {}} 
+                  onFreeMesa={() => setMesaToFree(mesa)}
+                  onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
+                  onDelete={() => {}} 
+                />
+              ))}
             </div>
-          ) : (
-            <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
-          )}
+          </ScrollArea>
         </ResizablePanel>
       </ResizablePanelGroup>
 
