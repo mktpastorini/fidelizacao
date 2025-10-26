@@ -2,17 +2,27 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import { useFaceRecognition } from '@/hooks/useFaceRecognition';
 import { useSettings } from '@/contexts/SettingsContext';
-import { Cliente } from '@/types/supabase';
+import { Cliente, StaffProfile } from '@/types/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, User, Video, VideoOff, Camera } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentModal } from './PaymentModal';
+import { useQuery } from '@tanstack/react-query';
 
 type CashierModeProps = {};
 
 const SCAN_INTERVAL_MS = 2000;
+
+async function fetchWaiters(): Promise<StaffProfile[]> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, first_name, last_name, role")
+    .in("role", ['garcom', 'balcao', 'gerente', 'admin', 'superadmin']);
+  if (error) throw error;
+  return data as StaffProfile[] || [];
+}
 
 export function CashierMode({}: CashierModeProps) {
   const webcamRef = useRef<Webcam>(null);
@@ -25,6 +35,11 @@ export function CashierMode({}: CashierModeProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [foundClient, setFoundClient] = useState<Cliente | null>(null);
   const [tableData, setTableData] = useState<any>(null);
+
+  const { data: waiters } = useQuery({
+    queryKey: ["waiters"],
+    queryFn: fetchWaiters,
+  });
 
   const videoConstraints = {
     width: 400,
@@ -152,6 +167,7 @@ export function CashierMode({}: CashierModeProps) {
         onOpenChange={setIsModalOpen}
         cliente={foundClient}
         tableData={tableData}
+        waiters={waiters || []}
       />
     </>
   );
