@@ -326,6 +326,40 @@ export default function ConfiguracoesPage() {
               <CardHeader><CardTitle>Configuração da Câmera</CardTitle><CardDescription>Escolha a câmera que será usada como padrão em todo o sistema.</CardDescription></CardHeader>
               <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
             </Card>
+            <Card>
+              <CardHeader><CardTitle>Configurações de Multi-Detecção</CardTitle><CardDescription>Ajuste os parâmetros para o modo de reconhecimento de múltiplos rostos.</CardDescription></CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-24 w-full" /> : (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="multi-detection-interval">Intervalo de Varredura (ms)</Label>
+                      <Input
+                        id="multi-detection-interval"
+                        type="number"
+                        placeholder="2000"
+                        defaultValue={settings?.multi_detection_interval || 2000}
+                        onBlur={(e) => updateSettingsMutation.mutate({ multi_detection_interval: parseInt(e.target.value) })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Tempo em milissegundos entre cada tentativa de reconhecimento. Valores menores consomem mais recursos.</p>
+                    </div>
+                    <div>
+                      <Label htmlFor="multi-detection-confidence">Confiança Mínima (0.0 a 1.0)</Label>
+                      <Input
+                        id="multi-detection-confidence"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="1"
+                        placeholder="0.85"
+                        defaultValue={settings?.multi_detection_confidence || 0.85}
+                        onBlur={(e) => updateSettingsMutation.mutate({ multi_detection_confidence: parseFloat(e.target.value) })}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Nível de confiança mínimo para considerar um rosto como um match. Padrão: 0.85.</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 

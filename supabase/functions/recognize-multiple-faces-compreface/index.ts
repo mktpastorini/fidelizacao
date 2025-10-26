@@ -59,7 +59,7 @@ serve(async (req) => {
 
   try {
     console.log("[RF-MULTI] 1/7: Parsing body da requisição...");
-    const { image_url } = await req.json();
+    const { image_url, min_similarity } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
     console.log("[RF-MULTI] 1/7: Body recebido.");
 
@@ -114,7 +114,7 @@ serve(async (req) => {
     }
 
     const recognizedFaces = [];
-    const minSimilarity = 0.85;
+    const minSimilarity = min_similarity ?? 0.85;
 
     if (responseBody.result && Array.isArray(responseBody.result)) {
       console.log(`[RF-MULTI] 6/7: Processando ${responseBody.result.length} rosto(s) detectado(s)...`);

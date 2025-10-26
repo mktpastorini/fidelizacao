@@ -76,6 +76,8 @@ export type UserSettings = {
   delivery_in_preparation_template_id?: string | null;
   delivery_ready_template_id?: string | null;
   delivery_out_for_delivery_template_id?: string | null;
+  multi_detection_interval?: number;
+  multi_detection_confidence?: number;
 };
 
 export type Pedido = {

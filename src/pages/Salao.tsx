@@ -15,7 +15,7 @@ import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { LiveRecognition } from "@/components/salao/LiveRecognition";
+import { CashierMode } from "@/components/caixa/CashierMode";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -88,7 +88,7 @@ export default function SalaoPage() {
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [mesaToFree, setMesaToFree] = useState<Mesa | null>(null);
   const [recognizedClient, setRecognizedClient] = useState<Cliente | null>(null);
-  const [isMultiDetectionMode, setIsMultiDetectionMode] = useState(false);
+  const [recognitionMode, setRecognitionMode] = useState<'caixa' | 'multi'>('multi');
   const [currentRecognizedClients, setCurrentRecognizedClients] = useState<
     { client: Cliente; timestamp: number }[]
   >([]);
@@ -189,11 +189,11 @@ export default function SalaoPage() {
         <Button onClick={() => setIsNewClientOpen(true)} disabled={isClosed}><UserPlus className="w-4 h-4 mr-2" />Novo Cliente</Button>
         <Button 
           variant="outline" 
-          onClick={() => setIsMultiDetectionMode(prev => !prev)} 
+          onClick={() => setRecognitionMode(prev => prev === 'caixa' ? 'multi' : 'caixa')} 
           disabled={isClosed}
         >
-          {isMultiDetectionMode ? <ScanFace className="w-4 h-4 mr-2" /> : <Users className="w-4 h-4 mr-2" />}
-          {isMultiDetectionMode ? "Modo Único" : "Multi-Detecção"}
+          {recognitionMode === 'caixa' ? <Users className="w-4 h-4 mr-2" /> : <ScanFace className="w-4 h-4 mr-2" />}
+          {recognitionMode === 'caixa' ? "Multi-Detecção" : "Modo Caixa"}
         </Button>
       </div>
     );
@@ -203,7 +203,7 @@ export default function SalaoPage() {
     return () => {
       setPageActions(null);
     };
-  }, [setPageActions, isClosed, openDayMutation, closeDayMutation, isCloseDayReady, canCloseDay, isMultiDetectionMode]);
+  }, [setPageActions, isClosed, openDayMutation, closeDayMutation, isCloseDayReady, canCloseDay, recognitionMode]);
 
   const allocatedClientIds = data?.mesas
     .flatMap(mesa => mesa.ocupantes.map(o => o.cliente?.id).filter(Boolean) as string[])
@@ -429,24 +429,6 @@ export default function SalaoPage() {
     }
   };
 
-  const handleClientRecognized = (cliente: Cliente) => {
-    if (isClosed) {
-      return;
-    }
-    
-    if (allocatedClientIds.includes(cliente.id)) {
-        setRecognizedClient(null); 
-        return;
-    }
-
-    if (recognizedClient?.id === cliente.id && isArrivalOpen) {
-      return;
-    }
-    
-    setRecognizedClient(cliente);
-    setIsArrivalOpen(true);
-  };
-
   const handleAllocateClientFromPanel = (client: Cliente) => {
     if (isClosed) {
       showError("O estabelecimento está fechado. Não é possível alocar clientes.");
@@ -487,18 +469,16 @@ export default function SalaoPage() {
       </div>
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize={isMultiDetectionMode ? 33 : 30} minSize={25}>
-          {isMultiDetectionMode ? (
-            <MultiLiveRecognition onRecognizedFacesUpdate={handleMultiFaceUpdate} allocatedClientIds={allocatedClientIds} />
+        <ResizablePanel defaultSize={30} minSize={25}>
+          {recognitionMode === 'caixa' ? (
+            <CashierMode />
           ) : (
-            <LiveRecognition onClientRecognized={handleClientRecognized} />
+            <MultiLiveRecognition onRecognizedFacesUpdate={handleMultiFaceUpdate} allocatedClientIds={allocatedClientIds} />
           )}
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={isMultiDetectionMode ? 33 : 70} minSize={30}>
-          {isMultiDetectionMode ? (
-            <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
-          ) : (
+        <ResizablePanel defaultSize={70} minSize={30}>
+          {recognitionMode === 'caixa' ? (
             <div className="h-full overflow-y-auto p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {mesasComPedidos?.map(mesa => (
@@ -515,31 +495,10 @@ export default function SalaoPage() {
                 ))}
               </div>
             </div>
+          ) : (
+            <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
           )}
         </ResizablePanel>
-        {isMultiDetectionMode && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={34} minSize={20}>
-              <div className="h-full overflow-y-auto p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {mesasComPedidos?.map(mesa => (
-                    <MesaCard 
-                      key={mesa.id} 
-                      mesa={mesa} 
-                      ocupantesCount={mesa.ocupantes.length} 
-                      onClick={() => handleMesaClick(mesa)} 
-                      onEditMesa={() => {}} 
-                      onFreeMesa={() => setMesaToFree(mesa)}
-                      onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
-                      onDelete={() => {}} 
-                    />
-                  ))}
-                </div>
-              </div>
-            </ResizablePanel>
-          </>
-        )}
       </ResizablePanelGroup>
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />

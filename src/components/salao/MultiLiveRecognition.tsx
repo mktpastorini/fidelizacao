@@ -22,7 +22,6 @@ type MultiLiveRecognitionProps = {
 };
 
 const PERSISTENCE_DURATION_MS = 10000; // 10 segundos
-const SCAN_INTERVAL_MS = 2000; // 2 segundos entre scans por câmera
 
 interface CameraInstance {
   id: string;
@@ -32,7 +31,6 @@ interface CameraInstance {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   mediaError: string | null;
   recognizedFaces: FaceMatch[];
-  lastRecognitionTime: number;
   isCameraReady: boolean;
 }
 
@@ -43,6 +41,10 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
   const [cameraInstances, setCameraInstances] = useState<CameraInstance[]>([]);
   const [allVideoDevices, setAllVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [persistentRecognizedClients, setPersistentRecognizedClients] = useState<RecognizedClientDisplay[]>([]);
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const scanInterval = settings?.multi_detection_interval || 2000;
+  const minConfidence = settings?.multi_detection_confidence || 0.85;
 
   // --- Setup Inicial de Câmeras ---
   useEffect(() => {
@@ -67,7 +69,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
             canvasRef: React.createRef(),
             mediaError: err.message,
             recognizedFaces: [],
-            lastRecognitionTime: 0,
             isCameraReady: false,
           }]);
         }
@@ -88,7 +89,6 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
         canvasRef: React.createRef(),
         mediaError: null,
         recognizedFaces: [],
-        lastRecognitionTime: 0,
         isCameraReady: false,
       }
     ]);
@@ -102,73 +102,62 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
     setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
   }, []);
 
-  // --- Lógica de Varredura Automática por Câmera ---
-  useEffect(() => {
-    const timeouts: NodeJS.Timeout[] = [];
+  // --- Lógica de Varredura Automática ---
+  const scanAllCameras = useCallback(async () => {
+    if (isRecognitionLoading) return;
+
+    const activeCameras = cameraInstances.filter(cam => cam.isCameraOn && cam.isCameraReady && !cam.mediaError && cam.webcamRef.current);
+    if (activeCameras.length === 0) return;
+
+    const allResults: FaceMatch[] = [];
+    for (const cam of activeCameras) {
+      const imageSrc = cam.webcamRef.current?.getScreenshot();
+      if (imageSrc) {
+        const results = await recognizeMultiple(imageSrc, minConfidence);
+        updateCameraInstance(cam.id, { recognizedFaces: results });
+        allResults.push(...results);
+      }
+    }
+
     const allocatedSet = new Set(allocatedClientIds);
-
-    const scanCamera = async (cam: CameraInstance) => {
-      if (!cam.isCameraOn || !cam.isCameraReady || cam.mediaError || isRecognitionLoading || !cam.webcamRef.current) {
-        timeouts.push(setTimeout(() => scanCamera(cam), 1000));
-        return;
-      }
-
-      const imageSrc = cam.webcamRef.current.getScreenshot();
-      if (!imageSrc) {
-        timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
-        return;
-      }
-
-      const results = await recognizeMultiple(imageSrc);
+    setPersistentRecognizedClients(prevClients => {
+      const now = Date.now();
+      const updatedClients = [...prevClients];
       
-      updateCameraInstance(cam.id, { recognizedFaces: results, lastRecognitionTime: Date.now() });
-
-      setPersistentRecognizedClients(prevClients => {
-        const now = Date.now();
-        const updatedClients = [...prevClients];
-        
-        results.forEach(match => {
-          if (!allocatedSet.has(match.client.id)) {
-            const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
-            if (existingIndex !== -1) {
-              updatedClients[existingIndex].timestamp = now;
-            } else {
-              updatedClients.push({ client: match.client, timestamp: now });
-            }
+      allResults.forEach(match => {
+        if (!allocatedSet.has(match.client.id)) {
+          const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
+          if (existingIndex !== -1) {
+            updatedClients[existingIndex].timestamp = now;
+          } else {
+            updatedClients.push({ client: match.client, timestamp: now });
           }
-        });
-        return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+        }
       });
+      return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
+    });
 
-      timeouts.push(setTimeout(() => scanCamera(cam), SCAN_INTERVAL_MS));
+  }, [cameraInstances, isRecognitionLoading, recognizeMultiple, minConfidence, updateCameraInstance, allocatedClientIds]);
+
+  useEffect(() => {
+    if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+
+    const loop = () => {
+      scanAllCameras();
+      scanTimeoutRef.current = setTimeout(loop, scanInterval);
     };
 
-    cameraInstances.forEach(scanCamera);
+    scanTimeoutRef.current = setTimeout(loop, scanInterval);
 
     return () => {
-      timeouts.forEach(clearTimeout);
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
     };
-  }, [
-    cameraInstances.map(c => `${c.id}-${c.isCameraOn}-${c.isCameraReady}-${c.deviceId}-${c.mediaError}`).join(),
-    recognizeMultiple, 
-    updateCameraInstance, 
-    allocatedClientIds
-  ]);
+  }, [scanAllCameras, scanInterval]);
 
   // --- Sincronização e Limpeza de Clientes Persistentes ---
   useEffect(() => {
     onRecognizedFacesUpdate(persistentRecognizedClients);
-    
-    const cleanupInterval = setInterval(() => {
-      setPersistentRecognizedClients(prevClients => {
-        const now = Date.now();
-        const allocatedSet = new Set(allocatedClientIds);
-        return prevClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
-      });
-    }, 5000);
-
-    return () => clearInterval(cleanupInterval);
-  }, [persistentRecognizedClients, onRecognizedFacesUpdate, allocatedClientIds]);
+  }, [persistentRecognizedClients, onRecognizedFacesUpdate]);
 
   const getAvailableDevices = useCallback((currentDeviceId: string | null) => {
     const usedDeviceIds = new Set(cameraInstances.map(c => c.deviceId).filter(Boolean));
@@ -202,7 +191,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                 <p>Clique em "Adicionar Câmera" para começar.</p>
               </div>
             )}
-            {cameraInstances.map((cam, index) => (
+            {cameraInstances.map((cam) => (
               <div key={cam.id} className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
                 {cam.isCameraOn && !cam.mediaError ? (
                   <>
@@ -214,7 +203,7 @@ export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientI
                       className="w-full h-full object-cover"
                       mirrored={true}
                       onUserMedia={() => updateCameraInstance(cam.id, { isCameraReady: true })}
-                      onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: err.message, isCameraOn: false, isCameraReady: false })}
+                      onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: (err as Error).message, isCameraOn: false, isCameraReady: false })}
                     />
                     <canvas ref={cam.canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
                     <Button 

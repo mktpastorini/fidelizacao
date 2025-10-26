@@ -17,12 +17,12 @@ export function useMultiFaceRecognition() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const recognizeMultiple = useCallback(async (imageSrc: string) => {
+  const recognizeMultiple = useCallback(async (imageSrc: string, minSimilarity?: number) => {
     setIsLoading(true);
     setError(null);
     try {
       const { data, error: functionError } = await supabase.functions.invoke('recognize-multiple-faces-compreface', {
-        body: { image_url: imageSrc },
+        body: { image_url: imageSrc, min_similarity: minSimilarity },
       });
 
       if (functionError) throw functionError;
