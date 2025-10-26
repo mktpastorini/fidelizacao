@@ -430,31 +430,24 @@ export default function SalaoPage() {
   };
 
   const handleClientRecognized = (cliente: Cliente) => {
-    console.log(`[SalaoPage] Cliente reconhecido no modo único: ${cliente.nome}. Verificando se já está alocado...`);
     if (isClosed) {
-      console.warn("[SalaoPage] Estabelecimento fechado. Ignorando reconhecimento.");
       return;
     }
     
     if (allocatedClientIds.includes(cliente.id)) {
-        console.log(`[SalaoPage] Cliente ${cliente.nome} já está alocado. Ignorando modal de chegada.`);
-        // Se o cliente já está alocado, limpamos o resultado do reconhecimento para evitar repetição
         setRecognizedClient(null); 
         return;
     }
 
     if (recognizedClient?.id === cliente.id && isArrivalOpen) {
-      console.log(`[SalaoPage] Modal de chegada para ${cliente.nome} já está aberto.`);
       return;
     }
     
-    console.log(`[SalaoPage] Abrindo modal de chegada para ${cliente.nome}.`);
     setRecognizedClient(cliente);
     setIsArrivalOpen(true);
   };
 
   const handleAllocateClientFromPanel = (client: Cliente) => {
-    console.log(`[SalaoPage] Tentando alocar cliente do painel: ${client.nome}`);
     if (isClosed) {
       showError("O estabelecimento está fechado. Não é possível alocar clientes.");
       return;
@@ -464,7 +457,6 @@ export default function SalaoPage() {
   };
 
   const handleMultiFaceUpdate = (clients: { client: Cliente; timestamp: number }[]) => {
-    console.log(`[SalaoPage] Atualização do modo multi-câmera recebida. ${clients.length} cliente(s) na lista.`);
     setCurrentRecognizedClients(clients);
   };
 
@@ -494,19 +486,21 @@ export default function SalaoPage() {
         </div>
       </div>
 
-      {isMultiDetectionMode ? (
-        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-          <ResizablePanel defaultSize={33} minSize={20}>
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+        <ResizablePanel defaultSize={isMultiDetectionMode ? 33 : 30} minSize={25}>
+          {isMultiDetectionMode ? (
             <MultiLiveRecognition onRecognizedFacesUpdate={handleMultiFaceUpdate} allocatedClientIds={allocatedClientIds} />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={33} minSize={20}>
+          ) : (
+            <LiveRecognition onClientRecognized={handleClientRecognized} />
+          )}
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={isMultiDetectionMode ? 33 : 70} minSize={30}>
+          {isMultiDetectionMode ? (
             <RecognizedClientsPanel clients={currentRecognizedClients} onAllocateClient={handleAllocateClientFromPanel} allocatedClientIds={allocatedClientIds} />
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={34} minSize={20}>
+          ) : (
             <div className="h-full overflow-y-auto p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {mesasComPedidos?.map(mesa => (
                   <MesaCard 
                     key={mesa.id} 
@@ -521,29 +515,32 @@ export default function SalaoPage() {
                 ))}
               </div>
             </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <div className="grid lg:grid-cols-3 gap-8 items-start">
-          <div className="lg:col-span-1">
-            <LiveRecognition onClientRecognized={handleClientRecognized} />
-          </div>
-          <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {mesasComPedidos?.map(mesa => (
-              <MesaCard 
-                key={mesa.id} 
-                mesa={mesa} 
-                ocupantesCount={mesa.ocupantes.length} 
-                onClick={() => handleMesaClick(mesa)} 
-                onEditMesa={() => {}} 
-                onFreeMesa={() => setMesaToFree(mesa)}
-                onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
-                onDelete={() => {}} 
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          )}
+        </ResizablePanel>
+        {isMultiDetectionMode && (
+          <>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={34} minSize={20}>
+              <div className="h-full overflow-y-auto p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {mesasComPedidos?.map(mesa => (
+                    <MesaCard 
+                      key={mesa.id} 
+                      mesa={mesa} 
+                      ocupantesCount={mesa.ocupantes.length} 
+                      onClick={() => handleMesaClick(mesa)} 
+                      onEditMesa={() => {}} 
+                      onFreeMesa={() => setMesaToFree(mesa)}
+                      onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
+                      onDelete={() => {}} 
+                    />
+                  ))}
+                </div>
+              </div>
+            </ResizablePanel>
+          </>
+        )}
+      </ResizablePanelGroup>
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
       <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
