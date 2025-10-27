@@ -14,6 +14,7 @@ const TABLES_WITH_IMAGES = {
 };
 
 serve(async (req) => {
+  console.log("Import data function invoked."); // Log de diagnóstico
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }

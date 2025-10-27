@@ -20,6 +20,7 @@ const TABLES_WITH_IMAGES = {
 };
 
 serve(async (req) => {
+  console.log("Export data function invoked."); // Log de diagnóstico
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
