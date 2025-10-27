@@ -21,7 +21,22 @@ export function DebtorAlertModal({ isOpen, onOpenChange, cliente }: DebtorAlertM
       const defaultPhrase = "{nome}, por favor, dirija-se ao caixa para efetuar o pagamento.";
       const phrase = settings?.exit_alert_phrase || defaultPhrase;
       const personalizedPhrase = phrase.replace(/{nome}/g, cliente.nome);
-      speak(personalizedPhrase);
+      
+      const speakAndRepeat = () => {
+        // Só fala se não estiver falando no momento, para evitar sobreposição
+        if (!window.speechSynthesis.speaking) {
+          speak(personalizedPhrase);
+        }
+      };
+
+      speakAndRepeat(); // Fala imediatamente ao abrir o modal
+      const intervalId = setInterval(speakAndRepeat, 7000); // Repete a cada 7 segundos
+
+      // Limpa o intervalo e para a fala quando o modal é fechado
+      return () => {
+        clearInterval(intervalId);
+        window.speechSynthesis.cancel();
+      };
     }
   }, [isOpen, cliente, settings]);
 
@@ -29,7 +44,7 @@ export function DebtorAlertModal({ isOpen, onOpenChange, cliente }: DebtorAlertM
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl bg-destructive text-destructive-foreground border-4 border-yellow-400 animate-pulse p-0">
+      <DialogContent className="max-w-2xl bg-destructive text-destructive-foreground border-4 border-yellow-400 p-0">
         <div className="flex flex-col items-center justify-center p-12 text-center">
           <AlertTriangle className="w-24 h-24 text-yellow-400 mb-4" />
           <h1 className="text-4xl font-extrabold uppercase tracking-wider">Alerta de Saída</h1>

@@ -8,8 +8,12 @@ export default function SaidaPage() {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
 
   const handleDebtorDetected = (cliente: Cliente) => {
-    setDebtor(cliente);
-    setIsAlertOpen(true);
+    // Só dispara o alerta se ele não estiver aberto,
+    // para evitar que o modal fique "piscando" ou seja impossível de fechar.
+    if (!isAlertOpen) {
+      setDebtor(cliente);
+      setIsAlertOpen(true);
+    }
   };
 
   return (
