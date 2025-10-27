@@ -22,23 +22,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Verifica se o cliente está em alguma mesa com um pedido 'aberto'
-    const { data: openOrder, error } = await supabaseAdmin
-      .from('mesa_ocupantes')
-      .select(`
-        pedido:pedidos!inner(id)
-      `)
-      .eq('cliente_id', cliente_id)
-      .eq('pedido.status', 'aberto')
-      .limit(1)
-      .maybeSingle();
+    // Chama a função RPC para verificar se o cliente tem uma conta aberta
+    const { data: hasOpenOrder, error } = await supabaseAdmin.rpc('check_client_has_open_order', {
+      p_cliente_id: cliente_id,
+    });
 
     if (error) {
-      console.error("Erro ao verificar status do cliente:", error);
+      console.error("Erro ao chamar RPC check_client_has_open_order:", error);
       throw new Error("Erro ao consultar o banco de dados.");
     }
 
-    return new Response(JSON.stringify({ hasOpenOrder: !!openOrder }), {
+    return new Response(JSON.stringify({ hasOpenOrder }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
