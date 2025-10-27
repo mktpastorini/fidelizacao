@@ -114,6 +114,7 @@ serve(async (req) => {
           .from('clientes')
           .select('*, filhos(*)')
           .eq('id', bestMatch.subject)
+          .eq('user_id', superadminId) // CORREÇÃO: Adicionado filtro de user_id
           .single();
 
         if (clientError) {
