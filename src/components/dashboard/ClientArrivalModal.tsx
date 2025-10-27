@@ -21,7 +21,7 @@ type ClientArrivalModalProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   cliente: Cliente | null;
-  mesasLivres: Mesa[];
+  availableTables: (Mesa & { ocupantes_count: number })[];
   onAllocateTable: (mesaId: string) => void;
   isAllocating: boolean;
 };
@@ -30,7 +30,7 @@ export function ClientArrivalModal({
   isOpen,
   onOpenChange,
   cliente,
-  mesasLivres,
+  availableTables,
   onAllocateTable,
   isAllocating,
 }: ClientArrivalModalProps) {
@@ -77,17 +77,17 @@ export function ClientArrivalModal({
             <label htmlFor="mesa-select" className="text-sm font-medium">Alocar à Mesa</label>
             <Select onValueChange={setSelectedMesaId}>
               <SelectTrigger id="mesa-select" className="mt-1">
-                <SelectValue placeholder="Selecione uma mesa livre" />
+                <SelectValue placeholder="Selecione uma mesa disponível" />
               </SelectTrigger>
               <SelectContent>
-                {mesasLivres.length > 0 ? (
-                  mesasLivres.map((mesa) => (
+                {availableTables.length > 0 ? (
+                  availableTables.map((mesa) => (
                     <SelectItem key={mesa.id} value={mesa.id}>
-                      Mesa {mesa.numero} (Capacidade: {mesa.capacidade})
+                      Mesa {mesa.numero} (Ocupação: {mesa.ocupantes_count} / {mesa.capacidade})
                     </SelectItem>
                   ))
                 ) : (
-                  <div className="p-2 text-sm text-muted-foreground">Nenhuma mesa livre.</div>
+                  <div className="p-2 text-sm text-muted-foreground">Nenhuma mesa com lugar disponível.</div>
                 )}
               </SelectContent>
             </Select>

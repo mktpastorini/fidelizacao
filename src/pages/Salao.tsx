@@ -205,26 +205,41 @@ export default function SalaoPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      let pedidoId: string | null = null;
-      const { data: existingPedido, error: existingPedidoError } = await supabase
-        .from("pedidos")
-        .select("id")
-        .eq("mesa_id", mesaId)
-        .eq("status", "aberto")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const mesaToOccupy = data?.mesas.find(m => m.id === mesaId);
+      const isAlreadyOccupied = !!mesaToOccupy?.cliente_id;
 
-      if (existingPedidoError) {
-        console.warn("Erro ao buscar pedido existente:", existingPedidoError.message);
-      }
+      if (isAlreadyOccupied) {
+        const { data: existingPedido, error: existingPedidoError } = await supabase
+          .from("pedidos")
+          .select("id, acompanhantes")
+          .eq("mesa_id", mesaId)
+          .eq("status", "aberto")
+          .single();
+        
+        if (existingPedidoError || !existingPedido) {
+          throw new Error("Não foi possível encontrar o pedido aberto para esta mesa ocupada.");
+        }
 
-      if (existingPedido) {
-        pedidoId = existingPedido.id;
-        await supabase.from("pedidos").update({
-          cliente_id: cliente.id,
-          acompanhantes: [{ id: cliente.id, nome: cliente.nome }],
-        }).eq("id", pedidoId);
+        const currentAcompanhantes = existingPedido.acompanhantes || [];
+        if (!currentAcompanhantes.some((c: any) => c.id === cliente.id)) {
+          const newAcompanhantes = [...currentAcompanhantes, { id: cliente.id, nome: cliente.nome }];
+          const { error: updatePedidoError } = await supabase
+            .from("pedidos")
+            .update({ acompanhantes: newAcompanhantes })
+            .eq("id", existingPedido.id);
+          if (updatePedidoError) throw updatePedidoError;
+        }
+
+        const { error: insertOccupantError } = await supabase
+          .from("mesa_ocupantes")
+          .insert({
+            mesa_id: mesaId,
+            cliente_id: cliente.id,
+            user_id: user.id,
+          });
+        if (insertOccupantError && insertOccupantError.code !== '23505') {
+          throw insertOccupantError;
+        }
       } else {
         const { data: newPedido, error: newPedidoError } = await supabase.from("pedidos").insert({
           mesa_id: mesaId,
@@ -234,17 +249,15 @@ export default function SalaoPage() {
           acompanhantes: [{ id: cliente.id, nome: cliente.nome }],
         }).select("id").single();
         if (newPedidoError) throw newPedidoError;
-        pedidoId = newPedido.id;
-      }
 
-      await supabase.from("mesas").update({ cliente_id: cliente.id }).eq("id", mesaId);
+        await supabase.from("mesas").update({ cliente_id: cliente.id }).eq("id", mesaId);
       
-      await supabase.from("mesa_ocupantes").delete().eq("mesa_id", mesaId);
-      await supabase.from("mesa_ocupantes").insert({
-        mesa_id: mesaId,
-        cliente_id: cliente.id,
-        user_id: user.id,
-      });
+        await supabase.from("mesa_ocupantes").insert({
+          mesa_id: mesaId,
+          cliente_id: cliente.id,
+          user_id: user.id,
+        });
+      }
 
       const { error: functionError } = await supabase.functions.invoke('send-welcome-message', {
         body: { clientId: cliente.id, userId: user.id },
@@ -385,7 +398,7 @@ export default function SalaoPage() {
     return { ...mesa, pedido };
   });
 
-  const mesasLivres = data?.mesas.filter(m => !m.cliente_id) || [];
+  const mesasDisponiveis = data?.mesas.filter(m => m.ocupantes.length < m.capacidade).map(m => ({...m, ocupantes_count: m.ocupantes.length})) || [];
 
   const handleMesaClick = (mesa: Mesa) => {
     if (isClosed && !mesa.cliente_id) {
@@ -489,7 +502,7 @@ export default function SalaoPage() {
       </ResizablePanelGroup>
 
       <NewClientDialog isOpen={isNewClientOpen} onOpenChange={setIsNewClientOpen} clientes={data?.clientes || []} onSubmit={addClientMutation.mutate} isSubmitting={addClientMutation.isPending} />
-      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} mesasLivres={mesasLivres} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
+      <ClientArrivalModal isOpen={isArrivalOpen} onOpenChange={setIsArrivalOpen} cliente={recognizedClient} availableTables={mesasDisponiveis} onAllocateTable={(mesaId) => { if (recognizedClient) { allocateTableMutation.mutate({ cliente: recognizedClient, mesaId }); } }} isAllocating={allocateTableMutation.isPending} />
       <PedidoModal isOpen={isPedidoOpen} onOpenChange={setIsPedidoOpen} mesa={selectedMesa} />
       <OcuparMesaDialog isOpen={isOcuparMesaOpen} onOpenChange={setIsOcuparMesaOpen} mesa={selectedMesa} clientes={data?.clientes || []} onSubmit={(clientePrincipalId, acompanhanteIds, currentOccupantIds) => ocuparMesaMutation.mutate({ clientePrincipalId, acompanhanteIds, currentOccupantIds })} isSubmitting={ocuparMesaMutation.isPending} />
       
