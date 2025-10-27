@@ -127,12 +127,18 @@ serve(async (req) => {
         .delete()
         .eq('mesa_id', current_mesa_id);
     } else if (oldPedido.cliente_id === cliente_id) {
-        // Se o cliente transferido era o principal, o pedido antigo fica sem cliente principal.
-        // Isso é aceitável se restarem itens da "Mesa Geral" ou de outros acompanhantes.
+        // Se o cliente transferido era o principal do PEDIDO, o pedido antigo fica sem cliente principal.
         await supabaseAdmin
             .from('pedidos')
             .update({ cliente_id: null })
             .eq('id', oldPedido.id);
+        
+        // Se o cliente transferido era o principal da MESA, a MESA deve ser liberada.
+        // Os ocupantes restantes (se houver) permanecem como ocupantes.
+        await supabaseAdmin
+            .from('mesas')
+            .update({ cliente_id: null })
+            .eq('id', current_mesa_id);
     }
 
 
