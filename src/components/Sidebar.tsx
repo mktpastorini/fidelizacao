@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog, UtensilsCrossed, DollarSign, Package, ScanFace } from "lucide-react";
+import { Home, Users, MessageSquare, Settings, LogOut, ClipboardList, History, ChefHat, LayoutDashboard, SquareKanban, Table as TableIcon, UserCog, UtensilsCrossed, DollarSign, Package, ScanFace, DoorOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ const allNavItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/", icon: Home, label: "Salão", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/caixa", icon: ScanFace, label: "Caixa", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
+  { to: "/saida", icon: DoorOpen, label: "Saída", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/delivery", icon: Package, label: "Delivery", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },
   { to: "/clientes", icon: Users, label: "Clientes", roles: ['superadmin', 'admin', 'gerente', 'balcao', 'garcom'] },
   { to: "/produtos", icon: ClipboardList, label: "Cardápio", roles: ['superadmin', 'admin', 'gerente', 'balcao'] },

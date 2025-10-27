@@ -78,6 +78,7 @@ export type UserSettings = {
   delivery_out_for_delivery_template_id?: string | null;
   multi_detection_interval?: number;
   multi_detection_confidence?: number;
+  exit_alert_phrase?: string | null; // Nova configuração
 };
 
 export type Pedido = {

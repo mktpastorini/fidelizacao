@@ -14,13 +14,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Copy, RefreshCw, Send, ShieldAlert, UserCog, Database } from "lucide-react";
+import { Copy, RefreshCw, Send, ShieldAlert, UserCog, Database, Volume2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useState, useEffect } from "react";
 import { IFoodSettings } from "@/components/configuracoes/iFoodSettings";
 import { BackupRestore } from "@/components/configuracoes/BackupRestore";
+import { Textarea } from "@/components/ui/textarea";
+import { speak } from "@/utils/tts";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -126,6 +128,11 @@ export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
   const [userId, setUserId] = useState<string | null>(null);
+  const [exitPhrase, setExitPhrase] = useState(settings?.exit_alert_phrase || "");
+
+  useEffect(() => {
+    setExitPhrase(settings?.exit_alert_phrase || "");
+  }, [settings]);
 
   useEffect(() => {
     const fetchUserId = async () => {
@@ -368,6 +375,27 @@ export default function ConfiguracoesPage() {
         {/* 5. Operação do Salão */}
         <TabsContent value="operacao" className="mt-6">
           <div className="space-y-6">
+            <Card>
+              <CardHeader><CardTitle>Alerta de Saída</CardTitle><CardDescription>Configure a frase que será dita quando um cliente com conta aberta for detectado na saída.</CardDescription></CardHeader>
+              <CardContent>
+                {isLoading ? <Skeleton className="h-24 w-full" /> : (
+                  <div className="space-y-2">
+                    <Label htmlFor="exit-phrase">Frase do Alerta</Label>
+                    <Textarea
+                      id="exit-phrase"
+                      placeholder="{nome}, por favor, dirija-se ao caixa para efetuar o pagamento."
+                      value={exitPhrase}
+                      onChange={(e) => setExitPhrase(e.target.value)}
+                      onBlur={() => updateSettingsMutation.mutate({ exit_alert_phrase: exitPhrase })}
+                    />
+                    <p className="text-xs text-muted-foreground">Use <code className="bg-muted p-1 rounded">{'{nome}'}</code> para inserir o nome do cliente.</p>
+                    <Button variant="outline" size="sm" onClick={() => speak(exitPhrase.replace(/{nome}/g, 'Cliente Exemplo'))}>
+                      <Volume2 className="w-4 h-4 mr-2" /> Testar Voz
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             <Card>
               <CardHeader><CardTitle>Fechamento do Dia</CardTitle><CardDescription>Configure o relatório diário e o fechamento automático.</CardDescription></CardHeader>
               <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : isError ? <p className="text-red-500">Erro ao carregar.</p> : (<div className="space-y-4"><div><Label htmlFor="report-phone">Nº de WhatsApp para Relatório</Label><Input id="report-phone" placeholder="(99) 99999-9999" defaultValue={settings?.daily_report_phone_number || ""} onBlur={(e) => updateSettingsMutation.mutate({ daily_report_phone_number: e.target.value })} /></div><div className="flex items-center space-x-2"><Switch id="auto-close" checked={settings?.auto_close_enabled} onCheckedChange={(checked) => updateSettingsMutation.mutate({ auto_close_enabled: checked })} /><Label htmlFor="auto-close">Habilitar fechamento automático</Label></div>{settings?.auto_close_enabled && (<div><Label htmlFor="auto-close-time">Horário do Fechamento</Label><Input id="auto-close-time" type="time" defaultValue={settings?.auto_close_time || "23:00"} onBlur={(e) => updateSettingsMutation.mutate({ auto_close_time: e.target.value })} /></div>)}</div>)}</CardContent>

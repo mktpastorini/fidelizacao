@@ -24,6 +24,7 @@ import CozinheirosPage from "./pages/Cozinheiros";
 import GorjetasPage from "./pages/Gorjetas";
 import DeliveryPage from "./pages/Delivery"; // Importado
 import CaixaPage from "./pages/Caixa"; // Importado
+import SaidaPage from "./pages/Saida"; // Importado
 import { PageActionsProvider } from "./contexts/PageActionsContext";
 import { SplashCursor } from "./components/SplashCursor";
 
@@ -75,6 +76,7 @@ const App = () => (
                 <Route path="/dashboard" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><DashboardPage /></RoleGuard>} />
                 <Route path="/" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SalaoPage /></RoleGuard>} />
                 <Route path="/caixa" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><CaixaPage /></RoleGuard>} />
+                <Route path="/saida" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SaidaPage /></RoleGuard>} />
                 <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
                 <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
                 <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
