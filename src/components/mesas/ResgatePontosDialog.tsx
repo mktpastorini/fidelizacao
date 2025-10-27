@@ -51,17 +51,6 @@ export function ResgatePontosDialog({
     }
   }, [isOpen, ocupantes]);
 
-  const uniqueOcupantes = useMemo(() => {
-    if (!ocupantes) return [];
-    const map = new Map<string, Cliente>();
-    for (const ocupante of ocupantes) {
-        if (ocupante && ocupante.id) {
-            map.set(ocupante.id, ocupante);
-        }
-    }
-    return Array.from(map.values());
-  }, [ocupantes]);
-
   const clienteResgatando = useMemo(() => {
     return ocupantes.find(c => c.id === selectedClienteId) || null;
   }, [ocupantes, selectedClienteId]);
@@ -218,13 +207,13 @@ export function ResgatePontosDialog({
               <Select 
                 value={selectedClienteId || ''} 
                 onValueChange={setSelectedClienteId}
-                disabled={uniqueOcupantes.length === 0}
+                disabled={ocupantes.length === 0}
               >
                 <SelectTrigger id="cliente-resgate" className="mt-1">
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {uniqueOcupantes.map(cliente => (
+                  {ocupantes.map(cliente => (
                     <SelectItem key={cliente.id} value={cliente.id}>
                       {cliente.nome} ({cliente.pontos} pts)
                     </SelectItem>

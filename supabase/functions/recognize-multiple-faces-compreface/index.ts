@@ -127,7 +127,6 @@ serve(async (req) => {
             .from('clientes')
             .select('*, filhos(*)')
             .eq('id', bestSubject.subject)
-            .eq('user_id', superadminId) // CORREÇÃO: Adicionado filtro de user_id
             .single();
 
           if (clientError) {
@@ -159,4 +158,4 @@ serve(async (req) => {
       status: 500,
     });
   }
-})
+});

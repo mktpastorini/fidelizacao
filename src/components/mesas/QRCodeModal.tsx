@@ -39,7 +39,7 @@ export function QRCodeModal({ isOpen, onOpenChange, mesaNumero, qrCodeUrl }: QRC
         <DialogHeader>
           <DialogTitle>QR Code da Mesa {mesaNumero}</DialogTitle>
         </DialogHeader>
-        <div className="my-4 flex justify-center p-4 bg-white rounded-lg">
+        <div className="my-4 flex justify-center">
           <QRCode
             value={qrCodeUrl}
             size={256}
@@ -47,6 +47,7 @@ export function QRCodeModal({ isOpen, onOpenChange, mesaNumero, qrCodeUrl }: QRC
             bgColor="white"
             fgColor="black"
             level="Q"
+            includeMargin={true}
           />
         </div>
         <DialogFooter className="flex flex-col sm:flex-row sm:justify-between gap-2">

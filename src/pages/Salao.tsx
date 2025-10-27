@@ -1,6 +1,4 @@
-"use client";
-
-import { useState, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Cliente, Mesa, Pedido, ItemPedido, UserSettings } from "@/types/supabase";
@@ -16,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WelcomeCard } from "@/components/dashboard/WelcomeCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MultiLiveRecognition } from "@/components/salao/MultiLiveRecognition";
 import { RecognizedClientsPanel } from "@/components/salao/RecognizedClientsPanel";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -479,10 +477,10 @@ export default function SalaoPage() {
                   mesa={mesa} 
                   ocupantesCount={mesa.ocupantes.length} 
                   onClick={() => handleMesaClick(mesa)} 
-                  onEditMesa={() => { /* Lógica de edição de mesa aqui */ }} 
+                  onEditMesa={() => {}} 
                   onFreeMesa={() => setMesaToFree(mesa)}
                   onEditOcupantes={() => handleOcuparMesaOpen(mesa)}
-                  onDelete={() => { /* Lógica de exclusão de mesa aqui */ }} 
+                  onDelete={() => {}} 
                 />
               ))}
             </div>
