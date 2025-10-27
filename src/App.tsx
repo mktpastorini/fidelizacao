@@ -25,7 +25,8 @@ import GorjetasPage from "./pages/Gorjetas";
 import DeliveryPage from "./pages/Delivery"; // Importado
 import CaixaPage from "./pages/Caixa"; // Importado
 import SaidaPage from "./pages/Saida"; // Importado
-import { PageActionsProvider } from "./contexts/PageActionsContext";
+import LandingPage from "./pages/LandingPage"; // Importado
+import { PageActionsProvider } from "./contexts/PageActionsProvider";
 import { PerformanceProvider } from "./contexts/PerformanceContext";
 
 const queryClient = new QueryClient();
@@ -37,6 +38,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            <Route path="/lp" element={<LandingPage />} />
             <Route path="/menu-publico/:mesaId" element={
               <SettingsProvider>
                 <MenuPublicoPage />
