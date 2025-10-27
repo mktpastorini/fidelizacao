@@ -56,6 +56,14 @@ serve(async (req) => {
     if (findPedidoError) throw findPedidoError;
 
     if (!existingPedido) {
+      const { data: cliente, error: clienteError } = await supabaseAdmin
+        .from('clientes')
+        .select('nome')
+        .eq('id', cliente_id)
+        .single();
+      
+      if (clienteError) throw new Error(`Erro ao buscar nome do cliente: ${clienteError.message}`);
+
       const { error: createPedidoError } = await supabaseAdmin
         .from('pedidos')
         .insert({
@@ -63,7 +71,7 @@ serve(async (req) => {
           cliente_id: cliente_id,
           user_id: user_id,
           status: 'aberto',
-          acompanhantes: [{ id: cliente_id, nome: (await supabaseAdmin.from('clientes').select('nome').eq('id', cliente_id).single()).data?.nome || 'Cliente' }]
+          acompanhantes: [{ id: cliente_id, nome: cliente.nome || 'Cliente' }]
         });
       if (createPedidoError) throw createPedidoError;
     }
