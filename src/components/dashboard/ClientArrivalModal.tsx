@@ -21,7 +21,10 @@ type ClientArrivalModalProps = {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   cliente: Cliente | null;
-  availableTables: (Mesa & { ocupantes_count: number })[];
+  availableTables: (Mesa & { 
+    ocupantes_count: number;
+    ocupantes: { cliente: { id: string; nome: string } | null }[];
+  })[];
   onAllocateTable: (mesaId: string) => void;
   isAllocating: boolean;
 };
@@ -83,7 +86,14 @@ export function ClientArrivalModal({
                 {availableTables.length > 0 ? (
                   availableTables.map((mesa) => (
                     <SelectItem key={mesa.id} value={mesa.id}>
-                      Mesa {mesa.numero} (Ocupação: {mesa.ocupantes_count} / {mesa.capacidade})
+                      <div>
+                        Mesa {mesa.numero} (Ocupação: {mesa.ocupantes_count} / {mesa.capacidade})
+                      </div>
+                      {mesa.ocupantes && mesa.ocupantes.length > 0 && (
+                        <div className="text-xs text-muted-foreground truncate">
+                          Ocupantes: {mesa.ocupantes.map(o => o.cliente?.nome).join(', ')}
+                        </div>
+                      )}
                     </SelectItem>
                   ))
                 ) : (
