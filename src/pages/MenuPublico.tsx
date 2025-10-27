@@ -12,7 +12,8 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { showError, showSuccess } from "@/utils/toast";
 import { ClientIdentificationModal } from "@/components/menu-publico/ClientIdentificationModal";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { OccupyTableModal } from "@/components/menu-publico/OccupyTableModal";
 
 type MesaData = Mesa & { user_id: string };
 
@@ -58,8 +59,6 @@ async function fetchMesaData(mesaId: string): Promise<MesaData | null> {
 export default function MenuPublicoPage() {
   const queryClient = useQueryClient();
   const [menuData, setMenuData] = useState<MenuData>({ produtos: [], categorias: [] });
-  const [mesaData, setMesaData] = useState<MesaData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isIdentificationOpen, setIsIdentificationOpen] = useState(false);
   const [itemToIdentify, setItemToIdentify] = useState<ItemToOrder | null>(null);
@@ -67,27 +66,24 @@ export default function MenuPublicoPage() {
   const navigate = useNavigate();
   const { mesaId } = useParams<{ mesaId: string }>();
 
+  const { data: mesaData, isLoading: isLoadingMesa, refetch: refetchMesa } = useQuery({
+    queryKey: ["mesaData", mesaId],
+    queryFn: () => fetchMesaData(mesaId!),
+    enabled: !!mesaId,
+  });
+
+  const { data: initialMenuData, isLoading: isLoadingMenu } = useQuery({
+    queryKey: ["menuData"],
+    queryFn: fetchMenuData,
+  });
+
   useEffect(() => {
-    if (!mesaId) {
-      setIsLoading(false);
-      return;
+    if (initialMenuData) {
+      setMenuData(initialMenuData);
     }
+  }, [initialMenuData]);
 
-    Promise.all([
-      fetchMenuData(),
-      fetchMesaData(mesaId),
-    ])
-      .then(([menuData, mesaData]) => {
-        setMenuData(menuData);
-        setMesaData(mesaData);
-      })
-      .catch(error => {
-        console.error("Erro ao carregar dados do menu:", error);
-        showError("Erro ao carregar dados do menu. Verifique o QR Code.");
-      })
-      .finally(() => setIsLoading(false));
-  }, [mesaId]);
-
+  const isLoading = isLoadingMesa || isLoadingMenu;
   const isMesaOcupada = !!mesaData?.cliente_id;
 
   const filteredProdutos = useMemo(() => {
@@ -103,7 +99,6 @@ export default function MenuPublicoPage() {
     
     const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
     
-    // Verifica estoque APENAS se for produto de venda
     if (!isRodizioType && (produto.estoque_atual ?? 0) <= 0) {
       showError(`O produto "${produto.nome}" está indisponível no momento.`);
       return;
@@ -123,35 +118,21 @@ export default function MenuPublicoPage() {
     const userId = mesaData.user_id;
 
     try {
-      // Se um cliente foi identificado, verifica se ele já é um ocupante. Se não, adiciona.
       if (clienteId) {
-        const { data: existingOccupant, error: checkError } = await supabase
-          .from('mesa_ocupantes')
-          .select('id')
-          .eq('mesa_id', mesaId)
-          .eq('cliente_id', clienteId)
-          .maybeSingle();
-
-        if (checkError) throw checkError;
-
-        if (!existingOccupant) {
-          const { error: insertError } = await supabase
-            .from('mesa_ocupantes')
-            .insert({
-              mesa_id: mesaId,
-              cliente_id: clienteId,
-              user_id: mesaData.user_id,
-            });
-          if (insertError) throw insertError;
-          
-          // Invalida queries para atualizar a UI do salão e da comanda
-          queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-          queryClient.invalidateQueries({ queryKey: ["ocupantes", mesaId] });
-          queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
-        }
+        const { error: occupantError } = await supabase.functions.invoke('add-occupant-public', {
+          body: {
+            mesa_id: mesaId,
+            cliente_id: clienteId,
+            user_id: mesaData.user_id,
+          }
+        });
+        if (occupantError) throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
+        
+        queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+        queryClient.invalidateQueries({ queryKey: ["ocupantes", mesaId] });
+        queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
       }
 
-      // 1. Verifica se já existe pedido aberto para a mesa
       let pedidoId: string | null = null;
       const { data: pedidoAberto, error: pedidoError } = await supabase
         .from("pedidos")
@@ -165,7 +146,6 @@ export default function MenuPublicoPage() {
       if (pedidoAberto) {
         pedidoId = pedidoAberto.id;
       } else {
-        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
         const { data: novoPedido, error: novoPedidoError } = await supabase
           .from("pedidos")
           .insert({ 
@@ -180,35 +160,28 @@ export default function MenuPublicoPage() {
         pedidoId = novoPedido.id;
       }
 
-      // 3. Insere o item no pedido
-      
       let nomeProdutoFinal = produto.nome + (observacoes ? ` (${observacoes})` : '');
       let requerPreparo = produto.requer_preparo;
-      let status: ItemPedido['status'] = 'pendente'; // Todos os itens começam como pendente
+      let status: ItemPedido['status'] = 'pendente';
 
-      // Se for Pacote Rodízio, prefixamos e forçamos requer_preparo: false.
       if (produto.tipo === 'rodizio') {
           nomeProdutoFinal = `[RODIZIO] ${nomeProdutoFinal}`;
           requerPreparo = false;
       }
       
-      // Se for Item de Rodízio, usamos o requer_preparo definido pelo produto.
       if (produto.tipo === 'componente_rodizio') {
-          requerPreparo = produto.requer_preparo;
+          requerPreparo = produto.requer_preparo; 
       }
-      
-      // NOTA: Removemos a lógica que marcava itens de venda direta sem preparo como 'entregue' aqui.
-      // Eles agora serão 'pendente' e o Garçom/Balcão os marcará como 'entregue' no Kanban.
 
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         nome_produto: nomeProdutoFinal,
         quantidade: quantidade,
         preco: produto.preco,
-        status: status, // Sempre 'pendente'
+        status: status,
         requer_preparo: requerPreparo,
         user_id: userId,
-        consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
+        consumido_por_cliente_id: clienteId,
       });
       if (itemError) throw itemError;
       
@@ -265,21 +238,9 @@ export default function MenuPublicoPage() {
     );
   }
 
-  if (!isMesaOcupada) {
-    return (
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
-        <Card className="mt-12 bg-yellow-900 text-white border-yellow-700">
-          <CardHeader><CardTitle className="flex items-center"><Lock className="w-6 h-6 mr-2" /> Mesa Livre</CardTitle></CardHeader>
-          <CardContent><p>Esta mesa não está ocupada por um cliente. Por favor, chame um atendente para iniciar seu pedido.</p></CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col bg-background">
       <div className="max-w-5xl mx-auto w-full p-4 sm:p-6 shrink-0">
-        {/* 1. Header Fixo */}
         <div className="flex justify-between items-center mb-4">
           <Button variant="ghost" onClick={() => navigate(-1)} className="text-foreground hover:bg-primary/10">
             <ArrowLeft className="w-4 h-4 mr-2" />
@@ -293,13 +254,11 @@ export default function MenuPublicoPage() {
           )}
         </div>
         
-        {/* 2. Título Fixo */}
         <h1 className="text-3xl font-serif font-bold mb-6 text-primary text-center flex items-center justify-center gap-2 tracking-wider">
           <Utensils className="w-6 h-6" />
           Cardápio da Mesa {mesaData?.numero || mesaId}
         </h1>
 
-        {/* 3. Filtro de Categorias Fixo */}
         <ScrollArea className="w-full whitespace-nowrap rounded-md border border-primary/30 bg-card/50 shadow-lg mb-4">
           <div className="flex w-max space-x-2 p-2">
             <Button 
@@ -324,9 +283,8 @@ export default function MenuPublicoPage() {
         </ScrollArea>
       </div>
 
-      {/* 4. Lista de Produtos Rolável */}
       <div className="flex-1 overflow-y-auto max-w-5xl mx-auto w-full">
-        {renderMenuContent()}
+        {isMesaOcupada ? renderMenuContent() : <div />}
       </div>
 
       {mesaId && (
@@ -337,7 +295,6 @@ export default function MenuPublicoPage() {
         />
       )}
 
-      {/* Modal de Identificação Facial */}
       <ClientIdentificationModal
         isOpen={isIdentificationOpen}
         onOpenChange={setIsIdentificationOpen}
@@ -346,6 +303,15 @@ export default function MenuPublicoPage() {
         mesaUserId={mesaData?.user_id || ''}
         onOrderConfirmed={handleOrderConfirmed}
       />
+
+      {!isMesaOcupada && (
+        <OccupyTableModal
+          isOpen={!isMesaOcupada}
+          mesaId={mesaId}
+          mesaUserId={mesaData.user_id}
+          onTableOccupied={() => refetchMesa()}
+        />
+      )}
     </div>
   );
 }
