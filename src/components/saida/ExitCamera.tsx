@@ -8,6 +8,7 @@ import { Loader2, Video, VideoOff } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type ExitCameraProps = {
   onDebtorDetected: (cliente: Cliente) => void;
@@ -23,14 +24,39 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Monitorando a saída...");
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const SCAN_INTERVAL_MS = settings?.saida_interval || 1000;
   const minConfidence = settings?.saida_confidence || 0.90;
 
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+        setDevices(videoDevices);
+
+        const savedCameraId = settings?.preferred_camera_device_id;
+        const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
+
+        if (savedCameraId && isSavedCameraAvailable) {
+          setSelectedDeviceId(savedCameraId);
+        } else if (videoDevices.length > 0) {
+          setSelectedDeviceId(videoDevices[0].deviceId);
+        }
+      } catch (err: any) {
+        handleMediaError(err);
+      }
+    };
+    getDevices();
+  }, [settings]);
+
   const videoConstraints = {
     width: 1280,
     height: 720,
-    deviceId: settings?.preferred_camera_device_id || undefined,
+    deviceId: selectedDeviceId || undefined,
   };
 
   const scanForDebtors = useCallback(async () => {
@@ -123,6 +149,22 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
             </div>
           )}
         </div>
+        {isCameraOn && !displayError && devices.length > 1 && (
+          <div className="w-full max-w-xs">
+            <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione uma câmera" />
+              </SelectTrigger>
+              <SelectContent>
+                {devices.map((device) => (
+                  <SelectItem key={device.deviceId} value={device.deviceId}>
+                    {device.label || `Câmera ${devices.indexOf(device) + 1}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         {displayError && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         <div className="w-full h-10 flex items-center justify-center">
           {renderStatus()}

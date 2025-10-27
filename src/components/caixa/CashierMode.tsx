@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { PaymentModal } from './PaymentModal';
 import { useQuery } from '@tanstack/react-query';
 import { showError } from '@/utils/toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type CashierModeProps = {};
 
@@ -34,6 +35,8 @@ export function CashierMode({}: CashierModeProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [foundClient, setFoundClient] = useState<Cliente | null>(null);
   const [tableData, setTableData] = useState<any>(null);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
 
   const { data: waiters } = useQuery({
     queryKey: ["waiters"],
@@ -43,10 +46,33 @@ export function CashierMode({}: CashierModeProps) {
   const SCAN_INTERVAL_MS = settings?.caixa_interval || 2000;
   const minConfidence = settings?.caixa_confidence || 0.85;
 
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+        setDevices(videoDevices);
+
+        const savedCameraId = settings?.preferred_camera_device_id;
+        const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
+
+        if (savedCameraId && isSavedCameraAvailable) {
+          setSelectedDeviceId(savedCameraId);
+        } else if (videoDevices.length > 0) {
+          setSelectedDeviceId(videoDevices[0].deviceId);
+        }
+      } catch (err: any) {
+        handleMediaError(err);
+      }
+    };
+    getDevices();
+  }, [settings]);
+
   const videoConstraints = {
     width: 400,
     height: 400,
-    deviceId: settings?.preferred_camera_device_id || undefined,
+    deviceId: selectedDeviceId || undefined,
   };
 
   const handleRecognition = useCallback(async (manualTrigger = false) => {
@@ -147,6 +173,22 @@ export function CashierMode({}: CashierModeProps) {
               </div>
             )}
           </div>
+          {isCameraOn && !displayError && devices.length > 1 && (
+            <div className="w-full">
+              <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma câmera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Câmera ${devices.indexOf(device) + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           {displayError && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
           
           <div className="w-full h-24 flex items-center justify-center">
