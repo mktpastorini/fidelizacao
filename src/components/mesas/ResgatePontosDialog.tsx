@@ -53,13 +53,13 @@ export function ResgatePontosDialog({
 
   const uniqueOcupantes = useMemo(() => {
     if (!ocupantes) return [];
-    const seen = new Set<string>();
-    return ocupantes.filter(o => {
-        if (!o || !o.id) return false;
-        const duplicate = seen.has(o.id);
-        seen.add(o.id);
-        return !duplicate;
-    });
+    const map = new Map<string, Cliente>();
+    for (const ocupante of ocupantes) {
+        if (ocupante && ocupante.id) {
+            map.set(ocupante.id, ocupante);
+        }
+    }
+    return Array.from(map.values());
   }, [ocupantes]);
 
   const clienteResgatando = useMemo(() => {
