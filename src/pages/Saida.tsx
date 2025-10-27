@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/utils/formatters";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type ItemPedido = {
   id: string;
@@ -48,16 +49,34 @@ export default function SaidaPage() {
   const { settings } = useSettings();
   const { superadminId } = useSuperadminId();
 
-  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [detectedClient, setDetectedClient] = useState<DetectedClient | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [lastDetectionTime, setLastDetectionTime] = useState(0);
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(settings?.preferred_camera_device_id || null);
 
   const detectionInterval = settings?.multi_detection_interval || 2000;
   const detectionConfidence = settings?.multi_detection_confidence || 0.85;
+
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+        setDevices(videoDevices);
+        if (!selectedDeviceId && videoDevices.length > 0) {
+          setSelectedDeviceId(settings?.preferred_camera_device_id || videoDevices[0].deviceId);
+        }
+      } catch (err: any) {
+        handleUserMediaError(err);
+      }
+    };
+    getDevices();
+  }, [settings, selectedDeviceId]);
 
   const videoConstraints = {
     width: 640,
@@ -251,15 +270,29 @@ export default function SaidaPage() {
                 </div>
               )}
             </div>
-            <div className="mt-4 flex gap-4">
-              <Button onClick={handleToggleCamera} variant={isCameraActive ? "destructive" : "default"}>
-                {isCameraActive ? "Parar Monitoramento" : "Iniciar Monitoramento"}
-              </Button>
-              {isCameraActive && (
-                <Button onClick={() => captureAndProcess()} disabled={isProcessing} variant="outline">
-                  <RefreshCw className="w-4 h-4 mr-2" /> Forçar Detecção
+            <div className="mt-4 flex flex-col sm:flex-row gap-4 w-full max-w-lg">
+              <Select value={selectedDeviceId || ''} onValueChange={setSelectedDeviceId} disabled={!isCameraActive}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma câmera" />
+                </SelectTrigger>
+                <SelectContent>
+                  {devices.map((device) => (
+                    <SelectItem key={device.deviceId} value={device.deviceId}>
+                      {device.label || `Câmera ${devices.indexOf(device) + 1}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-4">
+                <Button onClick={handleToggleCamera} variant={isCameraActive ? "destructive" : "default"} className="flex-1">
+                  {isCameraActive ? "Parar" : "Iniciar"}
                 </Button>
-              )}
+                {isCameraActive && (
+                  <Button onClick={() => captureAndProcess()} disabled={isProcessing} variant="outline" className="flex-1">
+                    <RefreshCw className="w-4 h-4 mr-2" /> Forçar
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
