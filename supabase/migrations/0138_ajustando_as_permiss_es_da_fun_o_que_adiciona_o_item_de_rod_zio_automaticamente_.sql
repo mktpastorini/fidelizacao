@@ -1,0 +1,1 @@
+ALTER FUNCTION public.handle_new_occupant_item() OWNER TO postgres;
