@@ -107,6 +107,7 @@ export default function ClientesPage() {
       if (!superadminId) throw new Error("ID do Super Admin não encontrado. Não é possível criar cliente.");
 
       const { avatar_urls, ...clienteData } = newCliente;
+      const primaryAvatarUrl = avatar_urls && avatar_urls.length > 0 ? avatar_urls[0] : null;
       
       if (!avatar_urls || avatar_urls.length === 0) {
         throw new Error("É necessário pelo menos uma foto para o reconhecimento.");
@@ -114,7 +115,7 @@ export default function ClientesPage() {
       
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: superadminId, p_nome: clienteData.nome, p_casado_com: clienteData.casado_com,
-        p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: clienteData.avatar_url,
+        p_whatsapp: clienteData.whatsapp, p_gostos: clienteData.gostos, p_avatar_url: primaryAvatarUrl,
         p_indicado_por_id: clienteData.indicado_por_id,
       });
       if (rpcError) throw new Error(rpcError.message);
@@ -151,7 +152,9 @@ export default function ClientesPage() {
       const { id, filhos, avatar_urls, ...clienteInfo } = updatedCliente;
       if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
 
-      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo }).eq("id", id);
+      const primaryAvatarUrl = avatar_urls && avatar_urls.length > 0 ? avatar_urls[0] : null;
+
+      const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo, avatar_url: primaryAvatarUrl }).eq("id", id);
       if (clienteError) throw new Error(clienteError.message);
 
       await supabase.from("filhos").delete().eq("cliente_id", id);

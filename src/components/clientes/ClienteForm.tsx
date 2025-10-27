@@ -42,7 +42,7 @@ const formSchema = z.object({
 });
 
 type ClienteFormProps = {
-  onSubmit: (values: z.infer<typeof formSchema> & { avatar_url?: string | null }) => void;
+  onSubmit: (values: z.infer<typeof formSchema>) => void;
   isSubmitting: boolean;
   defaultValues?: Partial<Cliente & { filhos: Filho[] }>;
   clientes: Cliente[];
@@ -102,11 +102,7 @@ export function ClienteForm({ onSubmit, isSubmitting, defaultValues, clientes, i
   };
 
   const handleFormSubmit = (values: z.infer<typeof formSchema>) => {
-    const submissionData = {
-      ...values,
-      avatar_url: values.avatar_urls[0] || null,
-    };
-    onSubmit(submissionData);
+    onSubmit(values);
   };
 
   const handleClearDuplicate = () => {
