@@ -129,9 +129,15 @@ export default function ConfiguracoesPage() {
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
   const [userId, setUserId] = useState<string | null>(null);
   const [exitPhrase, setExitPhrase] = useState(settings?.exit_alert_phrase || "");
+  const [multiDetectionInterval, setMultiDetectionInterval] = useState<number | string>(2000);
+  const [multiDetectionConfidence, setMultiDetectionConfidence] = useState<number | string>(0.85);
 
   useEffect(() => {
     setExitPhrase(settings?.exit_alert_phrase || "");
+    if (settings) {
+      setMultiDetectionInterval(settings.multi_detection_interval ?? 2000);
+      setMultiDetectionConfidence(settings.multi_detection_confidence ?? 0.85);
+    }
   }, [settings]);
 
   useEffect(() => {
@@ -346,8 +352,9 @@ export default function ConfiguracoesPage() {
                         id="multi-detection-interval"
                         type="number"
                         placeholder="2000"
-                        defaultValue={settings?.multi_detection_interval || 2000}
-                        onBlur={(e) => updateSettingsMutation.mutate({ multi_detection_interval: parseInt(e.target.value) })}
+                        value={multiDetectionInterval}
+                        onChange={(e) => setMultiDetectionInterval(e.target.value)}
+                        onBlur={() => updateSettingsMutation.mutate({ multi_detection_interval: parseInt(multiDetectionInterval as string) || 2000 })}
                       />
                       <p className="text-xs text-muted-foreground mt-1">Tempo em milissegundos entre cada tentativa de reconhecimento. Valores menores consomem mais recursos.</p>
                     </div>
@@ -360,8 +367,9 @@ export default function ConfiguracoesPage() {
                         min="0"
                         max="1"
                         placeholder="0.85"
-                        defaultValue={settings?.multi_detection_confidence || 0.85}
-                        onBlur={(e) => updateSettingsMutation.mutate({ multi_detection_confidence: parseFloat(e.target.value) })}
+                        value={multiDetectionConfidence}
+                        onChange={(e) => setMultiDetectionConfidence(e.target.value)}
+                        onBlur={() => updateSettingsMutation.mutate({ multi_detection_confidence: parseFloat(multiDetectionConfidence as string) || 0.85 })}
                       />
                       <p className="text-xs text-muted-foreground mt-1">Nível de confiança mínimo para considerar um rosto como um match. Padrão: 0.85.</p>
                     </div>
