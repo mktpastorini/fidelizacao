@@ -26,6 +26,7 @@ type ClientIdentificationModalProps = {
   mesaId: string;
   mesaUserId: string;
   onOrderConfirmed: (clienteId: string | null) => void;
+  isInitialAllocation?: boolean; // Nova prop
 };
 
 export function ClientIdentificationModal({
@@ -35,6 +36,7 @@ export function ClientIdentificationModal({
   mesaId,
   mesaUserId,
   onOrderConfirmed,
+  isInitialAllocation = false, // Valor padrão
 }: ClientIdentificationModalProps) {
   const queryClient = useQueryClient();
   const webcamRef = useRef<Webcam>(null);
@@ -154,19 +156,6 @@ export function ClientIdentificationModal({
       if (rpcError) throw new Error(rpcError.message);
       if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      // Usa a nova Edge Function para adicionar o ocupante
-      const { error: occupantError } = await supabase.functions.invoke('add-occupant-public', {
-        body: {
-          mesa_id: mesaId,
-          cliente_id: newClientId,
-          user_id: mesaUserId,
-        }
-      });
-      if (occupantError) {
-        await supabase.from("clientes").delete().eq("id", newClientId);
-        throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
-      }
-
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
         body: { subject: newClientId, image_urls: [values.avatar_url] }
       });
@@ -239,10 +228,12 @@ export function ClientIdentificationModal({
               <AvatarFallback><User className="w-8 h-8" /></AvatarFallback>
             </Avatar>
             <p className="text-lg font-bold text-primary">Bem-vindo(a) de volta, {match?.nome}!</p>
-            <p className="text-sm text-muted-foreground">Deseja atribuir o pedido a você?</p>
+            <p className="text-sm text-muted-foreground">
+              {isInitialAllocation ? "Deseja ocupar esta mesa em seu nome?" : "Deseja atribuir o pedido a você?"}
+            </p>
             <div className="flex gap-2 justify-center pt-2">
               <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
-              <Button onClick={handleConfirmMatch} className="bg-primary hover:bg-primary/90 text-primary-foreground"><Check className="w-4 h-4 mr-2" />Confirmar Pedido</Button>
+              <Button onClick={handleConfirmMatch} className="bg-primary hover:bg-primary/90 text-primary-foreground"><Check className="w-4 h-4 mr-2" />Confirmar</Button>
             </div>
           </div>
         );
@@ -254,9 +245,11 @@ export function ClientIdentificationModal({
             <div className="flex flex-col gap-2 pt-2">
               <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
               <Button onClick={() => setStep('quick_register')} className="bg-primary hover:bg-primary/90 text-primary-foreground"><UserPlus className="w-4 h-4 mr-2" />Cadastrar Rápido</Button>
-              <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
-                <X className="w-4 h-4 mr-2" /> Continuar como Mesa (Geral)
-              </Button>
+              {!isInitialAllocation && (
+                <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4 mr-2" /> Continuar como Mesa (Geral)
+                </Button>
+              )}
             </div>
           </div>
         );
@@ -275,24 +268,25 @@ export function ClientIdentificationModal({
   const dialogTitle = useMemo(() => {
     if (step === 'quick_register') return "Cadastro Rápido";
     if (step === 'match') return "Cliente Identificado";
+    if (isInitialAllocation) return "Bem-vindo! Vamos iniciar seu atendimento.";
     return "Identificação Facial";
-  }, [step]);
+  }, [step, isInitialAllocation]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md bg-card text-foreground">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-primary">{dialogTitle}</DialogTitle>
-          {step !== 'quick_register' && (
+          {step !== 'quick_register' && itemToOrder && (
             <DialogDescription>
-              {itemToOrder?.produto.nome} (x{itemToOrder?.quantidade})
+              {itemToOrder.produto.nome} (x{itemToOrder.quantidade})
             </DialogDescription>
           )}
         </DialogHeader>
         <div className="py-4">
           {renderContent()}
         </div>
-        {step === 'capture' && !mediaError && (
+        {step === 'capture' && !mediaError && !isInitialAllocation && (
           <DialogFooter>
             <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4 mr-2" /> Pedir como Mesa (Geral)
