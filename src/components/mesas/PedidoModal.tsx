@@ -108,7 +108,7 @@ async function fetchMesasLivres(currentMesaId: string): Promise<Mesa[]> {
     .from("mesas")
     .select("id, numero, capacidade")
     .is("cliente_id", null)
-    .not("id", currentMesaId)
+    .neq("id", currentMesaId) // CORREÇÃO APLICADA AQUI
     .order("numero");
   if (error) throw error;
   return data || [];
@@ -498,11 +498,13 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     onError: (error: Error) => showError(error.message),
   });
   
-  const handleTransferClient = () => {
+  const handleTransferClient = (clienteId: string) => {
     if (!ocupantes || ocupantes.length === 0) {
         showError("Não há clientes para transferir.");
         return;
     }
+    // Pré-seleciona o cliente que clicou no botão de transferência
+    setClientePagandoIndividual(ocupantes.find(c => c.id === clienteId) || null);
     setIsTransferOpen(true);
   };
 
@@ -646,8 +648,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                             <Button size="sm" variant="outline" onClick={() => handlePartialPaymentOpen(cliente as Cliente)}>
                               <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
                             </Button>
-                            {/* NOVO BOTÃO DE TRANSFERÊNCIA */}
-                            <Button size="sm" variant="outline" onClick={handleTransferClient} title="Transferir Cliente">
+                            <Button size="sm" variant="outline" onClick={() => handleTransferClient(cliente.id)} title="Transferir Cliente">
                               <ArrowRightLeft className="w-4 h-4" />
                             </Button>
                           </div>
