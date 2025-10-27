@@ -20,11 +20,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
-import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus, CheckCircle } from "lucide-react";
+import { PlusCircle, Trash2, CreditCard, ChevronsUpDown, Check, Users, UserCheck, Tag, MoreHorizontal, AlertTriangle, Star, DollarSign, Minus, Plus, CheckCircle, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FinalizarContaParcialDialog } from "./FinalizarContaParcialDialog";
 import { AplicarDescontoDialog } from "./AplicarDescontoDialog";
 import { ResgatePontosDialog } from "./ResgatePontosDialog";
+import { TransferClientDialog } from "./TransferClientDialog"; // NOVO IMPORT
 import { Badge } from "../ui/badge";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -102,6 +103,17 @@ async function fetchWaiters(): Promise<StaffProfile[]> {
   return data as StaffProfile[] || [];
 }
 
+async function fetchMesasLivres(currentMesaId: string): Promise<Mesa[]> {
+  const { data, error } = await supabase
+    .from("mesas")
+    .select("id, numero, capacidade")
+    .is("cliente_id", null)
+    .not("id", currentMesaId)
+    .order("numero");
+  if (error) throw error;
+  return data || [];
+}
+
 const calcularPrecoComDesconto = (item: ItemPedido) => {
   const precoTotal = (item.preco || 0) * item.quantidade;
   const desconto = precoTotal * ((item.desconto_percentual || 0) / 100);
@@ -114,6 +126,7 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
   const [clientePagandoIndividual, setClientePagandoIndividual] = useState<Cliente | null>(null);
   const [itemParaDesconto, setItemParaDesconto] = useState<ItemPedido | null>(null);
   const [isResgateOpen, setIsResgateOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false); // NOVO ESTADO
   
   const [itemMesaToPay, setItemMesaToPay] = useState<GroupedItem | null>(null);
   const [quantidadePagarMesa, setQuantidadePagarMesa] = useState(1);
@@ -150,6 +163,12 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     queryKey: ["waiters"],
     queryFn: fetchWaiters,
     enabled: isOpen,
+  });
+  
+  const { data: mesasLivres } = useQuery({
+    queryKey: ["mesasLivres", mesa?.id],
+    queryFn: () => fetchMesasLivres(mesa!.id),
+    enabled: !!mesa && isOpen,
   });
 
   const clientePrincipal = ocupantes?.find(o => o.id === mesa?.cliente_id) || null;
@@ -478,6 +497,14 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
     },
     onError: (error: Error) => showError(error.message),
   });
+  
+  const handleTransferClient = () => {
+    if (!ocupantes || ocupantes.length === 0) {
+        showError("Não há clientes para transferir.");
+        return;
+    }
+    setIsTransferOpen(true);
+  };
 
   return (
     <>
@@ -615,9 +642,15 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
                       <div key={cliente.id} className="p-3 border rounded-lg">
                         <div className="flex justify-between items-center mb-2">
                           <h4 className="font-semibold">{cliente.nome} {isPrincipal && "(Principal)"}</h4>
-                          <Button size="sm" variant="outline" onClick={() => handlePartialPaymentOpen(cliente as Cliente)}>
-                            <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handlePartialPaymentOpen(cliente as Cliente)}>
+                              <UserCheck className="w-4 h-4 mr-2" /> Finalizar Conta
+                            </Button>
+                            {/* NOVO BOTÃO DE TRANSFERÊNCIA */}
+                            <Button size="sm" variant="outline" onClick={handleTransferClient} title="Transferir Cliente">
+                              <ArrowRightLeft className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                         <ul className="space-y-2">
                           {itens.map((item) => {
@@ -890,6 +923,15 @@ export function PedidoModal({ isOpen, onOpenChange, mesa }: PedidoModalProps) {
         ocupantes={ocupantes || []}
         mesaId={mesa?.id || null}
         produtosResgatáveis={produtosResgatáveis}
+      />
+      
+      {/* NOVO MODAL DE TRANSFERÊNCIA */}
+      <TransferClientDialog
+        isOpen={isTransferOpen}
+        onOpenChange={setIsTransferOpen}
+        currentMesa={mesa}
+        ocupantes={ocupantes || []}
+        mesasLivres={mesasLivres || []}
       />
     </>
   );
