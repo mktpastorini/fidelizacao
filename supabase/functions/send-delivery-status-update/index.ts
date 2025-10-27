@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const IFOOD_API_URL = 'https://merchant-api.ifood.com.br';
-
 const statusLabels: { [key: string]: string } = {
   'CONFIRMED': 'Confirmado',
   'in_preparation': 'Em Preparo',
@@ -33,9 +31,11 @@ function personalizeMessage(content: string, client: any, orderDetails: { orderI
     }
   }
 
+  // Novas variáveis
   personalized = personalized.replace(/{codigo_pedido}/g, orderDetails.orderId);
   personalized = personalized.replace(/{status_delivery}/g, statusLabels[orderDetails.status] || orderDetails.status);
 
+  // Limpa variáveis não encontradas
   personalized = personalized.replace(/{[a-zA-Z_]+}/g, '');
   return personalized;
 }
@@ -52,43 +52,6 @@ async function getSuperadminId(supabaseAdmin: any) {
     throw new Error("Falha ao encontrar o Superadmin principal.");
   }
   return superadminProfile.id;
-}
-
-// --- iFood API Helpers ---
-async function getIfoodApiToken(clientId: string, clientSecret: string): Promise<string> {
-  console.log("iFood Status Update: Obtendo token de autenticação...");
-  const params = new URLSearchParams();
-  params.append('grantType', 'client_credentials');
-  params.append('clientId', clientId);
-  params.append('clientSecret', clientSecret);
-
-  const response = await fetch(`${IFOOD_API_URL}/authentication/v1.0/oauth/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: params,
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => response.text());
-    throw new Error(`Falha ao obter token do iFood. Status: ${response.status}. Detalhes: ${JSON.stringify(errorBody)}`);
-  }
-
-  const data = await response.json();
-  console.log("iFood Status Update: Token obtido com sucesso.");
-  return data.accessToken;
-}
-
-async function readyToDeliverIfoodOrder(ifoodOrderId: string, token: string) {
-  console.log(`Notificando iFood que o pedido ${ifoodOrderId} está pronto para entrega...`);
-  const response = await fetch(`${IFOOD_API_URL}/order/v1.0/orders/${ifoodOrderId}/ready-to-deliver`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Falha ao notificar iFood sobre pedido pronto. Status: ${response.status}. Detalhes: ${errorBody}`);
-  }
-  console.log(`Pedido ${ifoodOrderId} marcado como pronto no iFood.`);
 }
 
 serve(async (req) => {
@@ -113,7 +76,7 @@ serve(async (req) => {
 
     const { data: order, error: orderError } = await supabaseAdmin
       .from('pedidos')
-      .select('cliente_id, ifood_order_id, order_type')
+      .select('cliente_id, ifood_order_id')
       .eq('id', orderId)
       .eq('user_id', superadminId)
       .single();
@@ -122,36 +85,13 @@ serve(async (req) => {
     }
     const clientId = order.cliente_id;
 
-    // --- NEW IFOOD LOGIC ---
-    if (order.order_type === 'IFOOD' && newStatus === 'ready_for_delivery' && order.ifood_order_id) {
-      try {
-        const ifoodClientId = Deno.env.get('IFOOD_CLIENT_ID');
-        const ifoodClientSecret = Deno.env.get('IFOOD_CLIENT_SECRET');
-        if (!ifoodClientId || !ifoodClientSecret) {
-          console.warn("Credenciais do iFood não configuradas. Pulando notificação para o iFood.");
-        } else {
-          const token = await getIfoodApiToken(ifoodClientId, ifoodClientSecret);
-          await readyToDeliverIfoodOrder(order.ifood_order_id, token);
-        }
-      } catch (ifoodError) {
-        console.error("Erro ao notificar o iFood sobre pedido pronto:", ifoodError.message);
-        // Não joga o erro para não impedir a notificação do cliente
-      }
-    }
-    // --- END NEW IFOOD LOGIC ---
-
     const { data: settings, error: settingsError } = await supabaseAdmin
       .from('user_settings')
       .select('webhook_url, delivery_confirmed_template_id, delivery_in_preparation_template_id, delivery_ready_template_id, delivery_out_for_delivery_template_id')
       .eq('id', superadminId)
       .single();
     if (settingsError) throw settingsError;
-    if (!settings.webhook_url) {
-      return new Response(JSON.stringify({ success: true, message: 'Webhook não configurado, pulando notificação de cliente.' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
+    if (!settings.webhook_url) throw new Error('Webhook não configurado.');
 
     const templateIdMap: { [key: string]: string | null | undefined } = {
       'CONFIRMED': settings.delivery_confirmed_template_id,

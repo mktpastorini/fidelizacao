@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRangePicker } from "@/components/relatorios/DateRangePicker";
 import { DateRange } from "react-day-picker";
 import { startOfMonth, endOfMonth } from "date-fns";
-import { usePageActions } from "@/contexts/PageActionsContext";
 
 type DailyStats = {
   revenue_today: number;
@@ -81,28 +80,10 @@ async function fetchRangeStats(dateRange: DateRange): Promise<RangeStats> {
 }
 
 export default function DashboardPage() {
-  const { setPageActions } = usePageActions();
-  const [activeTab, setActiveTab] = useState("today");
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(getBrazilTime()),
     to: endOfMonth(getBrazilTime()),
   });
-
-  useEffect(() => {
-    const pageActions = (
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 max-w-md">
-          <TabsTrigger value="today">Visão de Hoje</TabsTrigger>
-          <TabsTrigger value="period">Análise por Período</TabsTrigger>
-        </TabsList>
-      </Tabs>
-    );
-    setPageActions(pageActions);
-
-    return () => {
-      setPageActions(null);
-    };
-  }, [setPageActions, activeTab]);
 
   const { data: dailyData, isLoading: isLoadingDaily } = useQuery({
     queryKey: ["dashboardData"],
@@ -128,6 +109,7 @@ export default function DashboardPage() {
     return <WelcomeCard />;
   }
 
+  // Mantendo os destaques de cor para pedidos pendentes (laranja) e em preparo (verde)
   const kitchenValue = (
     <div className="flex items-baseline gap-2">
       <span className="text-orange-500 dark:text-orange-400">{dailyData.dailyStats.pending_kitchen_orders}</span>
@@ -146,7 +128,12 @@ export default function DashboardPage() {
         <p className="text-muted-foreground mt-1">Visão geral e análise de desempenho do seu negócio.</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs defaultValue="today">
+        <TabsList className="grid w-full grid-cols-2 max-w-md">
+          <TabsTrigger value="today">Visão de Hoje</TabsTrigger>
+          <TabsTrigger value="period">Análise por Período</TabsTrigger>
+        </TabsList>
+        
         <TabsContent value="today" className="mt-6 space-y-6">
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Faturamento do Dia" value={formatCurrency(dailyData.dailyStats.revenue_today)} icon={DollarSign} variant="green" />
