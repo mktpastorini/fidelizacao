@@ -124,14 +124,19 @@ export default function CozinheirosPage() {
     mutationFn: async (updatedCook: any) => {
       const { id, avatar_urls, ...cookInfo } = updatedCook;
       
+      const originalCook = cozinheiros?.find(c => c.id === id);
+      const originalAvatarUrl = originalCook?.avatar_url;
+
       // 1. Atualiza os dados do cozinheiro
       const { error: cookError } = await supabase.from("cozinheiros").update({ ...cookInfo, avatar_url: avatar_urls[0] || null }).eq("id", id);
       if (cookError) throw new Error(cookError.message);
 
-      // 2. Se houver novas fotos, registra no CompreFace (substituindo as antigas)
-      if (avatar_urls && avatar_urls.length > 0) {
+      // 2. Se houver novas fotos, registra no CompreFace
+      const newAvatarUrls = avatar_urls.filter((url: string) => url !== originalAvatarUrl);
+
+      if (newAvatarUrls && newAvatarUrls.length > 0) {
         const { error: faceError } = await supabase.functions.invoke('add-cook-face-examples', {
-          body: { subject: id, image_urls: avatar_urls }
+          body: { subject: id, image_urls: newAvatarUrls }
         });
         if (faceError) throw new Error(`Cozinheiro atualizado, mas falha ao registrar novos rostos: ${faceError.message}`);
       }

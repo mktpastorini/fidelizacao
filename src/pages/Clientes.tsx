@@ -152,6 +152,9 @@ export default function ClientesPage() {
       const { id, filhos, avatar_urls, ...clienteInfo } = updatedCliente;
       if (!superadminId) throw new Error("ID do Super Admin não encontrado.");
 
+      const originalClient = clientes?.find(c => c.id === id);
+      const originalAvatarUrl = originalClient?.avatar_url;
+
       const primaryAvatarUrl = avatar_urls && avatar_urls.length > 0 ? avatar_urls[0] : null;
 
       const { error: clienteError } = await supabase.from("clientes").update({ ...clienteInfo, avatar_url: primaryAvatarUrl }).eq("id", id);
@@ -165,9 +168,11 @@ export default function ClientesPage() {
         if (insertFilhosError) throw new Error(insertFilhosError.message);
       }
 
-      if (avatar_urls && avatar_urls.length > 0) {
+      const newAvatarUrls = avatar_urls.filter((url: string) => url !== originalAvatarUrl);
+
+      if (newAvatarUrls && newAvatarUrls.length > 0) {
         const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
-          body: { subject: id, image_urls: avatar_urls }
+          body: { subject: id, image_urls: newAvatarUrls }
         });
         if (faceError) throw new Error(`Cliente atualizado, mas falha ao registrar novos rostos: ${faceError.message}`);
       }
