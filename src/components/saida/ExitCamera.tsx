@@ -63,13 +63,13 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   }, [isCameraOn, isRecognitionLoading, isCameraReady, recognizeMultiple, onDebtorDetected]);
 
   useEffect(() => {
-    if (isPaused || !isCameraOn || !isReady || !isCameraReady || isScanning) {
+    if (isPaused || !isCameraOn || !isCameraReady || isRecognitionLoading) {
       return;
     }
 
     const intervalId = setInterval(scanForDebtors, SCAN_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, [isPaused, isCameraOn, isReady, isCameraReady, isScanning, scanForDebtors]);
+  }, [isPaused, isCameraOn, isCameraReady, isRecognitionLoading, scanForDebtors]);
 
   const handleMediaError = (err: any) => {
     let errorMessage = `Erro de mídia: ${err.message}`;
