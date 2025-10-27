@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { showError, showSuccess } from "@/utils/toast";
 import { ArrowRight, Loader2 } from "lucide-react";
+import { Label } from "@/components/ui/label"; // IMPORT CORRIGIDO
 
 type TransferClientDialogProps = {
   isOpen: boolean;
