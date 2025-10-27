@@ -1,37 +1,23 @@
-import { useState } from "react";
-import { Cliente } from "@/types/supabase";
-import { ExitCamera } from "@/components/saida/ExitCamera";
-import { DebtorAlertModal } from "@/components/saida/DebtorAlertModal";
+import { useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
-export default function SaidaPage() {
-  const [debtor, setDebtor] = useState<Cliente | null>(null);
-  const [isAlertOpen, setIsAlertOpen] = useState(false);
+export default function Saida() {
+  const navigate = useNavigate();
 
-  const handleDebtorDetected = (cliente: Cliente) => {
-    // Só dispara o alerta se ele não estiver aberto,
-    // para evitar que o modal fique "piscando" ou seja impossível de fechar.
-    if (!isAlertOpen) {
-      setDebtor(cliente);
-      setIsAlertOpen(true);
-    }
-  };
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      await supabase.auth.signOut();
+      navigate('/login');
+    }, 3000); // Redireciona após 3 segundos
+
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="mb-6 shrink-0">
-        <h1 className="text-3xl font-bold">Monitoramento de Saída</h1>
-        <p className="text-muted-foreground mt-1">
-          O sistema está monitorando a saída para detectar clientes com contas abertas.
-        </p>
-      </div>
-      <div className="flex-1 flex justify-center items-start">
-        <ExitCamera onDebtorDetected={handleDebtorDetected} isPaused={isAlertOpen} />
-      </div>
-      <DebtorAlertModal
-        isOpen={isAlertOpen}
-        onOpenChange={setIsAlertOpen}
-        cliente={debtor}
-      />
+    <div className="min-h-screen w-full bg-muted">
+      {/* Esta página foi projetada para uma experiência visual focada, como uma imagem ou vídeo de fundo.
+          O processo de logout é executado em segundo plano e redireciona para a página de login. */}
     </div>
   );
 }
