@@ -5,6 +5,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { Skeleton } from "./ui/skeleton";
 import { Header } from "./Header";
 import { usePageActions } from "@/contexts/PageActionsContext";
+import { ConditionalSplashCursor } from "./ConditionalSplashCursor";
 
 const MainContent = () => {
   const { pageActions } = usePageActions();
@@ -39,6 +40,7 @@ export function Layout() {
     return (
       // Contêiner flexível para o layout de dock
       <div className="relative flex flex-col h-screen bg-background">
+        <ConditionalSplashCursor />
         <DockContent /> {/* Conteúdo principal com rolagem */}
         <Dock /> {/* Dock fixo na parte inferior */}
       </div>
@@ -47,6 +49,7 @@ export function Layout() {
 
   return (
     <div className="flex h-screen bg-background"> {/* Usando h-screen em vez de min-h-screen */}
+      <ConditionalSplashCursor />
       <Sidebar />
       <MainContent />
     </div>

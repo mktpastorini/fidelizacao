@@ -451,6 +451,22 @@ export default function ConfiguracoesPage() {
               <CardContent>{isLoading ? <Skeleton className="h-24 w-full" /> : (<RadioGroup value={settings?.menu_style || 'sidebar'} onValueChange={(value) => updateSettingsMutation.mutate({ menu_style: value })} className="space-y-2"><div className="flex items-center space-x-2"><RadioGroupItem value="sidebar" id="sidebar" /><Label htmlFor="sidebar">Barra Lateral (Padrão)</Label></div><div className="flex items-center space-x-2"><RadioGroupItem value="dock" id="dock" /><Label htmlFor="dock">Dock Inferior</Label></div></RadioGroup>)}</CardContent>
             </Card>
             <Card>
+              <CardHeader><CardTitle>Efeitos Visuais</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="splash-cursor-toggle">Efeito do Cursor</Label>
+                    <CardDescription>Habilita o efeito de fluido colorido que segue o mouse.</CardDescription>
+                  </div>
+                  <Switch
+                    id="splash-cursor-toggle"
+                    checked={settings?.splash_cursor_enabled ?? true}
+                    onCheckedChange={(checked) => updateSettingsMutation.mutate({ splash_cursor_enabled: checked })}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
               <CardHeader><CardTitle>Vídeo de Fundo do Login</CardTitle><CardDescription>Defina a URL do vídeo que será exibida na tela de login.</CardDescription></CardHeader>
               <CardContent>
                 {isLoading ? <Skeleton className="h-16 w-full" /> : (
