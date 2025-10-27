@@ -27,6 +27,7 @@ import CaixaPage from "./pages/Caixa"; // Importado
 import SaidaPage from "./pages/Saida"; // Importado
 import { PageActionsProvider } from "./contexts/PageActionsContext";
 import { SplashCursor } from "./components/SplashCursor";
+import { PerformanceProvider } from "./contexts/PerformanceContext";
 
 const queryClient = new QueryClient();
 
@@ -69,14 +70,17 @@ const App = () => (
               }
             >
               <Route element={
-                <PageActionsProvider>
-                  <Layout />
-                </PageActionsProvider>
+                <PerformanceProvider>
+                  <PageActionsProvider>
+                    <Layout />
+                  </PageActionsProvider>
+                </PerformanceProvider>
               }>
                 <Route path="/dashboard" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><DashboardPage /></RoleGuard>} />
                 <Route path="/" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SalaoPage /></RoleGuard>} />
                 <Route path="/caixa" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><CaixaPage /></RoleGuard>} />
                 <Route path="/saida" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><SaidaPage /></RoleGuard>} />
+                <Route path="/delivery" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><DeliveryPage /></RoleGuard>} />
                 <Route path="/clientes" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Clientes /></RoleGuard>} />
                 <Route path="/produtos" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><Produtos /></RoleGuard>} />
                 <Route path="/mesas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao', 'garcom']}><Mesas /></RoleGuard>} />
@@ -85,7 +89,6 @@ const App = () => (
                 <Route path="/historico" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Historico /></RoleGuard>} />
                 <Route path="/gorjetas" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'garcom']}><GorjetasPage /></RoleGuard>} />
                 <Route path="/mensagens" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente']}><Mensagens /></RoleGuard>} />
-                <Route path="/delivery" element={<RoleGuard allowedRoles={['superadmin', 'admin', 'gerente', 'balcao']}><DeliveryPage /></RoleGuard>} />
                 <Route path="/configuracoes" element={<RoleGuard allowedRoles={['superadmin', 'admin']}><Configuracoes /></RoleGuard>} />
                 <Route path="/usuarios" element={<RoleGuard allowedRoles={['superadmin']}><UsuariosPage /></RoleGuard>} />
               </Route>
