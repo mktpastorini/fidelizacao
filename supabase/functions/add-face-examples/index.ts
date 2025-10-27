@@ -60,9 +60,9 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[add-face-examples] 1/7: Parsing body da requisição...");
+    console.log("[add-face-examples] 1/6: Parsing body da requisição...");
     const { subject, image_urls } = await req.json();
-    console.log(`[add-face-examples] 1/7: Body recebido - subject: ${subject}, image_urls.length: ${image_urls?.length}`);
+    console.log(`[add-face-examples] 1/6: Body recebido - subject: ${subject}, image_urls.length: ${image_urls?.length}`);
     
     if (!subject || typeof subject !== 'string' || subject.trim() === '') {
       throw new Error(`Parâmetro 'subject' (ID do cliente) inválido ou ausente.`);
@@ -71,19 +71,8 @@ serve(async (req) => {
       throw new Error("`image_urls` deve ser um array com pelo menos uma URL.");
     }
 
-    console.log("[add-face-examples] 2/7: Autenticando usuário logado...");
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error("Falha na autenticação do usuário: Token de autorização ausente.");
-    }
-    
-    // Apenas verifica se o usuário está logado para garantir que a requisição é válida
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    console.log(`[add-face-examples] 2/7: Usuário autenticado: ${user.id}`);
-
-    // 3. Buscando configurações do CompreFace do Superadmin
-    console.log("[add-face-examples] 3/7: Buscando configurações globais do CompreFace...");
+    // 2. Buscando configurações do CompreFace do Superadmin
+    console.log("[add-face-examples] 2/6: Buscando configurações globais do CompreFace...");
     const { settings, error: settingsError } = await getComprefaceSettings(supabaseAdmin);
 
     if (settingsError) {
@@ -92,12 +81,12 @@ serve(async (req) => {
         status: 400,
       });
     }
-    console.log(`[add-face-examples] 3/7: Configurações carregadas.`);
+    console.log(`[add-face-examples] 2/6: Configurações carregadas.`);
 
     let successCount = 0;
     const errors = [];
 
-    console.log(`[add-face-examples] 4/7: Iniciando loop para ${image_urls.length} imagens...`);
+    console.log(`[add-face-examples] 3/6: Iniciando loop para ${image_urls.length} imagens...`);
     for (const [index, imageUrl] of image_urls.entries()) {
       const logPrefix = `[add-face-examples] Imagem ${index + 1}/${image_urls.length}:`;
       console.log(`${logPrefix} Processando URL: ${imageUrl}`);
@@ -121,7 +110,7 @@ serve(async (req) => {
 
         const payload = { file: base64String };
         
-        console.log(`${logPrefix} 5/7: Enviando para CompreFace...`);
+        console.log(`${logPrefix} 4/6: Enviando para CompreFace...`);
         // O subject é o ID do cliente, que é único.
         const requestUrl = `${settings.compreface_url}/api/v1/recognition/faces?subject=${encodeURIComponent(subject)}`;
         
@@ -134,7 +123,7 @@ serve(async (req) => {
           body: JSON.stringify(payload),
         });
 
-        console.log(`${logPrefix} 6/7: Resposta recebida do CompreFace com status: ${response.status}`);
+        console.log(`${logPrefix} 5/6: Resposta recebida do CompreFace com status: ${response.status}`);
         if (!response.ok) {
           const errorBody = await response.text();
           const errorMsg = `${logPrefix} Falha no envio. Status: ${response.status}. Detalhes: ${errorBody}`;
@@ -151,7 +140,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[add-face-examples] 7/7: Loop concluído. Sucessos: ${successCount}, Erros: ${errors.length}`);
+    console.log(`[add-face-examples] 6/6: Loop concluído. Sucessos: ${successCount}, Erros: ${errors.length}`);
     if (successCount === 0) {
       throw new Error(`Nenhuma imagem foi enviada com sucesso. Último erro: ${errors[errors.length - 1] || 'Erro desconhecido'}`);
     }

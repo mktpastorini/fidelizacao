@@ -58,27 +58,17 @@ serve(async (req) => {
   );
 
   try {
-    console.log("[RF-SINGLE] 1/7: Parsing body da requisição...");
-    const { image_url, min_similarity } = await req.json(); // Adicionado min_similarity
+    console.log("[RF-SINGLE] 1/6: Parsing body da requisição...");
+    const { image_url, min_similarity } = await req.json();
     if (!image_url) throw new Error("`image_url` é obrigatório.");
-    console.log("[RF-SINGLE] 1/7: Body recebido.");
+    console.log("[RF-SINGLE] 1/6: Body recebido.");
 
     let imageData = image_url;
     if (image_url.startsWith('data:image')) {
       imageData = image_url.split(',')[1];
     }
 
-    console.log("[RF-SINGLE] 2/7: Autenticando usuário logado...");
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error("Usuário não autenticado. O reconhecimento facial requer autenticação.");
-    }
-    
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (userError || !user) throw new Error("Token de autenticação inválido ou expirado.");
-    console.log(`[RF-SINGLE] 2/7: Usuário autenticado: ${user.id}`);
-
-    console.log("[RF-SINGLE] 3/7: Buscando configurações do CompreFace e ID do Super Admin...");
+    console.log("[RF-SINGLE] 2/6: Buscando configurações do CompreFace e ID do Super Admin...");
     const { settings, error: settingsError, superadminId } = await getComprefaceSettingsAndSuperadminId(supabaseAdmin);
 
     if (settingsError) {
@@ -88,10 +78,10 @@ serve(async (req) => {
       });
     }
     if (!superadminId) throw new Error("ID do Superadmin não encontrado.");
-    console.log("[RF-SINGLE] 3/7: Configurações carregadas.");
+    console.log("[RF-SINGLE] 2/6: Configurações carregadas.");
 
     const payload = { file: imageData };
-    console.log("[RF-SINGLE] 4/7: Enviando para CompreFace para reconhecimento...");
+    console.log("[RF-SINGLE] 3/6: Enviando para CompreFace para reconhecimento...");
     const response = await fetch(`${settings.compreface_url}/api/v1/recognition/recognize`, {
       method: 'POST',
       headers: {
@@ -101,9 +91,9 @@ serve(async (req) => {
       body: JSON.stringify(payload),
     });
 
-    console.log(`[RF-SINGLE] 5/7: Resposta recebida do CompreFace com status: ${response.status}`);
+    console.log(`[RF-SINGLE] 4/6: Resposta recebida do CompreFace com status: ${response.status}`);
     const responseBody = await response.json().catch(() => response.text());
-    console.log(`[RF-SINGLE] 5/7: Corpo da resposta do CompreFace:`, JSON.stringify(responseBody));
+    console.log(`[RF-SINGLE] 4/6: Corpo da resposta do CompreFace:`, JSON.stringify(responseBody));
 
     if (!response.ok) {
       if (response.status === 400 && typeof responseBody === 'object' && responseBody.code === 28) {
@@ -114,12 +104,12 @@ serve(async (req) => {
     }
 
     const bestMatch = responseBody.result?.[0]?.subjects?.[0];
-    const minSimilarity = min_similarity ?? 0.85; // Usa o valor recebido ou o padrão
+    const minSimilarity = min_similarity ?? 0.85;
 
     if (bestMatch) {
-      console.log(`[RF-SINGLE] 6/7: Melhor match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
+      console.log(`[RF-SINGLE] 5/6: Melhor match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
       if (bestMatch.similarity >= minSimilarity) {
-        console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject}`);
+        console.log(`[RF-SINGLE] 6/6: Buscando cliente no DB com ID: ${bestMatch.subject}`);
         const { data: client, error: clientError } = await supabaseAdmin
           .from('clientes')
           .select('*, filhos(*)')
@@ -133,7 +123,7 @@ serve(async (req) => {
           }
           throw new Error(`Match encontrado, mas erro ao buscar dados do cliente: ${clientError.message}`);
         }
-        console.log("[RF-SINGLE] 7/7: Cliente encontrado no DB. Retornando sucesso.");
+        console.log("[RF-SINGLE] 6/6: Cliente encontrado no DB. Retornando sucesso.");
         return new Response(JSON.stringify({ success: true, status: 'MATCH_FOUND', match: client, similarity: bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       } else {
         console.log(`[RF-SINGLE] Similaridade ${bestMatch.similarity} abaixo do limiar de ${minSimilarity}.`);
@@ -141,7 +131,7 @@ serve(async (req) => {
       }
     }
 
-    console.log("[RF-SINGLE] 6/7: Nenhum match encontrado na resposta do CompreFace.");
+    console.log("[RF-SINGLE] 6/6: Nenhum match encontrado na resposta do CompreFace.");
     return new Response(JSON.stringify({ success: true, status: 'NO_MATCH', message: 'Rosto detectado, mas não corresponde a nenhum cliente cadastrado.' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
