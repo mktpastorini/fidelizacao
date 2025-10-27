@@ -77,10 +77,9 @@ export function ClientIdentificationModal({
   }, []);
 
   const performRecognition = useCallback(async (imageSrc: string) => {
-    if (!isReady || !recognize) return;
+    if (!isReady || !recognize || step !== 'capture') return;
 
     setStep('identifying');
-    // O hook global agora usa o Edge Function que não precisa do mesaId, mas retorna o status detalhado
     const result = await recognize(imageSrc); 
     
     if (result?.status === 'MATCH_FOUND' && result.match) {
@@ -95,23 +94,36 @@ export function ClientIdentificationModal({
       setStep('no_match');
       showError("Falha desconhecida no reconhecimento.");
     }
-  }, [isReady, recognize]);
+  }, [isReady, recognize, step]);
 
   const handleCapture = useCallback(() => {
-    if (mediaError) {
-      showError(mediaError);
+    if (mediaError || !webcamRef.current) {
       return;
     }
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
-      if (imageSrc) {
-        setSnapshot(imageSrc);
-        performRecognition(imageSrc);
-      } else {
-        showError("Não foi possível capturar a imagem. Tente novamente.");
-      }
+    const imageSrc = webcamRef.current.getScreenshot();
+    if (imageSrc) {
+      setSnapshot(imageSrc);
+      performRecognition(imageSrc);
     }
   }, [performRecognition, mediaError]);
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+
+    if (isOpen && step === 'capture' && !mediaError && isReady) {
+      const timeoutId = setTimeout(() => {
+        handleCapture();
+        intervalId = setInterval(handleCapture, 2500);
+      }, 1000);
+
+      return () => {
+        clearTimeout(timeoutId);
+        if (intervalId) {
+          clearInterval(intervalId);
+        }
+      };
+    }
+  }, [isOpen, step, mediaError, isReady, handleCapture]);
 
   const handleConfirmMatch = () => {
     if (match) {
@@ -128,7 +140,6 @@ export function ClientIdentificationModal({
     setIsSubmittingNewClient(true);
 
     try {
-      // 1. Cria o cliente (usando a função RPC para garantir a contagem de indicações)
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: mesaUserId, 
         p_nome: values.nome, 
@@ -141,7 +152,6 @@ export function ClientIdentificationModal({
       if (rpcError) throw new Error(rpcError.message);
       if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      // 2. Adicionar o novo cliente como ocupante da mesa
       const { error: occupantError } = await supabase
         .from("mesa_ocupantes")
         .insert({
@@ -150,19 +160,16 @@ export function ClientIdentificationModal({
           user_id: mesaUserId,
         });
       if (occupantError) {
-        // Se falhar ao adicionar como ocupante, é melhor reverter o cadastro do cliente para evitar inconsistência.
         await supabase.from("clientes").delete().eq("id", newClientId);
         throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
       }
 
-      // 3. Registra a face no CompreFace
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
         body: { subject: newClientId, image_urls: [values.avatar_url] }
       });
       if (faceError) {
-        // Se falhar o registro facial, remove o cliente para evitar inconsistência
         await supabase.from("clientes").delete().eq("id", newClientId);
-        throw new Error(`O cadastro falhou durante o registro facial. Erro: ${faceError.message}`);
+        throw new Error(`O cadastro do cliente falhou durante o registro facial. A operação foi desfeita. Erro original: ${faceError.message}`);
       }
 
       showSuccess(`Bem-vindo(a), ${values.nome}! Seu pedido foi adicionado.`);
@@ -177,7 +184,6 @@ export function ClientIdentificationModal({
   };
 
   const handleCancelIdentification = () => {
-    // Adiciona o pedido como Mesa (Geral)
     onOrderConfirmed(null);
     onOpenChange(false);
   };
@@ -207,12 +213,12 @@ export function ClientIdentificationModal({
                 videoConstraints={videoConstraints} 
                 className="w-full h-full object-cover" 
                 mirrored={true}
-                onUserMediaError={handleMediaError} // Captura erros de mídia
+                onUserMediaError={handleMediaError}
               />
             </div>
-            <Button onClick={handleCapture} disabled={!isReady} className="w-full max-w-xs bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
-              <Camera className="w-4 h-4 mr-2" /> Capturar Rosto
-            </Button>
+            <div className="text-center h-10 flex items-center justify-center">
+              <p className="text-muted-foreground animate-pulse">Posicione o rosto na câmera...</p>
+            </div>
           </div>
         );
       case 'identifying':
