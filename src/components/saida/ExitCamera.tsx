@@ -11,11 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type ExitCameraProps = {
   onDebtorDetected: (cliente: Cliente) => void;
+  isPaused: boolean;
 };
 
-const SCAN_INTERVAL_MS = 1000; // Reduzido para 1 segundo
+const SCAN_INTERVAL_MS = 1000;
 
-export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
+export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
   const { isLoading: isRecognitionLoading, error: recognitionError, recognizeMultiple } = useMultiFaceRecognition();
@@ -62,9 +63,13 @@ export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
   }, [isCameraOn, isRecognitionLoading, isCameraReady, recognizeMultiple, onDebtorDetected]);
 
   useEffect(() => {
+    if (isPaused || !isCameraOn || !isReady || !isCameraReady || isScanning) {
+      return;
+    }
+
     const intervalId = setInterval(scanForDebtors, SCAN_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, [scanForDebtors]);
+  }, [isPaused, isCameraOn, isReady, isCameraReady, isScanning, scanForDebtors]);
 
   const handleMediaError = (err: any) => {
     let errorMessage = `Erro de mídia: ${err.message}`;
@@ -74,6 +79,18 @@ export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
   };
 
   const displayError = recognitionError || mediaError;
+
+  const renderStatus = () => {
+    if (isPaused) {
+      return <p className="font-semibold text-yellow-500">Pausado - Alerta na tela</p>;
+    }
+    if (isRecognitionLoading) {
+      return (
+        <div className="flex items-center text-sm"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {statusMessage}</div>
+      );
+    }
+    return <p className="text-muted-foreground">{isCameraOn ? statusMessage : "Câmera pausada"}</p>;
+  };
 
   return (
     <Card className="w-full max-w-4xl mx-auto">
@@ -107,11 +124,7 @@ export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
         </div>
         {displayError && <Alert variant="destructive"><AlertTitle>Erro</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
         <div className="w-full h-10 flex items-center justify-center">
-          {isRecognitionLoading ? (
-            <div className="flex items-center text-sm"><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {statusMessage}</div>
-          ) : (
-            <p className="text-muted-foreground">{statusMessage}</p>
-          )}
+          {renderStatus()}
         </div>
       </CardContent>
     </Card>

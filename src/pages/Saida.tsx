@@ -25,7 +25,7 @@ export default function SaidaPage() {
         </p>
       </div>
       <div className="flex-1 flex justify-center items-start">
-        <ExitCamera onDebtorDetected={handleDebtorDetected} />
+        <ExitCamera onDebtorDetected={handleDebtorDetected} isPaused={isAlertOpen} />
       </div>
       <DebtorAlertModal
         isOpen={isAlertOpen}
