@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CheckCircle, ScanFace, MessageCircle, Star, Shield, ChefHat, BarChart2, LucideIcon } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { useState, useEffect, useCallback } from "react";
 
 // --- Componentes da Página ---
 
@@ -20,29 +21,49 @@ const Nav = () => (
   </header>
 );
 
-const HeroSection = () => (
-  <section className="container grid lg:grid-cols-2 gap-12 items-center py-20 md:py-32">
-    <div className="flex flex-col items-start gap-6">
-      <h1 className="text-4xl md:text-6xl font-bold tracking-tighter">
-        Transforme Visitantes em Clientes Fiéis com IA
-      </h1>
-      <p className="text-lg text-muted-foreground">
-        O Fidelize usa reconhecimento facial para criar experiências personalizadas, automatizar a comunicação e aumentar a retenção de clientes no seu restaurante.
-      </p>
-      <div className="flex gap-4">
-        <Button size="lg">Quero Fidelizar Meus Clientes</Button>
-        <Button size="lg" variant="outline">Ver Funcionalidades</Button>
+const VIDEO_URLS = [
+  "/ia.mp4",
+  "/ia4.mp4",
+  "/ia2.mp4",
+  "/ia3.mp4",
+];
+
+const HeroSection = () => {
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+
+  useEffect(() => {
+    setCurrentVideoIndex(Math.floor(Math.random() * VIDEO_URLS.length));
+  }, []);
+
+  const loadNextVideo = useCallback(() => {
+    setCurrentVideoIndex((prevIndex) => (prevIndex + 1) % VIDEO_URLS.length);
+  }, []);
+
+  const videoUrl = VIDEO_URLS[currentVideoIndex];
+
+  return (
+    <section className="container grid lg:grid-cols-2 gap-12 items-center py-20 md:py-32">
+      <div className="flex flex-col items-start gap-6">
+        <h1 className="text-4xl md:text-6xl font-bold tracking-tighter">
+          Transforme Visitantes em Clientes Fiéis com IA
+        </h1>
+        <p className="text-lg text-muted-foreground">
+          O Fidelize usa reconhecimento facial para criar experiências personalizadas, automatizar a comunicação e aumentar a retenção de clientes no seu restaurante.
+        </p>
+        <div className="flex gap-4">
+          <Button size="lg">Quero Fidelizar Meus Clientes</Button>
+          <Button size="lg" variant="outline">Ver Funcionalidades</Button>
+        </div>
       </div>
-    </div>
-    <div className="bg-muted rounded-lg aspect-video flex items-center justify-center">
-      {/* Substitua este vídeo pelo seu vídeo de demonstração */}
-      <video className="rounded-lg w-full h-full object-cover" autoPlay loop muted playsInline>
-        <source src="/ia.mp4" type="video/mp4" />
-        Seu navegador não suporta o vídeo.
-      </video>
-    </div>
-  </section>
-);
+      <div className="bg-muted rounded-lg aspect-video flex items-center justify-center">
+        <video key={videoUrl} className="rounded-lg w-full h-full object-cover" autoPlay loop={false} muted playsInline onEnded={loadNextVideo}>
+          <source src={videoUrl} type="video/mp4" />
+          Seu navegador não suporta o vídeo.
+        </video>
+      </div>
+    </section>
+  );
+};
 
 interface FeatureCardProps {
   icon: LucideIcon;
@@ -105,6 +126,46 @@ const FeaturesSection = () => (
   </section>
 );
 
+const FaqSection = () => (
+  <section className="container py-20 md:py-28 max-w-4xl mx-auto">
+    <div className="text-center mb-12">
+      <h2 className="text-3xl md:text-4xl font-bold">Perguntas Frequentes</h2>
+    </div>
+    <Accordion type="single" collapsible className="w-full">
+      <AccordionItem value="item-1">
+        <AccordionTrigger>O que eu preciso para usar o reconhecimento facial?</AccordionTrigger>
+        <AccordionContent>
+          Você precisa de uma webcam simples e uma conta em um serviço de reconhecimento facial como o CompreFace, que pode ser auto-hospedado para maior privacidade. Nosso sistema guia você durante a configuração.
+        </AccordionContent>
+      </AccordionItem>
+      <AccordionItem value="item-2">
+        <AccordionTrigger>A integração com o iFood é complicada?</AccordionTrigger>
+        <AccordionContent>
+          Não. Basta você fornecer suas credenciais de desenvolvedor do iFood em nosso painel de configurações. O Fidelize cuida do resto, desde o recebimento de pedidos até a atualização de status.
+        </AccordionContent>
+      </AccordionItem>
+      <AccordionItem value="item-3">
+        <AccordionTrigger>Meus dados estão seguros?</AccordionTrigger>
+        <AccordionContent>
+          Sim. Utilizamos o Supabase, que oferece segurança de nível empresarial, incluindo "Row Level Security" no banco de dados. Isso garante que seus dados só podem ser acessados por usuários autorizados da sua equipe.
+        </AccordionContent>
+      </AccordionItem>
+      <AccordionItem value="item-4">
+        <AccordionTrigger>Posso personalizar as mensagens enviadas aos clientes?</AccordionTrigger>
+        <AccordionContent>
+          Com certeza. Você pode criar e editar templates de mensagem para diversos eventos (chegada, pagamento, aniversário) e usar variáveis como `"{nome}"` para personalizar cada envio automaticamente.
+        </AccordionContent>
+      </AccordionItem>
+      <AccordionItem value="item-5">
+        <AccordionTrigger>O sistema funciona em qualquer dispositivo?</AccordionTrigger>
+        <AccordionContent>
+          Sim, o Fidelize é uma aplicação web moderna e responsiva. Ele funciona em qualquer dispositivo com um navegador de internet, incluindo computadores, tablets e smartphones.
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  </section>
+);
+
 const CtaSection = () => (
   <section className="bg-muted py-20">
     <div className="container text-center max-w-4xl mx-auto">
@@ -133,6 +194,7 @@ export default function LandingPage() {
         <main>
           <HeroSection />
           <FeaturesSection />
+          <FaqSection />
           <CtaSection />
         </main>
         <Footer />
