@@ -25,7 +25,9 @@ type ClientIdentificationModalProps = {
   itemToOrder: ItemToOrder | null;
   mesaId: string;
   mesaUserId: string;
+  mode: 'order' | 'occupy'; // NOVO CAMPO
   onOrderConfirmed: (clienteId: string | null) => void;
+  onTableOccupied: (clienteId: string) => void; // NOVO CAMPO
 };
 
 export function ClientIdentificationModal({
@@ -34,7 +36,9 @@ export function ClientIdentificationModal({
   itemToOrder,
   mesaId,
   mesaUserId,
+  mode, // NOVO
   onOrderConfirmed,
+  onTableOccupied, // NOVO
 }: ClientIdentificationModalProps) {
   const queryClient = useQueryClient();
   const webcamRef = useRef<Webcam>(null);
@@ -127,8 +131,27 @@ export function ClientIdentificationModal({
     }
   }, [isOpen, step, mediaError, isReady, handleCapture]);
 
-  const handleConfirmMatch = () => {
-    if (match) {
+  const handleConfirmMatch = async () => {
+    if (!match) return;
+
+    if (mode === 'occupy') {
+      // Fluxo de Ocupação de Mesa
+      try {
+        const { data, error } = await supabase.functions.invoke('occupy-table-public', {
+          body: { mesa_id: mesaId, cliente_id: match.id, user_id: mesaUserId },
+        });
+        if (error) throw new Error(error.message);
+        if (!data.success) throw new Error(data.error || "Falha ao ocupar a mesa.");
+        
+        showSuccess(data.message);
+        onTableOccupied(match.id);
+        onOpenChange(false);
+        
+      } catch (error: any) {
+        showError(`Erro ao ocupar mesa: ${error.message}`);
+      }
+    } else {
+      // Fluxo de Pedido
       onOrderConfirmed(match.id);
       onOpenChange(false);
     }
@@ -154,19 +177,7 @@ export function ClientIdentificationModal({
       if (rpcError) throw new Error(rpcError.message);
       if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      // Usa a nova Edge Function para adicionar o ocupante
-      const { error: occupantError } = await supabase.functions.invoke('add-occupant-public', {
-        body: {
-          mesa_id: mesaId,
-          cliente_id: newClientId,
-          user_id: mesaUserId,
-        }
-      });
-      if (occupantError) {
-        await supabase.from("clientes").delete().eq("id", newClientId);
-        throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
-      }
-
+      // 1. Adicionar face ao CompreFace
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
         body: { subject: newClientId, image_urls: [values.avatar_url] }
       });
@@ -175,9 +186,36 @@ export function ClientIdentificationModal({
         throw new Error(`O cadastro do cliente falhou durante o registro facial. A operação foi desfeita. Erro original: ${faceError.message}`);
       }
 
-      showSuccess(`Bem-vindo(a), ${values.nome}! Seu pedido foi adicionado.`);
-      onOrderConfirmed(newClientId);
-      onOpenChange(false);
+      // 2. Se for modo 'occupy', chama a função de ocupação
+      if (mode === 'occupy') {
+        const { data, error } = await supabase.functions.invoke('occupy-table-public', {
+          body: { mesa_id: mesaId, cliente_id: newClientId, user_id: mesaUserId },
+        });
+        if (error) throw new Error(error.message);
+        if (!data.success) throw new Error(data.error || "Falha ao ocupar a mesa.");
+        
+        showSuccess(`Bem-vindo(a), ${values.nome}! Mesa ocupada com sucesso.`);
+        onTableOccupied(newClientId);
+        onOpenChange(false);
+        
+      } else {
+        // 3. Se for modo 'order', adiciona o ocupante e confirma o pedido
+        const { error: occupantError } = await supabase.functions.invoke('add-occupant-public', {
+          body: {
+            mesa_id: mesaId,
+            cliente_id: newClientId,
+            user_id: mesaUserId,
+          }
+        });
+        if (occupantError) {
+          await supabase.from("clientes").delete().eq("id", newClientId);
+          throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
+        }
+        
+        showSuccess(`Bem-vindo(a), ${values.nome}! Seu pedido foi adicionado.`);
+        onOrderConfirmed(newClientId);
+        onOpenChange(false);
+      }
 
     } catch (error: any) {
       showError(`Erro no cadastro rápido: ${error.message}`);
@@ -187,8 +225,14 @@ export function ClientIdentificationModal({
   };
 
   const handleCancelIdentification = () => {
-    onOrderConfirmed(null);
-    onOpenChange(false);
+    if (mode === 'occupy') {
+      // No modo ocupar, não há opção de continuar como Mesa Geral
+      onOpenChange(false);
+    } else {
+      // No modo pedido, permite continuar como Mesa Geral
+      onOrderConfirmed(null);
+      onOpenChange(false);
+    }
   };
 
   const renderContent = () => {
@@ -239,10 +283,15 @@ export function ClientIdentificationModal({
               <AvatarFallback><User className="w-8 h-8" /></AvatarFallback>
             </Avatar>
             <p className="text-lg font-bold text-primary">Bem-vindo(a) de volta, {match?.nome}!</p>
-            <p className="text-sm text-muted-foreground">Deseja atribuir o pedido a você?</p>
+            <p className="text-sm text-muted-foreground">
+              {mode === 'occupy' ? "Deseja ocupar esta mesa?" : "Deseja atribuir o pedido a você?"}
+            </p>
             <div className="flex gap-2 justify-center pt-2">
               <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
-              <Button onClick={handleConfirmMatch} className="bg-primary hover:bg-primary/90 text-primary-foreground"><Check className="w-4 h-4 mr-2" />Confirmar Pedido</Button>
+              <Button onClick={handleConfirmMatch} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Check className="w-4 h-4 mr-2" />
+                {mode === 'occupy' ? "Ocupar Mesa" : "Confirmar Pedido"}
+              </Button>
             </div>
           </div>
         );
@@ -254,9 +303,11 @@ export function ClientIdentificationModal({
             <div className="flex flex-col gap-2 pt-2">
               <Button variant="outline" onClick={resetState}><RefreshCw className="w-4 h-4 mr-2" />Tentar Novamente</Button>
               <Button onClick={() => setStep('quick_register')} className="bg-primary hover:bg-primary/90 text-primary-foreground"><UserPlus className="w-4 h-4 mr-2" />Cadastrar Rápido</Button>
-              <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
-                <X className="w-4 h-4 mr-2" /> Continuar como Mesa (Geral)
-              </Button>
+              {mode === 'order' && (
+                <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4 mr-2" /> Continuar como Mesa (Geral)
+                </Button>
+              )}
             </div>
           </div>
         );
@@ -275,24 +326,24 @@ export function ClientIdentificationModal({
   const dialogTitle = useMemo(() => {
     if (step === 'quick_register') return "Cadastro Rápido";
     if (step === 'match') return "Cliente Identificado";
-    return "Identificação Facial";
-  }, [step]);
+    return mode === 'occupy' ? "Ocupar Mesa via Reconhecimento" : "Identificação Facial";
+  }, [step, mode]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md bg-card text-foreground">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold text-primary">{dialogTitle}</DialogTitle>
-          {step !== 'quick_register' && (
+          {step !== 'quick_register' && mode === 'order' && itemToOrder && (
             <DialogDescription>
-              {itemToOrder?.produto.nome} (x{itemToOrder?.quantidade})
+              {itemToOrder.produto.nome} (x{itemToOrder.quantidade})
             </DialogDescription>
           )}
         </DialogHeader>
         <div className="py-4">
           {renderContent()}
         </div>
-        {step === 'capture' && !mediaError && (
+        {step === 'capture' && !mediaError && mode === 'order' && (
           <DialogFooter>
             <Button variant="ghost" onClick={handleCancelIdentification} className="text-muted-foreground hover:text-foreground">
               <X className="w-4 h-4 mr-2" /> Pedir como Mesa (Geral)

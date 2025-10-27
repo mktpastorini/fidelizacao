@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Produto, Mesa, Categoria, ItemPedido, Cliente } from "@/types/supabase";
+import { Produto, Mesa, Categoria, ItemPedido, UserSettings } from "@/types/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Utensils, Lock, ReceiptText } from "lucide-react";
+import { ArrowLeft, Utensils, Lock, ReceiptText, DoorOpen, UserCheck } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PublicMenuProductCard } from "@/components/menu-publico/PublicMenuProductCard";
 import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary";
@@ -19,6 +19,7 @@ type MesaData = Mesa & { user_id: string };
 type MenuData = {
   produtos: Produto[];
   categorias: Categoria[];
+  settings: UserSettings | null;
 };
 
 type ItemToOrder = {
@@ -27,7 +28,8 @@ type ItemToOrder = {
   observacoes: string;
 };
 
-async function fetchMenuData(): Promise<MenuData> {
+async function fetchMenuData(mesaUserId: string): Promise<MenuData> {
+  // Busca produtos que estão marcados para o menu
   const { data: produtos, error: produtosError } = await supabase
     .from("produtos")
     .select("*, categoria:categorias(nome)")
@@ -35,13 +37,24 @@ async function fetchMenuData(): Promise<MenuData> {
     .order("nome");
   if (produtosError) throw new Error(produtosError.message);
 
+  // Busca todas as categorias
   const { data: categorias, error: categoriasError } = await supabase
     .from("categorias")
     .select("*")
     .order("nome");
   if (categoriasError) throw new Error(categoriasError.message);
+  
+  // Busca configurações do Superadmin (para verificar se o estabelecimento está fechado)
+  const { data: settings, error: settingsError } = await supabase
+    .from("user_settings")
+    .select("*")
+    .eq("id", mesaUserId)
+    .single();
+  if (settingsError && settingsError.code !== 'PGRST116') {
+    console.error("Erro ao buscar configurações do Superadmin:", settingsError);
+  }
 
-  return { produtos: produtos || [], categorias: categorias || [] };
+  return { produtos: produtos || [], categorias: categorias || [], settings: settings || null };
 }
 
 async function fetchMesaData(mesaId: string): Promise<MesaData | null> {
@@ -57,15 +70,38 @@ async function fetchMesaData(mesaId: string): Promise<MesaData | null> {
 
 export default function MenuPublicoPage() {
   const queryClient = useQueryClient();
-  const [menuData, setMenuData] = useState<MenuData>({ produtos: [], categorias: [] });
+  const [menuData, setMenuData] = useState<MenuData>({ produtos: [], categorias: [], settings: null });
   const [mesaData, setMesaData] = useState<MesaData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [isIdentificationOpen, setIsIdentificationOpen] = useState(false);
+  const [identificationMode, setIdentificationMode] = useState<'order' | 'occupy'>('order'); // NOVO ESTADO
   const [itemToIdentify, setItemToIdentify] = useState<ItemToOrder | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const navigate = useNavigate();
   const { mesaId } = useParams<{ mesaId: string }>();
+
+  const isMesaOcupada = !!mesaData?.cliente_id;
+  const isClosed = menuData.settings?.establishment_is_closed || false;
+
+  const refetchAll = () => {
+    if (!mesaId || !mesaData?.user_id) return;
+    setIsLoading(true);
+    Promise.all([
+      fetchMenuData(mesaData.user_id),
+      fetchMesaData(mesaId),
+    ])
+      .then(([menuData, mesaData]) => {
+        setMenuData(menuData);
+        setMesaData(mesaData);
+        queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
+      })
+      .catch(error => {
+        console.error("Erro ao recarregar dados do menu:", error);
+        showError("Erro ao recarregar dados do menu.");
+      })
+      .finally(() => setIsLoading(false));
+  };
 
   useEffect(() => {
     if (!mesaId) {
@@ -73,13 +109,17 @@ export default function MenuPublicoPage() {
       return;
     }
 
-    Promise.all([
-      fetchMenuData(),
-      fetchMesaData(mesaId),
-    ])
-      .then(([menuData, mesaData]) => {
+    // Primeiro, buscamos apenas os dados da mesa para obter o user_id
+    fetchMesaData(mesaId)
+      .then(data => {
+        if (data && data.user_id) {
+          setMesaData(data);
+          return fetchMenuData(data.user_id);
+        }
+        throw new Error("Mesa ou ID do usuário não encontrado.");
+      })
+      .then(menuData => {
         setMenuData(menuData);
-        setMesaData(mesaData);
       })
       .catch(error => {
         console.error("Erro ao carregar dados do menu:", error);
@@ -88,28 +128,40 @@ export default function MenuPublicoPage() {
       .finally(() => setIsLoading(false));
   }, [mesaId]);
 
-  const isMesaOcupada = !!mesaData?.cliente_id;
-
   const filteredProdutos = useMemo(() => {
     if (selectedCategory === "all") return menuData.produtos;
     return menuData.produtos.filter(p => p.categoria_id === selectedCategory);
   }, [menuData.produtos, selectedCategory]);
 
   const handleInitiateOrder = (produto: Produto, quantidade: number, observacoes: string) => {
-    if (!mesaId || !mesaData || !isMesaOcupada) {
-      showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
+    if (!mesaId || !mesaData || !mesaData.user_id) {
+      showError("Erro interno: Dados da mesa ausentes.");
       return;
     }
     
+    if (isClosed) {
+      showError("O estabelecimento está fechado. Não é possível fazer pedidos.");
+      return;
+    }
+
     const isRodizioType = produto.tipo === 'rodizio' || produto.tipo === 'componente_rodizio';
     
-    // Verifica estoque APENAS se for produto de venda
     if (!isRodizioType && (produto.estoque_atual ?? 0) <= 0) {
       showError(`O produto "${produto.nome}" está indisponível no momento.`);
       return;
     }
 
     setItemToIdentify({ produto, quantidade, observacoes });
+    setIdentificationMode('order');
+    setIsIdentificationOpen(true);
+  };
+  
+  const handleOccupyTable = () => {
+    if (isClosed) {
+      showError("O estabelecimento está fechado. Não é possível ocupar mesas.");
+      return;
+    }
+    setIdentificationMode('occupy');
     setIsIdentificationOpen(true);
   };
 
@@ -121,37 +173,21 @@ export default function MenuPublicoPage() {
 
     const { produto, quantidade, observacoes } = itemToIdentify;
     const userId = mesaData.user_id;
+    const consumidoPorClienteId = clienteId;
 
     try {
-      // Se um cliente foi identificado, verifica se ele já é um ocupante. Se não, adiciona.
-      if (clienteId) {
-        const { data: existingOccupant, error: checkError } = await supabase
-          .from('mesa_ocupantes')
-          .select('id')
-          .eq('mesa_id', mesaId)
-          .eq('cliente_id', clienteId)
-          .maybeSingle();
-
-        if (checkError) throw checkError;
-
-        if (!existingOccupant) {
-          const { error: insertError } = await supabase
-            .from('mesa_ocupantes')
-            .insert({
-              mesa_id: mesaId,
-              cliente_id: clienteId,
-              user_id: mesaData.user_id,
-            });
-          if (insertError) throw insertError;
-          
-          // Invalida queries para atualizar a UI do salão e da comanda
-          queryClient.invalidateQueries({ queryKey: ["salaoData"] });
-          queryClient.invalidateQueries({ queryKey: ["ocupantes", mesaId] });
-          queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
-        }
+      // 1. Se um cliente foi identificado, garante que ele é um ocupante (Edge Function add-occupant-public faz isso)
+      if (consumidoPorClienteId) {
+        await supabase.functions.invoke('add-occupant-public', {
+          body: {
+            mesa_id: mesaId,
+            cliente_id: consumidoPorClienteId,
+            user_id: mesaData.user_id,
+          }
+        });
       }
 
-      // 1. Verifica se já existe pedido aberto para a mesa
+      // 2. Verifica se já existe pedido aberto para a mesa
       let pedidoId: string | null = null;
       const { data: pedidoAberto, error: pedidoError } = await supabase
         .from("pedidos")
@@ -165,7 +201,7 @@ export default function MenuPublicoPage() {
       if (pedidoAberto) {
         pedidoId = pedidoAberto.id;
       } else {
-        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
+        // 3. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
         const { data: novoPedido, error: novoPedidoError } = await supabase
           .from("pedidos")
           .insert({ 
@@ -180,45 +216,49 @@ export default function MenuPublicoPage() {
         pedidoId = novoPedido.id;
       }
 
-      // 3. Insere o item no pedido
-      
+      // 4. Insere o item no pedido
       let nomeProdutoFinal = produto.nome + (observacoes ? ` (${observacoes})` : '');
       let requerPreparo = produto.requer_preparo;
-      let status: ItemPedido['status'] = 'pendente'; // Todos os itens começam como pendente
+      let status: ItemPedido['status'] = 'pendente';
 
-      // Se for Pacote Rodízio, prefixamos e forçamos requer_preparo: false.
       if (produto.tipo === 'rodizio') {
           nomeProdutoFinal = `[RODIZIO] ${nomeProdutoFinal}`;
           requerPreparo = false;
       }
       
-      // Se for Item de Rodízio, usamos o requer_preparo definido pelo produto.
       if (produto.tipo === 'componente_rodizio') {
           requerPreparo = produto.requer_preparo;
       }
       
-      // NOTA: Removemos a lógica que marcava itens de venda direta sem preparo como 'entregue' aqui.
-      // Eles agora serão 'pendente' e o Garçom/Balcão os marcará como 'entregue' no Kanban.
-
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         nome_produto: nomeProdutoFinal,
         quantidade: quantidade,
         preco: produto.preco,
-        status: status, // Sempre 'pendente'
+        status: status,
         requer_preparo: requerPreparo,
         user_id: userId,
-        consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
+        consumido_por_cliente_id: consumidoPorClienteId,
       });
       if (itemError) throw itemError;
       
       showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
 
     } catch (error: any) {
       console.error("Erro ao adicionar pedido:", error);
       showError(error.message || "Erro ao adicionar pedido. Verifique as permissões.");
     } finally {
       setItemToIdentify(null);
+    }
+  };
+  
+  const handleTableOccupied = (clienteId: string) => {
+    // Após a ocupação bem-sucedida, recarrega os dados da mesa e do menu
+    refetchAll();
+    // Se havia um item pendente, inicia o fluxo de pedido para o cliente recém-alocado
+    if (itemToIdentify) {
+        handleOrderConfirmed(clienteId);
     }
   };
 
@@ -239,7 +279,7 @@ export default function MenuPublicoPage() {
                 key={produto.id} 
                 produto={produto} 
                 onInitiateOrder={handleInitiateOrder} 
-                disabled={isUnavailable}
+                disabled={isUnavailable || isClosed}
               />
             );
           })
@@ -265,12 +305,12 @@ export default function MenuPublicoPage() {
     );
   }
 
-  if (!isMesaOcupada) {
+  if (isClosed) {
     return (
       <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
-        <Card className="mt-12 bg-yellow-900 text-white border-yellow-700">
-          <CardHeader><CardTitle className="flex items-center"><Lock className="w-6 h-6 mr-2" /> Mesa Livre</CardTitle></CardHeader>
-          <CardContent><p>Esta mesa não está ocupada por um cliente. Por favor, chame um atendente para iniciar seu pedido.</p></CardContent>
+        <Card className="mt-12 bg-red-900 text-white border-red-700">
+          <CardHeader><CardTitle className="flex items-center"><Lock className="w-6 h-6 mr-2" /> Estabelecimento Fechado</CardTitle></CardHeader>
+          <CardContent><p>Desculpe, o estabelecimento está fechado e não está aceitando pedidos no momento.</p></CardContent>
         </Card>
       </div>
     );
@@ -285,10 +325,15 @@ export default function MenuPublicoPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar
           </Button>
-          {isMesaOcupada && mesaId && (
+          {isMesaOcupada ? (
             <Button variant="default" onClick={() => setIsSummaryOpen(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg">
               <ReceiptText className="w-4 h-4 mr-2" />
               Ver Comanda
+            </Button>
+          ) : (
+            <Button variant="default" onClick={handleOccupyTable} className="bg-green-600 hover:bg-green-700 text-white shadow-lg">
+              <DoorOpen className="w-4 h-4 mr-2" />
+              Ocupar Mesa
             </Button>
           )}
         </div>
@@ -298,6 +343,18 @@ export default function MenuPublicoPage() {
           <Utensils className="w-6 h-6" />
           Cardápio da Mesa {mesaData?.numero || mesaId}
         </h1>
+        
+        {/* Alerta de Mesa Livre */}
+        {!isMesaOcupada && (
+            <Card className="mb-4 bg-yellow-100 border-yellow-500 text-yellow-800">
+                <CardContent className="p-3 flex items-center gap-3">
+                    <UserCheck className="w-5 h-5 shrink-0" />
+                    <p className="text-sm font-medium">
+                        Mesa Livre. Clique em "Ocupar Mesa" para iniciar seu atendimento e fazer pedidos.
+                    </p>
+                </CardContent>
+            </Card>
+        )}
 
         {/* 3. Filtro de Categorias Fixo */}
         <ScrollArea className="w-full whitespace-nowrap rounded-md border border-primary/30 bg-card/50 shadow-lg mb-4">
@@ -344,7 +401,9 @@ export default function MenuPublicoPage() {
         itemToOrder={itemToIdentify}
         mesaId={mesaId || ''}
         mesaUserId={mesaData?.user_id || ''}
+        mode={identificationMode}
         onOrderConfirmed={handleOrderConfirmed}
+        onTableOccupied={handleTableOccupied}
       />
     </div>
   );
