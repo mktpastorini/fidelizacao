@@ -13,7 +13,7 @@ type ExitCameraProps = {
   onDebtorDetected: (cliente: Cliente) => void;
 };
 
-const SCAN_INTERVAL_MS = 2000;
+const SCAN_INTERVAL_MS = 1000; // Reduzido para 1 segundo
 
 export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
   const webcamRef = useRef<Webcam>(null);

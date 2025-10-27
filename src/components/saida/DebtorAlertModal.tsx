@@ -30,7 +30,7 @@ export function DebtorAlertModal({ isOpen, onOpenChange, cliente }: DebtorAlertM
       };
 
       speakAndRepeat(); // Fala imediatamente ao abrir o modal
-      const intervalId = setInterval(speakAndRepeat, 7000); // Repete a cada 7 segundos
+      const intervalId = setInterval(speakAndRepeat, 4000); // Repete a cada 4 segundos
 
       // Limpa o intervalo e para a fala quando o modal é fechado
       return () => {
