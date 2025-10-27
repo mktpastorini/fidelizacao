@@ -41,7 +41,9 @@ const App = () => (
             <Route path="/lp" element={<LandingPage />} />
             <Route path="/menu-publico/:mesaId" element={
               <SettingsProvider>
-                <MenuPublicoPage />
+                <PerformanceProvider>
+                  <MenuPublicoPage />
+                </PerformanceProvider>
               </SettingsProvider>
             } />
             
