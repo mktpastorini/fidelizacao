@@ -12,16 +12,18 @@ import {
 } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { User, Star, DollarSign, Users, CreditCard, UserCheck, CheckSquare } from "lucide-react";
+import { User, Star, DollarSign, Users, CreditCard, UserCheck, CheckSquare, ChevronDown } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/checkbox";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "../ui/accordion";
+import { Accordion, AccordionContent, AccordionItem } from "@/components/ui/accordion";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import { showError, showSuccess } from "@/utils/toast";
 import { Label } from "../ui/label";
 import { Switch } from "../ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "../ui/alert-dialog";
+import { cn } from "@/lib/utils";
 
 type PaymentModalProps = {
   isOpen: boolean;
@@ -193,19 +195,19 @@ export function PaymentModal({ isOpen, onOpenChange, cliente, tableData, waiters
             <Accordion type="multiple" defaultValue={groupedItems.map(g => g.id)} className="w-full space-y-4">
               {groupedItems.map(group => (
                 <AccordionItem key={group.id} value={group.id} className="border rounded-lg">
-                  <AccordionTrigger className="px-4 hover:no-underline">
-                    <div className="flex items-center justify-between w-full">
+                  <AccordionPrimitive.Header className="flex items-center px-4">
+                    <Checkbox
+                      checked={group.itens.every(item => selectedItemIds.has(item.id))}
+                      onCheckedChange={(checked) => handleSelectAllFromGroup(group.id, !!checked)}
+                    />
+                    <AccordionPrimitive.Trigger className={cn("flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-state=open]>svg]:rotate-180 ml-2")}>
+                      <span className="font-semibold">{group.nome}</span>
                       <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={group.itens.every(item => selectedItemIds.has(item.id))}
-                          onCheckedChange={(checked) => handleSelectAllFromGroup(group.id, !!checked)}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <span className="font-semibold">{group.nome}</span>
+                        <span className="font-bold text-primary">{formatCurrency(group.subtotal)}</span>
+                        <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200" />
                       </div>
-                      <span className="font-bold text-primary">{formatCurrency(group.subtotal)}</span>
-                    </div>
-                  </AccordionTrigger>
+                    </AccordionPrimitive.Trigger>
+                  </AccordionPrimitive.Header>
                   <AccordionContent className="px-4 pb-2">
                     <Table>
                       <TableBody>
