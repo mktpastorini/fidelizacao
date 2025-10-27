@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { QuickRegistrationStepper } from './QuickRegistrationStepper';
 import { supabase } from '@/integrations/supabase/client';
 import * as z from 'zod';
+import { useQueryClient } from '@tanstack/react-query';
 
 type ItemToOrder = {
   produto: Produto;
@@ -35,6 +36,7 @@ export function ClientIdentificationModal({
   mesaUserId,
   onOrderConfirmed,
 }: ClientIdentificationModalProps) {
+  const queryClient = useQueryClient();
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
   const { isReady, isLoading: isScanning, error: recognitionError, recognize } = useFaceRecognition();
@@ -152,13 +154,14 @@ export function ClientIdentificationModal({
       if (rpcError) throw new Error(rpcError.message);
       if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      const { error: occupantError } = await supabase
-        .from("mesa_ocupantes")
-        .insert({
+      // Usa a nova Edge Function para adicionar o ocupante
+      const { error: occupantError } = await supabase.functions.invoke('add-occupant-public', {
+        body: {
           mesa_id: mesaId,
           cliente_id: newClientId,
           user_id: mesaUserId,
-        });
+        }
+      });
       if (occupantError) {
         await supabase.from("clientes").delete().eq("id", newClientId);
         throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
