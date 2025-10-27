@@ -4,7 +4,7 @@ import { Produto, Mesa, Categoria, ItemPedido, Cliente } from "@/types/supabase"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Utensils, Lock, ReceiptText, UserPlus } from "lucide-react";
+import { ArrowLeft, Utensils, Lock, ReceiptText } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PublicMenuProductCard } from "@/components/menu-publico/PublicMenuProductCard";
 import { PublicOrderSummary } from "@/components/menu-publico/PublicOrderSummary";
@@ -96,8 +96,8 @@ export default function MenuPublicoPage() {
   }, [menuData.produtos, selectedCategory]);
 
   const handleInitiateOrder = (produto: Produto, quantidade: number, observacoes: string) => {
-    if (!mesaId || !mesaData) {
-      showError("Erro: Dados da mesa ausentes.");
+    if (!mesaId || !mesaData || !isMesaOcupada) {
+      showError("A mesa não está ocupada. Não é possível adicionar pedidos.");
       return;
     }
     
@@ -110,14 +110,7 @@ export default function MenuPublicoPage() {
     }
 
     setItemToIdentify({ produto, quantidade, observacoes });
-    
-    // Se a mesa estiver livre, inicia o fluxo de identificação/cadastro
-    if (!isMesaOcupada) {
-        setIsIdentificationOpen(true);
-    } else {
-        // Se a mesa já estiver ocupada, pula a identificação e usa o cliente principal (ou null para mesa geral)
-        handleOrderConfirmed(mesaData.cliente_id);
-    }
+    setIsIdentificationOpen(true);
   };
 
   const handleOrderConfirmed = async (clienteId: string | null) => {
@@ -128,34 +121,35 @@ export default function MenuPublicoPage() {
 
     const { produto, quantidade, observacoes } = itemToIdentify;
     const userId = mesaData.user_id;
-    let finalClienteId = clienteId;
 
     try {
-      // --- Lógica de Ocupação Automática (Se a mesa estava livre) ---
-      if (!isMesaOcupada && finalClienteId) {
-        // 1. Ocupa a mesa com o cliente identificado/cadastrado
-        const { error: mesaUpdateError } = await supabase
-            .from("mesas")
-            .update({ cliente_id: finalClienteId })
-            .eq("id", mesaId);
-        if (mesaUpdateError) throw mesaUpdateError;
-        
-        // 2. Adiciona o cliente como ocupante (o trigger handle_new_occupant_item cuidará do item de entrada)
-        const { error: occupantError } = await supabase
+      // Se um cliente foi identificado, verifica se ele já é um ocupante. Se não, adiciona.
+      if (clienteId) {
+        const { data: existingOccupant, error: checkError } = await supabase
+          .from('mesa_ocupantes')
+          .select('id')
+          .eq('mesa_id', mesaId)
+          .eq('cliente_id', clienteId)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+
+        if (!existingOccupant) {
+          const { error: insertError } = await supabase
             .from('mesa_ocupantes')
             .insert({
-                mesa_id: mesaId,
-                cliente_id: finalClienteId,
-                user_id: mesaData.user_id,
+              mesa_id: mesaId,
+              cliente_id: clienteId,
+              user_id: mesaData.user_id,
             });
-        if (occupantError) throw occupantError;
-        
-        // Atualiza o estado local para refletir a ocupação
-        setMesaData(prev => prev ? { ...prev, cliente_id: finalClienteId } : null);
-        
-        showSuccess(`Mesa ${mesaData.numero} ocupada por ${finalClienteId}!`);
+          if (insertError) throw insertError;
+          
+          // Invalida queries para atualizar a UI do salão e da comanda
+          queryClient.invalidateQueries({ queryKey: ["salaoData"] });
+          queryClient.invalidateQueries({ queryKey: ["ocupantes", mesaId] });
+          queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] });
+        }
       }
-      // --- Fim Lógica de Ocupação Automática ---
 
       // 1. Verifica se já existe pedido aberto para a mesa
       let pedidoId: string | null = null;
@@ -171,14 +165,14 @@ export default function MenuPublicoPage() {
       if (pedidoAberto) {
         pedidoId = pedidoAberto.id;
       } else {
-        // 2. Cria novo pedido aberto para a mesa
+        // 2. Cria novo pedido aberto para a mesa (usando o cliente principal da mesa)
         const { data: novoPedido, error: novoPedidoError } = await supabase
           .from("pedidos")
           .insert({ 
             mesa_id: mesaId, 
             status: "aberto", 
             user_id: userId,
-            cliente_id: finalClienteId, // Usa o cliente identificado/principal
+            cliente_id: mesaData.cliente_id,
           })
           .select("id")
           .single();
@@ -190,33 +184,35 @@ export default function MenuPublicoPage() {
       
       let nomeProdutoFinal = produto.nome + (observacoes ? ` (${observacoes})` : '');
       let requerPreparo = produto.requer_preparo;
-      let status: ItemPedido['status'] = 'pendente';
+      let status: ItemPedido['status'] = 'pendente'; // Todos os itens começam como pendente
 
+      // Se for Pacote Rodízio, prefixamos e forçamos requer_preparo: false.
       if (produto.tipo === 'rodizio') {
           nomeProdutoFinal = `[RODIZIO] ${nomeProdutoFinal}`;
           requerPreparo = false;
       }
       
+      // Se for Item de Rodízio, usamos o requer_preparo definido pelo produto.
       if (produto.tipo === 'componente_rodizio') {
           requerPreparo = produto.requer_preparo;
       }
       
+      // NOTA: Removemos a lógica que marcava itens de venda direta sem preparo como 'entregue' aqui.
+      // Eles agora serão 'pendente' e o Garçom/Balcão os marcará como 'entregue' no Kanban.
+
       const { error: itemError } = await supabase.from("itens_pedido").insert({
         pedido_id: pedidoId,
         nome_produto: nomeProdutoFinal,
         quantidade: quantidade,
         preco: produto.preco,
-        status: status,
+        status: status, // Sempre 'pendente'
         requer_preparo: requerPreparo,
         user_id: userId,
-        consumido_por_cliente_id: finalClienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
+        consumido_por_cliente_id: clienteId, // Usa o ID do cliente identificado ou null (Mesa Geral)
       });
       if (itemError) throw itemError;
       
       showSuccess(`Pedido de ${quantidade}x "${produto.nome}" adicionado com sucesso!`);
-      queryClient.invalidateQueries({ queryKey: ["publicOrderSummary", mesaId] }); // Atualiza a comanda
-      queryClient.invalidateQueries({ queryKey: ["salaoData"] }); // Atualiza o salão
-      queryClient.invalidateQueries({ queryKey: ["mesas"] }); // Atualiza o salão
 
     } catch (error: any) {
       console.error("Erro ao adicionar pedido:", error);
@@ -224,12 +220,6 @@ export default function MenuPublicoPage() {
     } finally {
       setItemToIdentify(null);
     }
-  };
-
-  const handleCancelIdentification = () => {
-    // Se o cliente optar por Mesa Geral, chamamos a função de confirmação com null
-    handleOrderConfirmed(null);
-    onOpenChange(false);
   };
 
   const renderMenuContent = () => {
@@ -275,6 +265,17 @@ export default function MenuPublicoPage() {
     );
   }
 
+  if (!isMesaOcupada) {
+    return (
+      <div className="max-w-5xl mx-auto p-4 sm:p-6 bg-background min-h-screen">
+        <Card className="mt-12 bg-yellow-900 text-white border-yellow-700">
+          <CardHeader><CardTitle className="flex items-center"><Lock className="w-6 h-6 mr-2" /> Mesa Livre</CardTitle></CardHeader>
+          <CardContent><p>Esta mesa não está ocupada por um cliente. Por favor, chame um atendente para iniciar seu pedido.</p></CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <div className="max-w-5xl mx-auto w-full p-4 sm:p-6 shrink-0">
@@ -290,15 +291,6 @@ export default function MenuPublicoPage() {
               Ver Comanda
             </Button>
           )}
-          {!isMesaOcupada && (
-            <Button variant="default" onClick={() => {
-                setItemToIdentify({ produto: { nome: 'Mesa', preco: 0 } as Produto, quantidade: 1, observacoes: '' });
-                setIsIdentificationOpen(true);
-            }} className="bg-green-600 hover:bg-green-700 text-primary-foreground shadow-lg">
-              <UserPlus className="w-4 h-4 mr-2" />
-              Ocupar Mesa
-            </Button>
-          )}
         </div>
         
         {/* 2. Título Fixo */}
@@ -306,16 +298,6 @@ export default function MenuPublicoPage() {
           <Utensils className="w-6 h-6" />
           Cardápio da Mesa {mesaData?.numero || mesaId}
         </h1>
-        
-        {/* Alerta de Mesa Livre */}
-        {!isMesaOcupada && (
-            <Card className="mb-4 bg-yellow-900/20 text-yellow-100 border-yellow-700">
-                <CardContent className="p-3 text-sm flex items-center gap-2">
-                    <Lock className="w-4 h-4 shrink-0" />
-                    Esta mesa está livre. Para fazer um pedido, clique em "Ocupar Mesa" ou em um produto para se identificar.
-                </CardContent>
-            </Card>
-        )}
 
         {/* 3. Filtro de Categorias Fixo */}
         <ScrollArea className="w-full whitespace-nowrap rounded-md border border-primary/30 bg-card/50 shadow-lg mb-4">
