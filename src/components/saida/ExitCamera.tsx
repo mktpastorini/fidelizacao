@@ -24,7 +24,6 @@ export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Monitorando a saída...");
-  const detectedDebtors = useRef(new Set<string>()).current;
 
   const videoConstraints = {
     width: 1280,
@@ -44,9 +43,6 @@ export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
     if (matches.length > 0) {
       setStatusMessage(`${matches.length} rosto(s) detectado(s). Verificando status...`);
       for (const match of matches) {
-        // Evita alertar sobre o mesmo cliente repetidamente
-        if (detectedDebtors.has(match.client.id)) continue;
-
         const { data, error } = await supabase.functions.invoke('check-customer-status', {
           body: { cliente_id: match.client.id },
         });
@@ -58,15 +54,12 @@ export function ExitCamera({ onDebtorDetected }: ExitCameraProps) {
 
         if (data.hasOpenOrder) {
           onDebtorDetected(match.client);
-          detectedDebtors.add(match.client.id);
-          // Remove o cliente da lista de "já detectados" após 30 segundos para permitir novo alerta se necessário
-          setTimeout(() => detectedDebtors.delete(match.client.id), 30000);
         }
       }
     } else {
       setStatusMessage("Monitorando a saída...");
     }
-  }, [isCameraOn, isRecognitionLoading, isCameraReady, recognizeMultiple, onDebtorDetected, detectedDebtors]);
+  }, [isCameraOn, isRecognitionLoading, isCameraReady, recognizeMultiple, onDebtorDetected]);
 
   useEffect(() => {
     const intervalId = setInterval(scanForDebtors, SCAN_INTERVAL_MS);
