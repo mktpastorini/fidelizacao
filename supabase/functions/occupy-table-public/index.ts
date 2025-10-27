@@ -58,6 +58,9 @@ serve(async (req) => {
       
       if (clienteError) throw new Error(`Erro ao buscar nome do cliente: ${clienteError.message}`);
 
+      // Cria a lista de acompanhantes (que inclui o cliente principal)
+      const acompanhantesList = [{ id: cliente_id, nome: cliente.nome || 'Cliente' }];
+
       const { error: createPedidoError } = await supabaseAdmin
         .from('pedidos')
         .insert({
@@ -65,7 +68,7 @@ serve(async (req) => {
           cliente_id: cliente_id,
           user_id: user_id,
           status: 'aberto',
-          acompanhantes: [{ id: cliente_id, nome: cliente.nome || 'Cliente' }]
+          acompanhantes: acompanhantesList
         });
       if (createPedidoError) throw createPedidoError;
     }
