@@ -46,28 +46,52 @@ export function CashierMode({}: CashierModeProps) {
   const SCAN_INTERVAL_MS = settings?.caixa_interval || 2000;
   const minConfidence = settings?.caixa_confidence || 0.85;
 
-  useEffect(() => {
-    const getDevices = async () => {
-      try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
-        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
-        setDevices(videoDevices);
+  const handleMediaError = useCallback((err: any) => {
+    console.error("[CashierMode] Erro ao acessar a câmera:", err);
+    let errorMessage = `Erro de mídia: ${err.message}`;
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errorMessage = "Acesso à câmera negado. Verifique as permissões do navegador.";
+    } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+      errorMessage = "Acesso à câmera bloqueado. O sistema deve ser acessado via HTTPS.";
+    }
+    setMediaError(errorMessage);
+    setIsCameraOn(false);
+    setIsCameraReady(false);
+  }, []);
 
+  const getDevices = useCallback(async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+      setDevices(videoDevices);
+
+      const currentSelected = selectedDeviceId;
+      const isCurrentSelectedAvailable = videoDevices.some(d => d.deviceId === currentSelected);
+
+      if (currentSelected && isCurrentSelectedAvailable) {
+        // Mantém a seleção atual se ainda for válida
+      } else {
         const savedCameraId = settings?.preferred_camera_device_id;
         const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
-
         if (savedCameraId && isSavedCameraAvailable) {
           setSelectedDeviceId(savedCameraId);
         } else if (videoDevices.length > 0) {
           setSelectedDeviceId(videoDevices[0].deviceId);
         }
-      } catch (err: any) {
-        handleMediaError(err);
       }
-    };
+    } catch (err: any) {
+      handleMediaError(err);
+    }
+  }, [settings, selectedDeviceId, handleMediaError]);
+
+  useEffect(() => {
     getDevices();
-  }, [settings]);
+    navigator.mediaDevices.addEventListener('devicechange', getDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', getDevices);
+    };
+  }, [getDevices]);
 
   const videoConstraints = {
     width: 400,
@@ -116,19 +140,6 @@ export function CashierMode({}: CashierModeProps) {
 
     return () => clearInterval(intervalId);
   }, [isCameraOn, isReady, isCameraReady, isScanning, isModalOpen, handleRecognition, SCAN_INTERVAL_MS]);
-
-  const handleMediaError = (err: any) => {
-    console.error("[CashierMode] Erro ao acessar a câmera:", err);
-    let errorMessage = `Erro de mídia: ${err.message}`;
-    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-      errorMessage = "Acesso à câmera negado. Verifique as permissões do navegador.";
-    } else if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-      errorMessage = "Acesso à câmera bloqueado. O sistema deve ser acessado via HTTPS.";
-    }
-    setMediaError(errorMessage);
-    setIsCameraOn(false);
-    setIsCameraReady(false);
-  };
 
   const displayError = error || mediaError;
 

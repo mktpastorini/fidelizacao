@@ -30,28 +30,46 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   const SCAN_INTERVAL_MS = settings?.saida_interval || 1000;
   const minConfidence = settings?.saida_confidence || 0.90;
 
-  useEffect(() => {
-    const getDevices = async () => {
-      try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
-        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
-        setDevices(videoDevices);
+  const handleMediaError = useCallback((err: any) => {
+    let errorMessage = `Erro de mídia: ${err.message}`;
+    if (err.name === 'NotAllowedError') errorMessage = "Acesso à câmera negado.";
+    setMediaError(errorMessage);
+    setIsCameraOn(false);
+  }, []);
 
+  const getDevices = useCallback(async () => {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
+      setDevices(videoDevices);
+
+      const currentSelected = selectedDeviceId;
+      const isCurrentSelectedAvailable = videoDevices.some(d => d.deviceId === currentSelected);
+
+      if (currentSelected && isCurrentSelectedAvailable) {
+        // Mantém a seleção atual se ainda for válida
+      } else {
         const savedCameraId = settings?.preferred_camera_device_id;
         const isSavedCameraAvailable = videoDevices.some(device => device.deviceId === savedCameraId);
-
         if (savedCameraId && isSavedCameraAvailable) {
           setSelectedDeviceId(savedCameraId);
         } else if (videoDevices.length > 0) {
           setSelectedDeviceId(videoDevices[0].deviceId);
         }
-      } catch (err: any) {
-        handleMediaError(err);
       }
-    };
+    } catch (err: any) {
+      handleMediaError(err);
+    }
+  }, [settings, selectedDeviceId, handleMediaError]);
+
+  useEffect(() => {
     getDevices();
-  }, [settings]);
+    navigator.mediaDevices.addEventListener('devicechange', getDevices);
+    return () => {
+      navigator.mediaDevices.removeEventListener('devicechange', getDevices);
+    };
+  }, [getDevices]);
 
   const videoConstraints = {
     width: 1280,
@@ -97,13 +115,6 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
     const intervalId = setInterval(scanForDebtors, SCAN_INTERVAL_MS);
     return () => clearInterval(intervalId);
   }, [isPaused, isCameraOn, isCameraReady, isRecognitionLoading, scanForDebtors, SCAN_INTERVAL_MS]);
-
-  const handleMediaError = (err: any) => {
-    let errorMessage = `Erro de mídia: ${err.message}`;
-    if (err.name === 'NotAllowedError') errorMessage = "Acesso à câmera negado.";
-    setMediaError(errorMessage);
-    setIsCameraOn(false);
-  };
 
   const displayError = recognitionError || mediaError;
 
