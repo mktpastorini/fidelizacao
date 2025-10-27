@@ -59,7 +59,7 @@ serve(async (req) => {
 
   try {
     console.log("[RF-SINGLE] 1/7: Parsing body da requisição...");
-    const { image_url } = await req.json();
+    const { image_url, min_similarity } = await req.json(); // Adicionado min_similarity
     if (!image_url) throw new Error("`image_url` é obrigatório.");
     console.log("[RF-SINGLE] 1/7: Body recebido.");
 
@@ -114,10 +114,11 @@ serve(async (req) => {
     }
 
     const bestMatch = responseBody.result?.[0]?.subjects?.[0];
+    const minSimilarity = min_similarity ?? 0.85; // Usa o valor recebido ou o padrão
 
     if (bestMatch) {
       console.log(`[RF-SINGLE] 6/7: Melhor match encontrado - Subject: ${bestMatch.subject}, Similaridade: ${bestMatch.similarity}`);
-      if (bestMatch.similarity >= 0.85) {
+      if (bestMatch.similarity >= minSimilarity) {
         console.log(`[RF-SINGLE] 7/7: Buscando cliente no DB com ID: ${bestMatch.subject}`);
         const { data: client, error: clientError } = await supabaseAdmin
           .from('clientes')
@@ -135,7 +136,7 @@ serve(async (req) => {
         console.log("[RF-SINGLE] 7/7: Cliente encontrado no DB. Retornando sucesso.");
         return new Response(JSON.stringify({ success: true, status: 'MATCH_FOUND', match: client, similarity: bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       } else {
-        console.log(`[RF-SINGLE] Similaridade ${bestMatch.similarity} abaixo do limiar de 0.85.`);
+        console.log(`[RF-SINGLE] Similaridade ${bestMatch.similarity} abaixo do limiar de ${minSimilarity}.`);
         return new Response(JSON.stringify({ success: true, status: 'NO_MATCH', message: `Rosto detectado, mas não reconhecido. (Similaridade: ${(bestMatch.similarity * 100).toFixed(0)}%)`, similarity: bestMatch.similarity }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
       }
     }

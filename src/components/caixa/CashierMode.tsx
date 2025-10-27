@@ -10,10 +10,9 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { PaymentModal } from './PaymentModal';
 import { useQuery } from '@tanstack/react-query';
+import { showError } from '@/utils/toast';
 
 type CashierModeProps = {};
-
-const SCAN_INTERVAL_MS = 2000;
 
 async function fetchWaiters(): Promise<StaffProfile[]> {
   const { data, error } = await supabase
@@ -41,6 +40,9 @@ export function CashierMode({}: CashierModeProps) {
     queryFn: fetchWaiters,
   });
 
+  const SCAN_INTERVAL_MS = settings?.multi_detection_interval || 2000;
+  const minConfidence = settings?.multi_detection_confidence || 0.85;
+
   const videoConstraints = {
     width: 400,
     height: 400,
@@ -53,12 +55,11 @@ export function CashierMode({}: CashierModeProps) {
     const imageSrc = webcamRef.current.getScreenshot();
     if (!imageSrc) return;
 
-    const result = await recognize(imageSrc);
+    const result = await recognize(imageSrc, minConfidence);
     
     if (result?.status === 'MATCH_FOUND' && result.match) {
       setLastStatusMessage(`Cliente encontrado: ${result.match.nome}`);
       
-      // Fetch table data for the recognized client
       const { data: tableDetails, error: rpcError } = await supabase.rpc('get_customer_table_details', { p_cliente_id: result.match.id });
       
       if (rpcError) {
@@ -76,7 +77,7 @@ export function CashierMode({}: CashierModeProps) {
     } else if (result?.message) {
       setLastStatusMessage(result.message);
     }
-  }, [isCameraOn, isScanning, recognize]);
+  }, [isCameraOn, isScanning, recognize, minConfidence]);
 
   useEffect(() => {
     if (!isCameraOn || !isReady || !isCameraReady || isScanning || isModalOpen) {
@@ -88,7 +89,7 @@ export function CashierMode({}: CashierModeProps) {
     }, SCAN_INTERVAL_MS);
 
     return () => clearInterval(intervalId);
-  }, [isCameraOn, isReady, isCameraReady, isScanning, isModalOpen, handleRecognition]);
+  }, [isCameraOn, isReady, isCameraReady, isScanning, isModalOpen, handleRecognition, SCAN_INTERVAL_MS]);
 
   const handleMediaError = (err: any) => {
     console.error("[CashierMode] Erro ao acessar a câmera:", err);

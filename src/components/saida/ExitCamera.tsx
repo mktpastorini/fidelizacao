@@ -14,8 +14,6 @@ type ExitCameraProps = {
   isPaused: boolean;
 };
 
-const SCAN_INTERVAL_MS = 1000;
-
 export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   const webcamRef = useRef<Webcam>(null);
   const { settings } = useSettings();
@@ -25,6 +23,9 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Monitorando a saída...");
+
+  const SCAN_INTERVAL_MS = settings?.multi_detection_interval || 2000;
+  const minConfidence = settings?.multi_detection_confidence || 0.90; // Mantém um padrão mais alto para segurança
 
   const videoConstraints = {
     width: 1280,
@@ -39,7 +40,7 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
     if (!imageSrc) return;
 
     setStatusMessage("Analisando...");
-    const matches = await recognizeMultiple(imageSrc, 0.90); // Confiança alta para evitar falsos positivos
+    const matches = await recognizeMultiple(imageSrc, minConfidence);
 
     if (matches.length > 0) {
       setStatusMessage(`${matches.length} rosto(s) detectado(s). Verificando status...`);
@@ -60,7 +61,7 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
     } else {
       setStatusMessage("Monitorando a saída...");
     }
-  }, [isCameraOn, isRecognitionLoading, isCameraReady, recognizeMultiple, onDebtorDetected]);
+  }, [isCameraOn, isRecognitionLoading, isCameraReady, recognizeMultiple, onDebtorDetected, minConfidence]);
 
   useEffect(() => {
     if (isPaused || !isCameraOn || !isCameraReady || isRecognitionLoading) {
@@ -69,7 +70,7 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
 
     const intervalId = setInterval(scanForDebtors, SCAN_INTERVAL_MS);
     return () => clearInterval(intervalId);
-  }, [isPaused, isCameraOn, isCameraReady, isRecognitionLoading, scanForDebtors]);
+  }, [isPaused, isCameraOn, isCameraReady, isRecognitionLoading, scanForDebtors, SCAN_INTERVAL_MS]);
 
   const handleMediaError = (err: any) => {
     let errorMessage = `Erro de mídia: ${err.message}`;

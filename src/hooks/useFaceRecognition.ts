@@ -17,13 +17,13 @@ export function useFaceRecognition() {
   const [error, setError] = useState<string | null>(null);
   const { isPerformanceModeEnabled } = usePerformance();
 
-  const recognize = useCallback(async (imageSrc: string): Promise<FaceRecognitionResult> => {
+  const recognize = useCallback(async (imageSrc: string, minSimilarity?: number): Promise<FaceRecognitionResult> => {
     setIsLoading(true);
     setError(null);
     const startTime = performance.now();
     try {
       const { data, error: functionError } = await supabase.functions.invoke('recognize-face-compreface', {
-        body: { image_url: imageSrc },
+        body: { image_url: imageSrc, min_similarity: minSimilarity },
       });
 
       if (functionError) throw functionError;
