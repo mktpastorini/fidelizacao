@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ScanFace, MessageCircle, Star, Shield, ChefHat, BarChart2, LucideIcon } from "lucide-react";
+import { ScanFace, MessageCircle, Star, Shield, ChefHat, BarChart2, LucideIcon, QrCode, ClipboardList, Sparkles } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useState, useEffect, useCallback } from "react";
 
@@ -45,10 +45,10 @@ const HeroSection = () => {
     <section className="container grid lg:grid-cols-2 gap-12 items-center py-20 md:py-32">
       <div className="flex flex-col items-start gap-6">
         <h1 className="text-4xl md:text-6xl font-bold tracking-tighter">
-          De Visitantes a Fãs: A Mágica do Atendimento Personalizado com IA
+          Da Porta à Mesa: A Revolução do Atendimento que Conhece seu Cliente.
         </h1>
         <p className="text-lg text-muted-foreground">
-          Imagine chamar cada cliente pelo nome e saber suas preferências assim que ele entra. Com o Fidelize, isso não é mágica, é tecnologia que gera lucro e lealdade.
+          Reconhecimento facial na chegada, pedidos inteligentes na mesa e segurança total no caixa. Transforme cada visita em uma experiência memorável e lucrativa.
         </p>
         <div className="flex gap-4">
           <Button size="lg">Quero Fidelizar Meus Clientes</Button>
@@ -100,7 +100,7 @@ const FeaturesSection = () => (
       <FeatureCard
         icon={Shield}
         title="Segurança Antifraude e Alertas de Saída"
-        description="Ações sensíveis como descontos exigem aprovação de um gerente. E mais: nosso sistema alerta em tempo real se um cliente com conta aberta tentar sair, evitando prejuízos."
+        description="Ações sensíveis como descontos exigem aprovação de um gerente. E mais: nosso sistema alerta em tempo real com um aviso sonoro se um cliente com conta aberta tentar sair."
       />
       <FeatureCard
         icon={Star}
@@ -113,9 +113,24 @@ const FeaturesSection = () => (
         description="Mantenha o relacionamento aquecido com mensagens automáticas de boas-vindas, pós-pagamento e aniversário via WhatsApp. Tudo personalizado para criar uma conexão real."
       />
       <FeatureCard
+        icon={QrCode}
+        title="Cardápio Digital com QR Code"
+        description="Gere QR Codes para cada mesa e ofereça um cardápio digital sempre atualizado. Reduza custos de impressão e permita que seus clientes explorem seus pratos de forma interativa."
+      />
+      <FeatureCard
+        icon={ClipboardList}
+        title="Estoque Inteligente, Lucro Máximo"
+        description="Receba alertas de estoque baixo, controle o custo de cada prato e evite desperdícios. Saiba exatamente quando comprar e nunca mais perca uma venda por falta de insumos."
+      />
+      <FeatureCard
+        icon={Sparkles}
+        title="A Mágica Acontece na Mesa"
+        description="Nosso sistema identifica clientes (novos e recorrentes) diretamente na mesa. Clientes novos fazem um cadastro rápido e automático em segundos, enquanto os recorrentes são recebidos com suas preferências."
+      />
+      <FeatureCard
         icon={ChefHat}
-        title="Gestão de Cozinha e Delivery"
-        description="Otimize o tempo de preparo com nosso Kanban inteligente e gerencie pedidos de delivery, incluindo integração total com iFood."
+        title="Cozinha e Delivery de Alta Performance"
+        description="Otimize o tempo de preparo com nosso Kanban inteligente e gerencie pedidos de delivery, incluindo integração total com iFood, para garantir entregas rápidas e clientes satisfeitos."
       />
       <FeatureCard
         icon={BarChart2}
@@ -139,15 +154,15 @@ const FaqSection = () => (
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="item-2">
-        <AccordionTrigger>A integração com o iFood é complicada?</AccordionTrigger>
+        <AccordionTrigger>Como funciona o cadastro rápido na mesa para novos clientes?</AccordionTrigger>
         <AccordionContent>
-          Não. Basta você fornecer suas credenciais de desenvolvedor do iFood em nosso painel de configurações. O Fidelize cuida do resto, desde o recebimento de pedidos até a atualização de status.
+          É simples! Ao sentar, o cliente pode optar por um cadastro rápido via câmera. Em segundos, o sistema captura a foto, pede o nome e o contato, e o cliente já está no seu banco de dados, pronto para receber um atendimento personalizado e acumular pontos de fidelidade desde a primeira visita.
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="item-3">
         <AccordionTrigger>Meus dados estão seguros?</AccordionTrigger>
         <AccordionContent>
-          Sim. Utilizamos o Supabase, que oferece segurança de nível empresarial, incluindo "Row Level Security" no banco de dados. Isso garante que seus dados só podem ser acessados por usuários autorizados da sua equipe.
+          Sim. Utilizamos tecnologia de ponta com segurança de nível empresarial. Isso garante que seus dados só podem ser acessados por usuários autorizados da sua equipe.
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="item-4">
