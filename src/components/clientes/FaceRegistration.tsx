@@ -149,15 +149,15 @@ export function FaceRegistration({ onFaceRegistered, isSubmitting }: FaceRegistr
       <div className="flex gap-2">
         {capturedImage ? (
           <>
-            <Button onClick={resetCapture} variant="outline" disabled={isSubmitting}>
+            <Button type="button" onClick={resetCapture} variant="outline" disabled={isSubmitting}>
               <RefreshCw className="w-4 h-4 mr-2" /> Tentar Novamente
             </Button>
-            <Button onClick={handleSaveFace} disabled={isSubmitting}>
+            <Button type="button" onClick={handleSaveFace} disabled={isSubmitting}>
               {isSubmitting ? 'Salvando...' : 'Salvar Rosto'}
             </Button>
           </>
         ) : (
-          <Button onClick={capture} disabled={!!cameraError}>
+          <Button type="button" onClick={capture} disabled={!!cameraError}>
             <Camera className="w-4 h-4 mr-2" /> Capturar Rosto
           </Button>
         )}
