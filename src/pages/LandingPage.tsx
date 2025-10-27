@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CheckCircle, ScanFace, MessageCircle, Star, Shield, ChefHat, BarChart2, LucideIcon } from "lucide-react";
+import { ScanFace, MessageCircle, Star, Shield, ChefHat, BarChart2, LucideIcon } from "lucide-react";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useState, useEffect, useCallback } from "react";
 
@@ -45,10 +45,10 @@ const HeroSection = () => {
     <section className="container grid lg:grid-cols-2 gap-12 items-center py-20 md:py-32">
       <div className="flex flex-col items-start gap-6">
         <h1 className="text-4xl md:text-6xl font-bold tracking-tighter">
-          Transforme Visitantes em Clientes Fiéis com IA
+          De Visitantes a Fãs: A Mágica do Atendimento Personalizado com IA
         </h1>
         <p className="text-lg text-muted-foreground">
-          O Fidelize usa reconhecimento facial para criar experiências personalizadas, automatizar a comunicação e aumentar a retenção de clientes no seu restaurante.
+          Imagine chamar cada cliente pelo nome e saber suas preferências assim que ele entra. Com o Fidelize, isso não é mágica, é tecnologia que gera lucro e lealdade.
         </p>
         <div className="flex gap-4">
           <Button size="lg">Quero Fidelizar Meus Clientes</Button>
@@ -86,31 +86,31 @@ const FeatureCard = ({ icon: Icon, title, description }: FeatureCardProps) => (
 const FeaturesSection = () => (
   <section className="container py-20 md:py-28">
     <div className="text-center max-w-3xl mx-auto mb-12">
-      <h2 className="text-3xl md:text-4xl font-bold">Uma Plataforma Completa para o Seu Negócio</h2>
+      <h2 className="text-3xl md:text-4xl font-bold">Mais que um Sistema, uma Revolução no seu Atendimento</h2>
       <p className="text-lg text-muted-foreground mt-4">
-        Do reconhecimento na porta à análise de dados, o Fidelize tem tudo que você precisa para crescer.
+        Descubra as ferramentas que vão encantar seus clientes e proteger seu caixa.
       </p>
     </div>
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
       <FeatureCard
         icon={ScanFace}
-        title="Reconhecimento Facial Inteligente"
-        description="Identifique clientes na chegada, no caixa e até na saída, acionando alertas para contas abertas e personalizando o atendimento."
-      />
-      <FeatureCard
-        icon={MessageCircle}
-        title="Automação de Mensagens"
-        description="Envie mensagens de boas-vindas, pós-pagamento e aniversário via WhatsApp, tudo de forma automática e personalizada."
-      />
-      <FeatureCard
-        icon={Star}
-        title="Programa de Fidelidade por Pontos"
-        description="Recompense seus clientes a cada visita. Eles acumulam pontos e podem resgatar por prêmios, incentivando o retorno."
+        title="Atendimento VIP Automático"
+        description="Nosso sistema reconhece seus clientes na chegada, exibindo nome, preferências e histórico. Surpreenda-os com um serviço que parece ler mentes."
       />
       <FeatureCard
         icon={Shield}
-        title="Prevenção de Fraudes"
-        description="Ações sensíveis como aplicar descontos ou liberar mesas exigem aprovação de um gerente, garantindo total controle e auditoria."
+        title="Segurança Antifraude e Alertas de Saída"
+        description="Ações sensíveis como descontos exigem aprovação de um gerente. E mais: nosso sistema alerta em tempo real se um cliente com conta aberta tentar sair, evitando prejuízos."
+      />
+      <FeatureCard
+        icon={Star}
+        title="Operação de Salão sem Estresse"
+        description="Chega de caixas perdidos ou comandas confusas. O Fidelize acompanha a movimentação dos clientes, mesmo que troquem de mesa, garantindo um fechamento de conta rápido e sem erros."
+      />
+      <FeatureCard
+        icon={MessageCircle}
+        title="Comunicação que Fideliza"
+        description="Mantenha o relacionamento aquecido com mensagens automáticas de boas-vindas, pós-pagamento e aniversário via WhatsApp. Tudo personalizado para criar uma conexão real."
       />
       <FeatureCard
         icon={ChefHat}
@@ -119,8 +119,8 @@ const FeaturesSection = () => (
       />
       <FeatureCard
         icon={BarChart2}
-        title="Relatórios e Análises"
-        description="Acompanhe o faturamento, ticket médio, desempenho dos garçons e muito mais com dashboards intuitivos."
+        title="Decisões Baseadas em Dados"
+        description="Entenda seu negócio a fundo. Acompanhe faturamento, ticket médio, desempenho da equipe e produtos mais vendidos com dashboards claros e objetivos."
       />
     </div>
   </section>
@@ -135,7 +135,7 @@ const FaqSection = () => (
       <AccordionItem value="item-1">
         <AccordionTrigger>O que eu preciso para usar o reconhecimento facial?</AccordionTrigger>
         <AccordionContent>
-          Você precisa de uma webcam simples e uma conta em um serviço de reconhecimento facial como o CompreFace, que pode ser auto-hospedado para maior privacidade. Nosso sistema guia você durante a configuração.
+          Apenas uma webcam de boa qualidade. Nossa equipe cuida de toda a configuração técnica do sistema de reconhecimento para você, garantindo que tudo funcione perfeitamente.
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="item-2">
