@@ -9,7 +9,7 @@ export function AuthLayout() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { settings, isLoading: isLoadingSettings } = useSettings();
+  const { isLoading: isLoadingSettings } = useSettings();
 
   useEffect(() => {
     const setupSessionAndProfile = async () => {
@@ -57,22 +57,10 @@ export function AuthLayout() {
   }, [navigate]);
 
   useEffect(() => {
-    // Só executa a lógica de persistência da URL se as configurações já foram carregadas
-    if (!loading && !session && !isLoadingSettings) {
-      console.log("AuthLayout: Tentando salvar login_video_url no localStorage.");
-      console.log("AuthLayout: Valor lido do settings:", settings?.login_video_url);
-      
-      // Antes de redirecionar para /login, salva a URL do vídeo se estiver disponível
-      if (settings?.login_video_url) {
-        localStorage.setItem('login_video_url', settings.login_video_url);
-        console.log("AuthLayout: URL salva com sucesso no localStorage.");
-      } else {
-        localStorage.removeItem('login_video_url');
-        console.log("AuthLayout: Nenhuma URL encontrada no settings, removendo do localStorage.");
-      }
+    if (!loading && !session) {
       navigate("/login");
     }
-  }, [session, loading, navigate, settings, isLoadingSettings]);
+  }, [session, loading, navigate]);
 
   if (loading || isLoadingSettings) {
     return (
