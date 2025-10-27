@@ -1,287 +1,335 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import Webcam from 'react-webcam';
-import { useMultiFaceRecognition, FaceMatch } from '@/hooks/useMultiFaceRecognition';
-import { useSettings } from '@/contexts/SettingsContext';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, Video, VideoOff, Users, PlusCircle, Trash2 } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+"use client";
 
-type RecognizedClientDisplay = {
-  client: FaceMatch['client'];
-  timestamp: number;
-};
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from 'sonner';
+import { Camera, Video, VideoOff, Users, AlertCircle, Plus, Minus } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { v4 as uuidv4 } from 'uuid';
 
-type MultiLiveRecognitionProps = {
-  onRecognizedFacesUpdate: (clients: RecognizedClientDisplay[]) => void;
-  allocatedClientIds: string[];
-};
+const MultiLiveRecognition = () => {
+  const [availableDevices, setAvailableDevices] = useState([]);
+  const [cameraInstances, setCameraInstances] = useState([]);
+  const videoRefs = useRef({});
+  const detectionIntervals = useRef({});
+  const [detectionBoxes, setDetectionBoxes] = useState({});
+  const [settings, setSettings] = useState({
+    multi_detection_interval: 2000,
+    multi_detection_confidence: 0.85,
+  });
+  const [isDetecting, setIsDetecting] = useState(true);
 
-const PERSISTENCE_DURATION_MS = 10000; // 10 segundos
+  const fetchSettings = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('multi_detection_interval, multi_detection_confidence')
+        .eq('id', user.id)
+        .single();
+      if (data) {
+        setSettings(prev => ({ ...prev, ...data }));
+      }
+    }
+  }, []);
 
-interface CameraInstance {
-  id: string;
-  deviceId: string | null;
-  isCameraOn: boolean;
-  webcamRef: React.RefObject<Webcam>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  mediaError: string | null;
-  recognizedFaces: FaceMatch[];
-  isCameraReady: boolean;
-}
-
-export function MultiLiveRecognition({ onRecognizedFacesUpdate, allocatedClientIds }: MultiLiveRecognitionProps) {
-  const { settings } = useSettings();
-  const { isLoading: isRecognitionLoading, error: recognitionError, recognizeMultiple } = useMultiFaceRecognition();
-  
-  const [cameraInstances, setCameraInstances] = useState<CameraInstance[]>([]);
-  const [allVideoDevices, setAllVideoDevices] = useState<MediaDeviceInfo[]>([]);
-  const [persistentRecognizedClients, setPersistentRecognizedClients] = useState<RecognizedClientDisplay[]>([]);
-  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const scanInterval = settings?.multi_detection_interval || 2000;
-  const minConfidence = settings?.multi_detection_confidence || 0.85;
-
-  // --- Setup Inicial de Câmeras ---
   useEffect(() => {
+    fetchSettings();
     const getDevices = async () => {
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = mediaDevices.filter(({ kind }) => kind === 'videoinput');
-        setAllVideoDevices(videoDevices);
-
-        if (cameraInstances.length === 0 && videoDevices.length > 0) {
-          addCameraInstance(videoDevices[0].deviceId);
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        setAvailableDevices(videoDevices);
+        if (videoDevices.length > 0 && cameraInstances.length === 0) {
+          setCameraInstances([{ id: uuidv4(), deviceId: videoDevices[0].deviceId, isCameraOn: false, stream: null, mediaError: null }]);
         }
-      } catch (err: any) {
-        console.error("Erro ao listar dispositivos de câmera:", err);
-        if (cameraInstances.length === 0) {
-          setCameraInstances([{
-            id: 'cam-1',
-            deviceId: null,
-            isCameraOn: false,
-            webcamRef: React.createRef(),
-            canvasRef: React.createRef(),
-            mediaError: err.message,
-            recognizedFaces: [],
-            isCameraReady: false,
-          }]);
-        }
+      } catch (err) {
+        console.error("Erro ao acessar dispositivos de mídia:", err);
+        toast.error("Não foi possível acessar as câmeras. Verifique as permissões do navegador.");
       }
     };
     getDevices();
-  }, []);
+  }, [fetchSettings, cameraInstances.length]);
 
-  const addCameraInstance = (initialDeviceId: string | null = null) => {
-    const newId = `cam-${Date.now()}`;
-    setCameraInstances(prev => [
-      ...prev,
-      {
-        id: newId,
-        deviceId: initialDeviceId,
-        isCameraOn: true,
-        webcamRef: React.createRef(),
-        canvasRef: React.createRef(),
-        mediaError: null,
-        recognizedFaces: [],
-        isCameraReady: false,
-      }
-    ]);
+  const updateCameraInstance = (id, updates) => {
+    setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
   };
 
-  const removeCameraInstance = (id: string) => {
+  const startStream = useCallback(async (cam) => {
+    if (cam.stream) {
+      cam.stream.getTracks().forEach(track => track.stop());
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: cam.deviceId } }
+      });
+      updateCameraInstance(cam.id, { stream, mediaError: null });
+    } catch (err) {
+      console.error(`Erro ao iniciar a câmera ${cam.deviceId}:`, err);
+      let errorMessage = "Erro ao iniciar a câmera.";
+      if (err.name === "NotAllowedError") {
+        errorMessage = "Permissão para câmera negada.";
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        errorMessage = "Câmera não encontrada.";
+      } else if (err.name === "NotReadableError") {
+        errorMessage = "A câmera já está em uso por outra aplicação.";
+      }
+      updateCameraInstance(cam.id, { isCameraOn: false, mediaError: errorMessage });
+      toast.error(errorMessage, { id: `cam-error-${cam.id}` });
+    }
+  }, []);
+
+  const stopStream = useCallback((cam) => {
+    if (cam.stream) {
+      cam.stream.getTracks().forEach(track => track.stop());
+      updateCameraInstance(cam.id, { stream: null });
+    }
+    if (detectionIntervals.current[cam.id]) {
+      clearInterval(detectionIntervals.current[cam.id]);
+      delete detectionIntervals.current[cam.id];
+    }
+  }, []);
+
+  useEffect(() => {
+    cameraInstances.forEach(cam => {
+      if (cam.isCameraOn && !cam.stream) {
+        startStream(cam);
+      } else if (!cam.isCameraOn && cam.stream) {
+        stopStream(cam);
+      }
+    });
+  }, [cameraInstances, startStream, stopStream]);
+
+  const captureAndDetect = useCallback(async (camId) => {
+    const video = videoRefs.current[camId];
+    if (!video || video.readyState < 2) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const context = canvas.getContext('2d');
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const { data, error } = await supabase.functions.invoke('compreface-search', {
+        body: blob,
+        headers: { 'Content-Type': 'image/jpeg' }
+      });
+
+      if (error) {
+        console.error('Erro na detecção:', error);
+        return;
+      }
+      
+      if (data && data.results) {
+        const validDetections = data.results
+          .filter(result => result.subjects && result.subjects.length > 0 && result.subjects[0].similarity >= settings.multi_detection_confidence)
+          .map(result => ({
+            ...result.box,
+            cliente_nome: result.subjects[0].subject,
+            similarity: result.subjects[0].similarity,
+          }));
+        
+        setDetectionBoxes(prev => ({ ...prev, [camId]: validDetections }));
+      } else {
+        setDetectionBoxes(prev => ({ ...prev, [camId]: [] }));
+      }
+    }, 'image/jpeg');
+  }, [settings.multi_detection_confidence]);
+
+  useEffect(() => {
+    cameraInstances.forEach(cam => {
+      if (cam.isCameraOn && cam.stream && isDetecting) {
+        if (!detectionIntervals.current[cam.id]) {
+          detectionIntervals.current[cam.id] = setInterval(() => {
+            captureAndDetect(cam.id);
+          }, settings.multi_detection_interval);
+        }
+      } else {
+        if (detectionIntervals.current[cam.id]) {
+          clearInterval(detectionIntervals.current[cam.id]);
+          delete detectionIntervals.current[cam.id];
+        }
+      }
+    });
+
+    return () => {
+      Object.values(detectionIntervals.current).forEach(clearInterval);
+    };
+  }, [cameraInstances, isDetecting, settings.multi_detection_interval, captureAndDetect]);
+
+  const handleDeviceChange = (id, deviceId) => {
+    updateCameraInstance(id, { deviceId });
+  };
+
+  const addCamera = () => {
+    if (availableDevices.length > 0) {
+      const newDeviceId = availableDevices.find(d => !cameraInstances.some(c => c.deviceId === d.deviceId))?.deviceId || availableDevices[0].deviceId;
+      setCameraInstances(prev => [...prev, { id: uuidv4(), deviceId: newDeviceId, isCameraOn: false, stream: null, mediaError: null }]);
+    }
+  };
+
+  const removeCamera = (id) => {
+    const camToRemove = cameraInstances.find(c => c.id === id);
+    if (camToRemove) stopStream(camToRemove);
     setCameraInstances(prev => prev.filter(cam => cam.id !== id));
   };
 
-  const updateCameraInstance = useCallback((id: string, updates: Partial<CameraInstance>) => {
-    setCameraInstances(prev => prev.map(cam => cam.id === id ? { ...cam, ...updates } : cam));
-  }, []);
-
-  // --- Lógica de Varredura Automática ---
-  const scanAllCameras = useCallback(async () => {
-    if (isRecognitionLoading) return;
-
-    const activeCameras = cameraInstances.filter(cam => cam.isCameraOn && cam.isCameraReady && !cam.mediaError && cam.webcamRef.current);
-    if (activeCameras.length === 0) return;
-
-    const allResults: FaceMatch[] = [];
-    for (const cam of activeCameras) {
-      const imageSrc = cam.webcamRef.current?.getScreenshot();
-      if (imageSrc) {
-        const results = await recognizeMultiple(imageSrc, minConfidence);
-        updateCameraInstance(cam.id, { recognizedFaces: results });
-        allResults.push(...results);
-      }
-    }
-
-    const allocatedSet = new Set(allocatedClientIds);
-    setPersistentRecognizedClients(prevClients => {
-      const now = Date.now();
-      const updatedClients = [...prevClients];
-      
-      allResults.forEach(match => {
-        if (!allocatedSet.has(match.client.id)) {
-          const existingIndex = updatedClients.findIndex(c => c.client.id === match.client.id);
-          if (existingIndex !== -1) {
-            updatedClients[existingIndex].timestamp = now;
-          } else {
-            updatedClients.push({ client: match.client, timestamp: now });
-          }
-        }
-      });
-      return updatedClients.filter(c => (now - c.timestamp) < PERSISTENCE_DURATION_MS && !allocatedSet.has(c.client.id));
-    });
-
-  }, [cameraInstances, isRecognitionLoading, recognizeMultiple, minConfidence, updateCameraInstance, allocatedClientIds]);
-
-  useEffect(() => {
-    if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-
-    const loop = () => {
-      scanAllCameras().finally(() => {
-        scanTimeoutRef.current = setTimeout(loop, scanInterval);
-      });
-    };
-
-    // Start the first scan immediately
-    loop();
-
-    return () => {
-      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
-    };
-  }, [scanAllCameras, scanInterval]);
-
-  // --- Sincronização e Limpeza de Clientes Persistentes ---
-  useEffect(() => {
-    onRecognizedFacesUpdate(persistentRecognizedClients);
-  }, [persistentRecognizedClients, onRecognizedFacesUpdate]);
-
-  const getAvailableDevices = useCallback((currentDeviceId: string | null) => {
-    const usedDeviceIds = new Set(cameraInstances.map(c => c.deviceId).filter(Boolean));
-    return allVideoDevices.filter(device => 
-      device.deviceId === currentDeviceId || !usedDeviceIds.has(device.deviceId)
-    );
-  }, [allVideoDevices, cameraInstances]);
-
-  const displayError = recognitionError;
-
   return (
-    <Card className="sticky top-6 h-full flex flex-col">
-      <CardContent className="flex-1 flex flex-col gap-4 p-4 pt-0 min-h-0">
-        <div className="flex justify-end">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => addCameraInstance()} 
-            disabled={allVideoDevices.length === 0 || cameraInstances.length >= allVideoDevices.length}
-          >
-            <PlusCircle className="w-4 h-4 mr-2" /> Adicionar Câmera
-          </Button>
-        </div>
-
-        {displayError && <Alert variant="destructive"><AlertTitle>Erro Global</AlertTitle><AlertDescription>{displayError}</AlertDescription></Alert>}
-        
-        <ScrollArea className="flex-1">
-          <div className="grid grid-cols-1 gap-4 pr-2">
-            {cameraInstances.length === 0 && allVideoDevices.length > 0 && (
-              <div className="text-center text-muted-foreground p-4">
-                <p>Clique em "Adicionar Câmera" para começar.</p>
-              </div>
-            )}
-            {cameraInstances.map((cam) => (
-              <div key={cam.id} className="relative w-full aspect-video rounded-lg overflow-hidden border bg-secondary flex items-center justify-center">
-                {cam.isCameraOn && !cam.mediaError ? (
-                  <>
-                    <Webcam
-                      audio={false}
-                      ref={cam.webcamRef}
-                      screenshotFormat="image/jpeg"
-                      videoConstraints={{ deviceId: cam.deviceId ? { exact: cam.deviceId } : undefined, width: 1280, height: 720 }}
-                      className="w-full h-full object-cover"
-                      mirrored={true}
-                      onUserMedia={() => updateCameraInstance(cam.id, { isCameraReady: true })}
-                      onUserMediaError={(err) => updateCameraInstance(cam.id, { mediaError: (err as Error).message, isCameraOn: false, isCameraReady: false })}
-                    />
-                    <canvas ref={cam.canvasRef} className="absolute top-0 left-0 w-full h-full transform scaleX(-1)" />
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={() => updateCameraInstance(cam.id, { isCameraOn: !cam.isCameraOn })} 
-                      disabled={!!cam.mediaError}
-                      className="absolute top-2 right-2 z-10 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
-                    >
-                      {cam.isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-                    </Button>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center text-muted-foreground p-4">
-                    <VideoOff className="w-12 h-12 mb-2" />
-                    <p>{cam.isCameraOn ? (cam.mediaError || "Câmera indisponível") : "Câmera desligada"}</p>
-                    <Button 
-                      size="sm" 
-                      className="mt-2" 
-                      onClick={() => updateCameraInstance(cam.id, { isCameraOn: true, mediaError: null })}
-                      disabled={!cam.deviceId}
-                    >
-                      Ligar Câmera
-                    </Button>
-                  </div>
-                )}
-                <div className="absolute bottom-2 left-2 right-2 flex items-center gap-2 bg-black/50 p-2 rounded-md">
-                  <Select 
-                    value={cam.deviceId || ''} 
-                    onValueChange={(value) => updateCameraInstance(cam.id, { deviceId: value, isCameraOn: true, mediaError: null })}
-                  >
-                    <SelectTrigger className="w-full bg-white/10 text-white border-none">
-                      <SelectValue placeholder="Selecione uma câmera" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {getAvailableDevices(cam.deviceId).map((device) => (
-                        <SelectItem key={device.deviceId} value={device.deviceId}>
-                          {device.label || `Câmera ${allVideoDevices.indexOf(device) + 1}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {cameraInstances.length > 1 && (
-                    <Button variant="destructive" size="icon" onClick={() => removeCameraInstance(cam.id)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ))}
+    <Card>
+      <CardHeader>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="flex items-center"><Camera className="mr-2" />Reconhecimento em Múltiplas Câmeras</CardTitle>
+            <CardDescription>Monitore diversas fontes de vídeo simultaneamente.</CardDescription>
           </div>
-          <ScrollBar orientation="vertical" />
-        </ScrollArea>
-        
-        <div className="w-full h-24 flex items-center justify-center shrink-0">
-          {isRecognitionLoading ? (
-            <div className="text-center space-y-2">
-              <Loader2 className="w-8 h-8 animate-spin mx-auto" />
-              <p>Analisando múltiplos rostos...</p>
-            </div>
-          ) : persistentRecognizedClients.length > 0 ? (
-            <div className="text-center space-y-2 animate-in fade-in">
-              <p className="text-sm text-muted-foreground">Rostos detectados:</p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {persistentRecognizedClients.map(face => (
-                  <Badge key={face.client.id} className="flex items-center gap-1 bg-primary text-primary-foreground">
-                    <Users className="w-3 h-3" /> {face.client.nome}
-                  </Badge>
-                ))}
+          <div className="flex items-center space-x-2">
+            <Button size="icon" variant="outline" onClick={addCamera} disabled={cameraInstances.length >= availableDevices.length}>
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="outline" onClick={() => removeCamera(cameraInstances[cameraInstances.length - 1]?.id)} disabled={cameraInstances.length <= 1}>
+              <Minus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {cameraInstances.map((cam) => (
+            <div key={cam.id} className="relative aspect-video bg-gray-900 rounded-lg flex items-center justify-center text-white overflow-hidden border border-gray-700">
+              {cam.isCameraOn && cam.stream ? (
+                <>
+                  <video
+                    ref={el => {
+                      if (el) {
+                        videoRefs.current[cam.id] = el;
+                        if (el.srcObject !== cam.stream) {
+                          el.srcObject = cam.stream;
+                        }
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0">
+                    {detectionBoxes[cam.id]?.map((box, index) => (
+                      <div
+                        key={index}
+                        className="absolute border-2 rounded-md transition-all duration-200"
+                        style={{
+                          left: `${box.x_min * 100}%`,
+                          top: `${box.y_min * 100}%`,
+                          width: `${(box.x_max - box.x_min) * 100}%`,
+                          height: `${(box.y_max - box.y_min) * 100}%`,
+                          borderColor: box.similarity > 0.95 ? '#2ecc71' : box.similarity > 0.85 ? '#f1c40f' : '#e74c3c',
+                          boxShadow: `0 0 10px ${box.similarity > 0.95 ? '#2ecc71' : box.similarity > 0.85 ? '#f1c40f' : '#e74c3c'}`,
+                        }}
+                      >
+                        <div className="absolute -top-7 left-0 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                          {box.cliente_nome} ({(box.similarity * 100).toFixed(1)}%)
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 z-20"
+                    onClick={() => updateCameraInstance(cam.id, { isCameraOn: false })}
+                  >
+                    <VideoOff className="h-4 w-4" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="text-center p-4">
+                    <VideoOff className="h-12 w-12 mx-auto text-gray-500" />
+                    <p className="mt-2 text-sm text-gray-400">
+                      {cam.isCameraOn ? (cam.mediaError || "Câmera indisponível") : "Câmera desligada"}
+                    </p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute top-2 right-2 z-20 text-white hover:bg-white/20"
+                    onClick={() => updateCameraInstance(cam.id, { isCameraOn: true, mediaError: null })}
+                  >
+                    <Video className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/80 to-transparent z-10">
+                <Select
+                  value={cam.deviceId}
+                  onValueChange={(value) => handleDeviceChange(cam.id, value)}
+                  disabled={cam.isCameraOn}
+                >
+                  <SelectTrigger className="w-full bg-gray-800/80 border-gray-600 text-white">
+                    <SelectValue placeholder="Selecione a câmera" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDevices.map((device, index) => (
+                      <SelectItem key={device.deviceId} value={device.deviceId}>
+                        {device.label || `Câmera ${index + 1}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-          ) : (
-            <p className="text-muted-foreground">Aguardando clientes para multi-detecção...</p>
-          )}
+          ))}
+        </div>
+        <div className="mt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="detection-switch" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Ativar Detecção</span>
+            </Label>
+            <Switch
+              id="detection-switch"
+              checked={isDetecting}
+              onCheckedChange={setIsDetecting}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Intervalo de Detecção: {settings.multi_detection_interval}ms</Label>
+            <Slider
+              min={500}
+              max={10000}
+              step={100}
+              value={[settings.multi_detection_interval]}
+              onValueChange={(value) => setSettings(s => ({ ...s, multi_detection_interval: value[0] }))}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Confiança Mínima: {(settings.multi_detection_confidence * 100).toFixed(0)}%</Label>
+            <Slider
+              min={0.5}
+              max={1}
+              step={0.01}
+              value={[settings.multi_detection_confidence]}
+              onValueChange={(value) => setSettings(s => ({ ...s, multi_detection_confidence: value[0] }))}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>
   );
-}
+};
+
+export default MultiLiveRecognition;
