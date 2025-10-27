@@ -40,14 +40,48 @@ serve(async (req) => {
       .update({ cliente_id: cliente_id })
       .eq('id', mesa_id);
     if (updateMesaError) throw updateMesaError;
+    
+    // 3. Criar o pedido aberto (se não existir)
+    // Ocupar a mesa implica que um pedido deve ser aberto.
+    const { data: existingPedido, error: existingPedidoError } = await supabaseAdmin
+        .from("pedidos")
+        .select("id")
+        .eq("mesa_id", mesa_id)
+        .eq("status", "aberto")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    // 3. Adicionar o cliente como ocupante (isso dispara o trigger handle_new_occupant_item para criar o pedido e o item automático)
+    if (existingPedidoError) throw existingPedidoError;
+
+    if (!existingPedido) {
+        // Cria novo pedido aberto
+        const { error: newPedidoError } = await supabaseAdmin.from("pedidos").insert({
+            mesa_id: mesa_id,
+            cliente_id: cliente_id,
+            user_id: user_id,
+            status: "aberto",
+            acompanhantes: [{ id: cliente_id, nome: (await supabaseAdmin.from('clientes').select('nome').eq('id', cliente_id).single()).data?.nome || 'Cliente' }],
+        });
+        if (newPedidoError) throw newPedidoError;
+    } else {
+        // Se já existe um pedido (o que não deveria acontecer se a mesa estava livre, mas por segurança)
+        // Apenas atualiza o cliente principal e acompanhantes
+        const clienteNome = (await supabaseAdmin.from('clientes').select('nome').eq('id', cliente_id).single()).data?.nome || 'Cliente';
+        await supabaseAdmin.from("pedidos").update({
+            cliente_id: cliente_id,
+            acompanhantes: [{ id: cliente_id, nome: clienteNome }],
+        }).eq("id", existingPedido.id);
+    }
+
+
+    // 4. Adicionar o cliente como ocupante (isso dispara o trigger handle_new_occupant_item para adicionar o item automático)
     const { error: insertOccupantError } = await supabaseAdmin
       .from('mesa_ocupantes')
       .insert({ mesa_id, cliente_id, user_id });
     if (insertOccupantError) throw insertOccupantError;
     
-    // 4. Enviar mensagem de boas-vindas (opcional, mas bom para o fluxo)
+    // 5. Enviar mensagem de boas-vindas (opcional, mas bom para o fluxo)
     try {
         const { error: welcomeError } = await supabaseAdmin.functions.invoke('send-welcome-message', {
             body: { clientId: cliente_id, userId: user_id },
