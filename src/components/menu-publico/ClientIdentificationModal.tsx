@@ -129,6 +129,7 @@ export function ClientIdentificationModal({
 
   const handleConfirmMatch = () => {
     if (match) {
+      // Chama a função de confirmação no MenuPublico, que cuidará da ocupação da mesa e do pedido
       onOrderConfirmed(match.id);
       onOpenChange(false);
     }
@@ -142,6 +143,7 @@ export function ClientIdentificationModal({
     setIsSubmittingNewClient(true);
 
     try {
+      // 1. Cria o cliente no banco de dados
       const { error: rpcError, data: newClientId } = await supabase.rpc('create_client_with_referral', {
         p_user_id: mesaUserId, 
         p_nome: values.nome, 
@@ -154,27 +156,17 @@ export function ClientIdentificationModal({
       if (rpcError) throw new Error(rpcError.message);
       if (!newClientId) throw new Error("Falha ao obter o ID do novo cliente após a criação.");
 
-      // Usa a nova Edge Function para adicionar o ocupante
-      const { error: occupantError } = await supabase.functions.invoke('add-occupant-public', {
-        body: {
-          mesa_id: mesaId,
-          cliente_id: newClientId,
-          user_id: mesaUserId,
-        }
-      });
-      if (occupantError) {
-        await supabase.from("clientes").delete().eq("id", newClientId);
-        throw new Error(`Falha ao adicionar cliente à mesa: ${occupantError.message}`);
-      }
-
+      // 2. Adiciona a face ao CompreFace
       const { error: faceError } = await supabase.functions.invoke('add-face-examples', {
         body: { subject: newClientId, image_urls: [values.avatar_url] }
       });
       if (faceError) {
+        // Se falhar, remove o cliente do banco
         await supabase.from("clientes").delete().eq("id", newClientId);
         throw new Error(`O cadastro do cliente falhou durante o registro facial. A operação foi desfeita. Erro original: ${faceError.message}`);
       }
-
+      
+      // 3. Chama a função de confirmação no MenuPublico, que cuidará da ocupação da mesa e do pedido
       showSuccess(`Bem-vindo(a), ${values.nome}! Seu pedido foi adicionado.`);
       onOrderConfirmed(newClientId);
       onOpenChange(false);
@@ -187,6 +179,7 @@ export function ClientIdentificationModal({
   };
 
   const handleCancelIdentification = () => {
+    // Se o cliente optar por Mesa Geral, chama a função de confirmação com null
     onOrderConfirmed(null);
     onOpenChange(false);
   };
