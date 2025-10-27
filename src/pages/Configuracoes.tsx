@@ -14,12 +14,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Copy, RefreshCw, Send, ShieldAlert, UserCog } from "lucide-react";
+import { Copy, RefreshCw, Send, ShieldAlert, UserCog, Database } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useState, useEffect } from "react";
 import { IFoodSettings } from "@/components/configuracoes/iFoodSettings";
+import { BackupRestore } from "@/components/configuracoes/BackupRestore";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -205,7 +206,7 @@ export default function ConfiguracoesPage() {
   };
 
   const birthdayTemplates = data?.templates.filter(t => t.tipo === 'aniversario' || t.tipo === 'geral') || [];
-  const gridColsClass = userRole === 'superadmin' ? 'grid-cols-8' : 'grid-cols-7';
+  const gridColsClass = userRole === 'superadmin' ? 'grid-cols-9' : 'grid-cols-8';
 
   return (
     <div>
@@ -225,6 +226,7 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="operacao">Operação do Salão</TabsTrigger>
           <TabsTrigger value="aparencia">Aparência</TabsTrigger>
           <TabsTrigger value="api">Documentação API</TabsTrigger>
+          {userRole === 'superadmin' && <TabsTrigger value="backup">Backup</TabsTrigger>}
           {userRole === 'superadmin' && <TabsTrigger value="visao-geral" className="flex items-center gap-1"><UserCog className="w-4 h-4" /> Sistema</TabsTrigger>}
         </TabsList>
 
@@ -409,7 +411,14 @@ export default function ConfiguracoesPage() {
           <ApiDocumentation />
         </TabsContent>
         
-        {/* 8. Visão Geral do Sistema (Apenas Superadmin) */}
+        {/* 8. Backup (Apenas Superadmin) */}
+        {userRole === 'superadmin' && (
+          <TabsContent value="backup" className="mt-6">
+            <BackupRestore />
+          </TabsContent>
+        )}
+        
+        {/* 9. Visão Geral do Sistema (Apenas Superadmin) */}
         {userRole === 'superadmin' && (
           <TabsContent value="visao-geral" className="mt-6">
             <SystemOverview />
