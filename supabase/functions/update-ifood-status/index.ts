@@ -31,19 +31,6 @@ async function getIfoodApiToken(clientId: string, clientSecret: string): Promise
   return data.accessToken;
 }
 
-async function confirmIfoodOrder(ifoodOrderId: string, token: string) {
-  console.log(`Confirmando pedido ${ifoodOrderId} no iFood...`);
-  const response = await fetch(`${IFOOD_API_URL}/order/v1.0/orders/${ifoodOrderId}/confirm`, {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Falha ao confirmar pedido no iFood. Status: ${response.status}. Detalhes: ${errorBody}`);
-  }
-  console.log(`Pedido ${ifoodOrderId} confirmado no iFood.`);
-}
-
 async function dispatchIfoodOrder(ifoodOrderId: string, token: string) {
   console.log(`Despachando pedido ${ifoodOrderId} no iFood...`);
   const response = await fetch(`${IFOOD_API_URL}/order/v1.0/orders/${ifoodOrderId}/dispatch`, {
@@ -102,9 +89,8 @@ serve(async (req) => {
 
     const token = await getIfoodApiToken(ifoodClientId, ifoodClientSecret);
 
-    if (new_status === 'CONFIRMED') {
-      await confirmIfoodOrder(pedido.ifood_order_id, token);
-    } else if (new_status === 'out_for_delivery') {
+    // A confirmação já é feita pelo webhook. Apenas o despacho é necessário aqui.
+    if (new_status === 'out_for_delivery') {
       await dispatchIfoodOrder(pedido.ifood_order_id, token);
     }
 
@@ -120,4 +106,4 @@ serve(async (req) => {
       status: 500,
     });
   }
-});
+})
