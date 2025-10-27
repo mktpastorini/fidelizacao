@@ -1,10 +1,17 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { decode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const TABLES_WITH_IMAGES = {
+  'clientes': { urlField: 'avatar_url', base64Field: 'avatar_base64', bucket: 'client_avatars' },
+  'cozinheiros': { urlField: 'avatar_url', base64Field: 'avatar_base64', bucket: 'client_avatars' },
+  'produtos': { urlField: 'imagem_url', base64Field: 'imagem_base64', bucket: 'client_avatars' }
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -32,6 +39,37 @@ serve(async (req) => {
 
     const backupData = await req.json();
 
+    // Pré-processamento: Fazer upload de imagens base64 e substituir por URLs
+    for (const tableName in TABLES_WITH_IMAGES) {
+      if (backupData[tableName]) {
+        const config = TABLES_WITH_IMAGES[tableName as keyof typeof TABLES_WITH_IMAGES];
+        
+        for (const row of backupData[tableName]) {
+          if (row[config.base64Field]) {
+            try {
+              const imageBody = decode(row[config.base64Field]);
+              const filePath = `public/${Date.now()}-${Math.random()}.jpg`;
+              
+              const { error: uploadError } = await supabaseAdmin.storage
+                .from(config.bucket)
+                .upload(filePath, imageBody, { contentType: 'image/jpeg' });
+
+              if (uploadError) throw new Error(`Erro ao fazer upload da imagem para ${tableName}: ${uploadError.message}`);
+
+              const { data: { publicUrl } } = supabaseAdmin.storage.from(config.bucket).getPublicUrl(filePath);
+              
+              row[config.urlField] = publicUrl;
+              delete row[config.base64Field];
+
+            } catch (e) {
+              console.warn(`Falha ao processar imagem base64 para ${tableName}: ${e.message}`);
+            }
+          }
+        }
+      }
+    }
+
+    // Chamar a função SQL com os dados já processados
     const { error: rpcError } = await supabaseAdmin.rpc('import_backup_data', { backup_data: backupData });
 
     if (rpcError) {
