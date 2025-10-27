@@ -40,8 +40,8 @@ export function CashierMode({}: CashierModeProps) {
     queryFn: fetchWaiters,
   });
 
-  const SCAN_INTERVAL_MS = settings?.multi_detection_interval || 2000;
-  const minConfidence = settings?.multi_detection_confidence || 0.85;
+  const SCAN_INTERVAL_MS = settings?.caixa_interval || 2000;
+  const minConfidence = settings?.caixa_confidence || 0.85;
 
   const videoConstraints = {
     width: 400,

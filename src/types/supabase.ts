@@ -78,6 +78,10 @@ export type UserSettings = {
   delivery_out_for_delivery_template_id?: string | null;
   multi_detection_interval?: number;
   multi_detection_confidence?: number;
+  caixa_interval?: number;
+  caixa_confidence?: number;
+  saida_interval?: number;
+  saida_confidence?: number;
   exit_alert_phrase?: string | null; // Nova configuração
 };
 

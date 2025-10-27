@@ -24,8 +24,8 @@ export function ExitCamera({ onDebtorDetected, isPaused }: ExitCameraProps) {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Monitorando a saída...");
 
-  const SCAN_INTERVAL_MS = settings?.multi_detection_interval || 2000;
-  const minConfidence = settings?.multi_detection_confidence || 0.90; // Mantém um padrão mais alto para segurança
+  const SCAN_INTERVAL_MS = settings?.saida_interval || 1000;
+  const minConfidence = settings?.saida_confidence || 0.90;
 
   const videoConstraints = {
     width: 1280,

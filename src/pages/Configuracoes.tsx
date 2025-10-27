@@ -23,6 +23,7 @@ import { IFoodSettings } from "@/components/configuracoes/iFoodSettings";
 import { BackupRestore } from "@/components/configuracoes/BackupRestore";
 import { Textarea } from "@/components/ui/textarea";
 import { speak } from "@/utils/tts";
+import { Separator } from "@/components/ui/separator";
 
 type UserData = {
   templates: MessageTemplate[];
@@ -128,15 +129,25 @@ export default function ConfiguracoesPage() {
   const queryClient = useQueryClient();
   const { settings, refetch: refetchSettings, isLoading: isLoadingSettings, userRole } = useSettings();
   const [userId, setUserId] = useState<string | null>(null);
-  const [exitPhrase, setExitPhrase] = useState(settings?.exit_alert_phrase || "");
-  const [multiDetectionInterval, setMultiDetectionInterval] = useState<number | string>(2000);
-  const [multiDetectionConfidence, setMultiDetectionConfidence] = useState<number | string>(0.85);
+  const [exitPhrase, setExitPhrase] = useState("");
+  
+  // Estados para os campos de reconhecimento
+  const [salaoInterval, setSalaoInterval] = useState<number | string>("");
+  const [salaoConfidence, setSalaoConfidence] = useState<number | string>("");
+  const [caixaInterval, setCaixaInterval] = useState<number | string>("");
+  const [caixaConfidence, setCaixaConfidence] = useState<number | string>("");
+  const [saidaInterval, setSaidaInterval] = useState<number | string>("");
+  const [saidaConfidence, setSaidaConfidence] = useState<number | string>("");
 
   useEffect(() => {
-    setExitPhrase(settings?.exit_alert_phrase || "");
     if (settings) {
-      setMultiDetectionInterval(settings.multi_detection_interval ?? 2000);
-      setMultiDetectionConfidence(settings.multi_detection_confidence ?? 0.85);
+      setExitPhrase(settings.exit_alert_phrase || "");
+      setSalaoInterval(settings.multi_detection_interval ?? 2000);
+      setSalaoConfidence(settings.multi_detection_confidence ?? 0.85);
+      setCaixaInterval(settings.caixa_interval ?? 2000);
+      setCaixaConfidence(settings.caixa_confidence ?? 0.85);
+      setSaidaInterval(settings.saida_interval ?? 1000);
+      setSaidaConfidence(settings.saida_confidence ?? 0.90);
     }
   }, [settings]);
 
@@ -342,36 +353,53 @@ export default function ConfiguracoesPage() {
               <CardContent><CameraSettings onSave={(values) => updateSettingsMutation.mutate(values)} /></CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle>Configurações de Multi-Detecção</CardTitle><CardDescription>Ajuste os parâmetros para o modo de reconhecimento de múltiplos rostos.</CardDescription></CardHeader>
+              <CardHeader><CardTitle>Parâmetros de Reconhecimento</CardTitle><CardDescription>Ajuste os parâmetros para cada modo de reconhecimento facial.</CardDescription></CardHeader>
               <CardContent>
-                {isLoading ? <Skeleton className="h-24 w-full" /> : (
-                  <div className="space-y-4">
+                {isLoading ? <Skeleton className="h-64 w-full" /> : (
+                  <div className="space-y-6">
+                    {/* Salão */}
                     <div>
-                      <Label htmlFor="multi-detection-interval">Intervalo de Varredura (ms)</Label>
-                      <Input
-                        id="multi-detection-interval"
-                        type="number"
-                        placeholder="2000"
-                        value={multiDetectionInterval}
-                        onChange={(e) => setMultiDetectionInterval(e.target.value)}
-                        onBlur={() => updateSettingsMutation.mutate({ multi_detection_interval: parseInt(multiDetectionInterval as string) || 2000 })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Tempo em milissegundos entre cada tentativa de reconhecimento. Valores menores consomem mais recursos.</p>
+                      <h4 className="font-semibold mb-2">Salão (Multi-Detecção)</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="salao-interval">Intervalo (ms)</Label>
+                          <Input id="salao-interval" type="number" value={salaoInterval} onChange={(e) => setSalaoInterval(e.target.value)} onBlur={() => updateSettingsMutation.mutate({ multi_detection_interval: parseInt(salaoInterval as string) || 2000 })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="salao-confidence">Confiança Mínima</Label>
+                          <Input id="salao-confidence" type="number" step="0.01" min="0" max="1" value={salaoConfidence} onChange={(e) => setSalaoConfidence(e.target.value)} onBlur={() => updateSettingsMutation.mutate({ multi_detection_confidence: parseFloat(salaoConfidence as string) || 0.85 })} />
+                        </div>
+                      </div>
                     </div>
+                    <Separator />
+                    {/* Caixa */}
                     <div>
-                      <Label htmlFor="multi-detection-confidence">Confiança Mínima (0.0 a 1.0)</Label>
-                      <Input
-                        id="multi-detection-confidence"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="1"
-                        placeholder="0.85"
-                        value={multiDetectionConfidence}
-                        onChange={(e) => setMultiDetectionConfidence(e.target.value)}
-                        onBlur={() => updateSettingsMutation.mutate({ multi_detection_confidence: parseFloat(multiDetectionConfidence as string) || 0.85 })}
-                      />
-                      <p className="text-xs text-muted-foreground mt-1">Nível de confiança mínimo para considerar um rosto como um match. Padrão: 0.85.</p>
+                      <h4 className="font-semibold mb-2">Modo Caixa</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="caixa-interval">Intervalo (ms)</Label>
+                          <Input id="caixa-interval" type="number" value={caixaInterval} onChange={(e) => setCaixaInterval(e.target.value)} onBlur={() => updateSettingsMutation.mutate({ caixa_interval: parseInt(caixaInterval as string) || 2000 })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="caixa-confidence">Confiança Mínima</Label>
+                          <Input id="caixa-confidence" type="number" step="0.01" min="0" max="1" value={caixaConfidence} onChange={(e) => setCaixaConfidence(e.target.value)} onBlur={() => updateSettingsMutation.mutate({ caixa_confidence: parseFloat(caixaConfidence as string) || 0.85 })} />
+                        </div>
+                      </div>
+                    </div>
+                    <Separator />
+                    {/* Saída */}
+                    <div>
+                      <h4 className="font-semibold mb-2">Monitoramento de Saída</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="saida-interval">Intervalo (ms)</Label>
+                          <Input id="saida-interval" type="number" value={saidaInterval} onChange={(e) => setSaidaInterval(e.target.value)} onBlur={() => updateSettingsMutation.mutate({ saida_interval: parseInt(saidaInterval as string) || 1000 })} />
+                        </div>
+                        <div>
+                          <Label htmlFor="saida-confidence">Confiança Mínima</Label>
+                          <Input id="saida-confidence" type="number" step="0.01" min="0" max="1" value={saidaConfidence} onChange={(e) => setSaidaConfidence(e.target.value)} onBlur={() => updateSettingsMutation.mutate({ saida_confidence: parseFloat(saidaConfidence as string) || 0.90 })} />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
