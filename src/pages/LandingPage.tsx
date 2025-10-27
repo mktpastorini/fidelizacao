@@ -153,7 +153,7 @@ const FaqSection = () => (
       <AccordionItem value="item-4">
         <AccordionTrigger>Posso personalizar as mensagens enviadas aos clientes?</AccordionTrigger>
         <AccordionContent>
-          Com certeza. Você pode criar e editar templates de mensagem para diversos eventos (chegada, pagamento, aniversário) e usar variáveis como `"{nome}"` para personalizar cada envio automaticamente.
+          Com certeza. Você pode criar e editar templates de mensagem para diversos eventos (chegada, pagamento, aniversário) e usar variáveis como '{"{nome}"}' para personalizar cada envio automaticamente.
         </AccordionContent>
       </AccordionItem>
       <AccordionItem value="item-5">
